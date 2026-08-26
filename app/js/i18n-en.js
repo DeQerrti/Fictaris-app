@@ -363,6 +363,8 @@ export const EN_DICT = {
 
   // ── Настройки (settings-panel.js) ──
   "Обновления": "Updates",
+  "Обновление {version} скачано — перезапусти, чтобы установить.": "Update {version} downloaded — restart to install.",
+  "Не удалось скачать обновление: {message}": "Couldn't download the update: {message}",
   "О приложении": "About",
   "Репозиторий на GitHub": "GitHub repository",
   "Сообщить о проблеме": "Report an issue",

@@ -696,8 +696,10 @@ async function pickConflict(config, conflict, choice, row) {
 function updateStatusText(res) {
   if (res.status === "latest") return i18n("У тебя последняя версия.");
   if (res.status === "downloading") return i18n("Скачивается обновление {version}…", res);
+  if (res.status === "ready") return i18n("Обновление {version} скачано — перезапусти, чтобы установить.", res);
   if (res.status === "available") return i18n("Доступно обновление {version}.", res);
   if (res.status === "dev") return i18n("Проверка недоступна в режиме разработки (npm start).");
+  if (res.status === "error" && res.message) return i18n("Не удалось скачать обновление: {message}", res);
   return i18n("Не удалось проверить обновления — нет сети или GitHub недоступен.");
 }
 
@@ -712,19 +714,68 @@ function buildUpdateSection(info) {
   const btn = document.createElement("button");
   btn.className = "btn";
   btn.textContent = i18n("Проверить обновления");
+
+  let pollTimer = null;
+  function stopPolling() {
+    clearTimeout(pollTimer);
+    pollTimer = null;
+  }
+
+  // Скачивание идёт в фоне главного процесса и может занять больше
+  // времени, чем один ответ check-update, — поэтому статус "downloading"
+  // не финальный: следом опрашиваем update-status, пока не придёт
+  // готовый файл или явная ошибка (см. electron/main.js — раньше
+  // сорвавшееся на середине скачивание было незаметно и текст навсегда
+  // застревал на «Скачивается…»).
+  function renderResult(res) {
+    if (!document.body.contains(status)) return; // ушли с "Данные" во время скачивания — не поллим впустую
+    status.textContent = updateStatusText(res);
+    if (res.status === "ready") {
+      restartBtn.style.display = "";
+    } else {
+      restartBtn.style.display = "none";
+    }
+    if (res.status === "downloading") {
+      pollTimer = setTimeout(pollDownload, 3000);
+    } else {
+      stopPolling();
+      btn.disabled = false;
+    }
+  }
+
+  async function pollDownload() {
+    try {
+      const s = await apiGet("/api/app/update-status");
+      if (s.type === "ready") renderResult({ status: "ready", version: s.version });
+      else if (s.type === "error") renderResult({ status: "error", version: s.version, message: s.message });
+      else if (s.type === "downloading") renderResult({ status: "downloading", version: s.version });
+      else pollTimer = setTimeout(pollDownload, 3000);
+    } catch {
+      pollTimer = setTimeout(pollDownload, 3000);
+    }
+  }
+
+  const restartBtn = document.createElement("button");
+  restartBtn.className = "btn accent";
+  restartBtn.textContent = i18n("Перезапустить");
+  restartBtn.style.display = "none";
+  restartBtn.style.marginLeft = "8px";
+  restartBtn.addEventListener("click", () => apiPost("/api/app/update-restart", {}));
+
   btn.addEventListener("click", async () => {
+    stopPolling();
     btn.disabled = true;
+    restartBtn.style.display = "none";
     status.textContent = i18n("Проверяю…");
     try {
-      status.textContent = updateStatusText(await apiPost("/api/app/check-update", {}));
+      renderResult(await apiPost("/api/app/check-update", {}));
     } catch {
       status.textContent = i18n("Не удалось проверить обновления.");
-    } finally {
       btn.disabled = false;
     }
   });
 
-  section.append(btn, status);
+  section.append(btn, restartBtn, status);
   return section;
 }
 

@@ -73,6 +73,11 @@ async function poll() {
       version: status.version,
       onAction: () => apiPost("/api/app/update-download", {}),
     });
+  } else if (status.type === "error") {
+    // Тихо: полоска — для позитивного сценария (обновление готово/
+    // доступно), а не для тревоги на каждый обрыв сети. Явную причину
+    // ошибки увидит тот, кто сам зайдёт в «Данные» и нажмёт «Проверить
+    // обновления» — там уже показывается message из update-status.
   }
 }
 

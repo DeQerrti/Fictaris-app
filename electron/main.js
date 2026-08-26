@@ -152,6 +152,8 @@ function appRoutes() {
     "GET /api/app/update-status": async () => {
       if (pendingUpdateInfo) return { type: "ready", version: pendingUpdateInfo.version };
       if (macUpdateInfo) return { type: "available", version: macUpdateInfo.version };
+      if (lastUpdateError) return { type: "error", version: downloadingVersion, message: lastUpdateError };
+      if (downloadingVersion) return { type: "downloading", version: downloadingVersion };
       return { type: null };
     },
 
@@ -173,6 +175,8 @@ function appRoutes() {
       await saveConfig({ dismissedUpdate: body.version });
       pendingUpdateInfo = null;
       macUpdateInfo = null;
+      downloadingVersion = null;
+      lastUpdateError = null;
       return { ok: true };
     },
 
@@ -236,12 +240,31 @@ autoUpdater.autoInstallOnAppQuit = false;
 // pendingUpdateInfo — файл уже скачан (Windows/Linux), macUpdateInfo —
 // на GitHub есть более новая версия (macOS). Оба читает GET
 // /api/app/update-status, оба сбрасывает POST /api/app/update-dismiss.
+// downloadingVersion/lastUpdateError — то же самое для промежуточного
+// состояния «качаем прямо сейчас»: раньше падение скачивания (сеть
+// оборвалась на середине, диск кончился) было не видно вообще —
+// autoUpdater просто ничего не делал дальше, а на экране навсегда
+// оставалась надпись «Скачивается…» без единого шанса узнать, что что-то
+// пошло не так.
 let pendingUpdateInfo = null;
 let macUpdateInfo = null;
+let downloadingVersion = null;
+let lastUpdateError = null;
+
+autoUpdater.on("download-progress", (progress) => {
+  downloadingVersion = downloadingVersion || progress.version || null;
+});
 
 autoUpdater.on("update-downloaded", (info) => {
+  downloadingVersion = null;
+  lastUpdateError = null;
   if (config.dismissedUpdate === info.version) return;
   pendingUpdateInfo = info;
+});
+
+autoUpdater.on("error", (err) => {
+  downloadingVersion = null;
+  lastUpdateError = String(err?.message || err || "unknown error");
 });
 
 async function checkForUpdatesMac() {
@@ -273,13 +296,16 @@ async function checkForUpdatesManual() {
     }
   }
 
-  if (pendingUpdateInfo) return { status: "available", version: pendingUpdateInfo.version };
+  if (pendingUpdateInfo) return { status: "ready", version: pendingUpdateInfo.version };
+  lastUpdateError = null;
   try {
     const result = await autoUpdater.checkForUpdates();
     const version = result?.updateInfo?.version;
     if (!version || version === app.getVersion()) return { status: "latest" };
-    // Обновление нашлось и качается в фоне — полоска появится сама,
-    // как только download закончится (update-downloaded выше).
+    // Обновление нашлось и качается в фоне — раздел «Данные» дальше сам
+    // поллит GET /api/app/update-status, пока не придёт «ready» или
+    // «error» (см. downloadingVersion/lastUpdateError выше).
+    downloadingVersion = version;
     return { status: "downloading", version };
   } catch {
     return { status: "error" };

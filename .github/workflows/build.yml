@@ -126,3 +126,23 @@ jobs:
           files: dist/*.apk
           draft: true
           fail_on_unmatched_files: false
+
+  # До сих пор релиз так и оставался черновиком навсегда, если кто-то не
+  # заходил на вкладку Releases и не жал «Publish» руками — ни
+  # electron-updater (Windows/Linux качают именно опубликованный latest.yml),
+  # ни человек с обычной страницы релизов черновик вообще не видят. Черновик
+  # на время сборки нужен только затем, чтобы три параллельных job'а
+  # (Windows/macOS/Linux) не публиковали релиз по частям, пока другие ещё
+  # заливают файлы; как только все, включая Android, закончили — публикуем.
+  publish:
+    name: Опубликовать релиз
+    needs: [build, android]
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', inputs.version) || github.ref_name }}
+        run: gh release edit "$TAG" --draft=false --repo "${{ github.repository }}"
