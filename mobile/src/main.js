@@ -20,6 +20,7 @@
 
 import { Filesystem, Directory } from "@capacitor/filesystem";
 import { App } from "@capacitor/app";
+import { Share } from "@capacitor/share";
 import { ROUTES, ApiError } from "../../core/api.js";
 import { MobileVault } from "./vault.js";
 
@@ -139,6 +140,9 @@ async function appRoutes(pathname, body) {
   // Открыть папку в системном проводнике на телефоне нечем — молча
   // отвечаем ok, кнопка эту возможность на мобильном и не показывает.
   if (pathname === "/api/app/open-vault-folder") return { ok: true };
+  if (pathname === "/api/app/check-update") {
+    return { status: (await checkForUpdate(true)) || "latest" };
+  }
   // Остальное (pick-vault и т.п.) с телефона неприменимо, но отвечать
   // всё равно надо — иначе застрявший на компьютерном пути fetch
   // просто зависнет без ответа.
@@ -241,8 +245,87 @@ function installImages() {
   scan(document.documentElement);
 }
 
+// ── Обновления ──────────────────────────────────
+// На телефоне ставить apk в один клик негде — сервера, который бы тихо
+// скачал файл и подменил приложение (как electron-updater на
+// компьютере), у Android нет. Вместо этого просто спрашиваем GitHub,
+// какой релиз последний, и если он новее — показываем полоску внизу
+// экрана. Кнопка открывает системный шаринг на apk, откуда его удобно
+// сохранить и открыть через браузер или «Файлы»: Android всё равно
+// попросит подтверждение при установке файла поверх старой версии, так
+// что скачивание в один клик тут не нужнее, чем на компьютере.
+const UPDATE_REPO = "DeQerrti/Fictaris-app";
+const UPDATE_DISMISSED_KEY = "fictaris_update_dismissed";
+
+function isNewerVersion(latest, current) {
+  const a = latest.replace(/^v/i, "").split(".").map(Number);
+  const b = current.replace(/^v/i, "").split(".").map(Number);
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const x = a[i] || 0;
+    const y = b[i] || 0;
+    if (x !== y) return x > y;
+  }
+  return false;
+}
+
+// Те же CSS-классы, что и у десктопной полоски (app/style.css) — это
+// одна и та же страница, стили уже загружены.
+function showUpdateBanner(version, url) {
+  const bar = document.createElement("div");
+  bar.className = "update-banner";
+
+  const text = document.createElement("span");
+  text.textContent = `Доступна версия ${version}`;
+
+  const updateBtn = document.createElement("button");
+  updateBtn.className = "btn accent";
+  updateBtn.textContent = "Скачать";
+  updateBtn.addEventListener("click", () => {
+    Share.share({ title: "Fictaris", url }).catch(() => {});
+    bar.remove();
+  });
+
+  const laterBtn = document.createElement("button");
+  laterBtn.className = "btn";
+  laterBtn.textContent = "Позже";
+  laterBtn.addEventListener("click", () => {
+    localStorage.setItem(UPDATE_DISMISSED_KEY, `v${version}`);
+    bar.remove();
+  });
+
+  const actions = document.createElement("div");
+  actions.className = "update-banner-actions";
+  actions.append(updateBtn, laterBtn);
+  bar.append(text, actions);
+  document.body.appendChild(bar);
+}
+
+// force — кнопка «Проверить обновления» в разделе «Данные»: снимает
+// прошлый отказ («Позже») и всегда возвращает статус, а не молчит, как
+// тихая проверка при запуске.
+async function checkForUpdate(force = false) {
+  try {
+    const res = await window.fetch(`https://api.github.com/repos/${UPDATE_REPO}/releases/latest`, {
+      headers: { Accept: "application/vnd.github+json" },
+    });
+    if (!res.ok) return force ? "error" : undefined;
+    const release = await res.json();
+    const tag = release.tag_name || "";
+    const mine = await appVersion();
+    if (!tag || !mine || !isNewerVersion(tag, mine)) return force ? "latest" : undefined;
+    if (!force && localStorage.getItem(UPDATE_DISMISSED_KEY) === tag) return;
+    if (force) localStorage.removeItem(UPDATE_DISMISSED_KEY);
+    const asset = (release.assets || []).find((a) => /\.apk$/i.test(a.name));
+    showUpdateBanner(tag.replace(/^v/i, ""), asset?.browser_download_url || release.html_url);
+    return "available";
+  } catch {
+    return force ? "error" : undefined;
+  }
+}
+
 if (NATIVE) {
   installFetch();
   installImages();
   vault.ensure().catch(() => {});
+  checkForUpdate().catch(() => {});
 }

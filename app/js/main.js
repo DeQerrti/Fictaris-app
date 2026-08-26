@@ -12,6 +12,7 @@ import { renderContinuity } from "./continuity.js";
 import { renderData } from "./data-panel.js";
 import { renderTrash, trashCount } from "./trash.js";
 import { initProjectSwitcher } from "./project-switcher.js";
+import { initUpdateBanner } from "./update-banner.js";
 
 const MODULES = {
   manuscript: renderManuscript,
@@ -74,6 +75,9 @@ async function boot() {
   openModule("manuscript");
   refreshTrashBadge();
   initProjectSwitcher();
+  // На телефоне обновления проверяет сам mobile.bundle.js (полностью на
+  // клиенте, без /api/app/update-status) — там своя полоска.
+  if (!info.mobile) initUpdateBanner();
 }
 
 boot();

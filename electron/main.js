@@ -15,6 +15,14 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Vault } from "./vault.js";
 import { createServer, listen } from "./server.js";
+import { findUpdate, openDownload } from "./update.js";
+// Именно так, а не `import { autoUpdater } from "electron-updater"` — см.
+// тот же приём и тот же комментарий в electron/main.js у TasteID:
+// electron-updater — модуль CommonJS, и в упакованном app.asar именованный
+// импорт падает с SyntaxError прямо при старте. Через default-импорт и
+// деструктуризацию работает и из исходников, и из собранного .exe.
+import pkg from "electron-updater";
+const { autoUpdater } = pkg;
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const APP_DIR = path.join(HERE, "..", "app");
@@ -125,7 +133,43 @@ function appRoutes() {
       vaultPath: vault?.root || null,
       vaults: (config.vaults || []).map(({ id, name, path: p }) => ({ id, name, path: p })),
       currentVaultId: config.currentVaultId || null,
+      version: app.getVersion(),
     }),
+
+    // Полоска обновления в интерфейсе (app/js/update-banner.js) не
+    // тянет ipc — опрашивает этот адрес обычным поллингом, как и всё
+    // остальное общение страницы с диском.
+    "GET /api/app/update-status": async () => {
+      if (pendingUpdateInfo) return { type: "ready", version: pendingUpdateInfo.version };
+      if (macUpdateInfo) return { type: "available", version: macUpdateInfo.version };
+      return { type: null };
+    },
+
+    "POST /api/app/update-restart": async () => {
+      if (!pendingUpdateInfo) return { ok: false };
+      // Второй аргумент — isForceRunAfter: без него electron-updater не
+      // гарантирует перезапуск после тихой (oneClick) установки на
+      // Windows, и приложение просто закрывалось, не открываясь обратно.
+      autoUpdater.quitAndInstall(false, true);
+      return { ok: true };
+    },
+
+    "POST /api/app/update-download": async () => {
+      if (macUpdateInfo) openDownload(macUpdateInfo);
+      return { ok: true };
+    },
+
+    "POST /api/app/update-dismiss": async ({ body }) => {
+      await saveConfig({ dismissedUpdate: body.version });
+      pendingUpdateInfo = null;
+      macUpdateInfo = null;
+      return { ok: true };
+    },
+
+    // Кнопка «Проверить обновления» в разделе «Данные» — в отличие от
+    // тихой проверки при запуске, всегда возвращает статус и снимает
+    // прошлый отказ («Позже»), если человек попросил проверить сам.
+    "POST /api/app/check-update": async () => checkForUpdatesManual(),
 
     "POST /api/app/pick-vault": async () => ({ path: await askForVault() }),
 
@@ -164,6 +208,83 @@ function appRoutes() {
       return { ok: true };
     },
   };
+}
+
+// ── Обновления ─────────────────────────────────
+// На Windows и Linux — тихо: electron-updater сам качает файл в фоне,
+// полоска в интерфейсе (update-status) появляется только когда всё уже
+// готово и осталось лишь перезапустить. На macOS так не выходит —
+// Gatekeeper блокирует подмену приложения в фоне без платной подписи, а
+// её здесь нет и не планируется (см. electron/update.js). Поэтому мак
+// остаётся на пути «нашли — предложили открыть страницу загрузки».
+//
+// Отказ («Позже») запоминается в конфиге по номеру версии, чтобы про
+// одну и ту же версию не спрашивать при каждом запуске подряд.
+autoUpdater.autoDownload = true;
+autoUpdater.autoInstallOnAppQuit = false;
+
+// pendingUpdateInfo — файл уже скачан (Windows/Linux), macUpdateInfo —
+// на GitHub есть более новая версия (macOS). Оба читает GET
+// /api/app/update-status, оба сбрасывает POST /api/app/update-dismiss.
+let pendingUpdateInfo = null;
+let macUpdateInfo = null;
+
+autoUpdater.on("update-downloaded", (info) => {
+  if (config.dismissedUpdate === info.version) return;
+  pendingUpdateInfo = info;
+});
+
+async function checkForUpdatesMac() {
+  try {
+    const update = await findUpdate(app.getVersion());
+    if (!update || config.dismissedUpdate === update.version) return;
+    macUpdateInfo = update;
+  } catch {
+    // Нет сети или GitHub недоступен — не повод тревожить человека.
+  }
+}
+
+// Ручная проверка — кнопка «Проверить обновления» в разделе «Данные».
+// В отличие от автоматической, всегда снимает прошлый отказ: если
+// человек однажды нажал «Позже», а потом сам попросил проверить снова,
+// молчать в ответ на dismissedUpdate было бы странно.
+async function checkForUpdatesManual() {
+  if (!app.isPackaged) return { status: "dev" };
+  await saveConfig({ dismissedUpdate: null });
+
+  if (process.platform === "darwin") {
+    try {
+      const update = await findUpdate(app.getVersion());
+      if (!update) return { status: "latest" };
+      macUpdateInfo = update;
+      return { status: "available", version: update.version };
+    } catch {
+      return { status: "error" };
+    }
+  }
+
+  if (pendingUpdateInfo) return { status: "available", version: pendingUpdateInfo.version };
+  try {
+    const result = await autoUpdater.checkForUpdates();
+    const version = result?.updateInfo?.version;
+    if (!version || version === app.getVersion()) return { status: "latest" };
+    // Обновление нашлось и качается в фоне — полоска появится сама,
+    // как только download закончится (update-downloaded выше).
+    return { status: "downloading", version };
+  } catch {
+    return { status: "error" };
+  }
+}
+
+function checkForUpdates() {
+  if (!app.isPackaged) return; // при запуске из исходников (npm start) не мешаем
+  if (process.platform === "darwin") {
+    checkForUpdatesMac();
+    return;
+  }
+  autoUpdater.checkForUpdates().catch(() => {
+    // Нет сети или GitHub недоступен — не повод тревожить человека.
+  });
 }
 
 function openMain() {
@@ -221,6 +342,7 @@ app.whenReady().then(async () => {
   createWindow();
   if (known) openMain();
   else openWelcome();
+  checkForUpdates();
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {

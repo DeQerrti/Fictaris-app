@@ -65,12 +65,50 @@ export async function renderData(root) {
   const wrap = document.createElement("div");
   wrap.className = "data-panel";
 
+  const info = await apiGet("/api/app/info").catch(() => ({}));
+
+  wrap.appendChild(buildUpdateSection(info));
   wrap.appendChild(buildExportSection());
   wrap.appendChild(buildImportSection());
   wrap.appendChild(buildDemoSection());
   wrap.appendChild(buildHistorySection());
 
   root.appendChild(wrap);
+}
+
+function updateStatusText(res) {
+  if (res.status === "latest") return "У тебя последняя версия.";
+  if (res.status === "downloading") return `Скачивается обновление ${res.version}…`;
+  if (res.status === "available") return `Доступно обновление ${res.version}.`;
+  if (res.status === "dev") return "Проверка недоступна в режиме разработки (npm start).";
+  return "Не удалось проверить обновления — нет сети или GitHub недоступен.";
+}
+
+function buildUpdateSection(info) {
+  const section = document.createElement("div");
+  section.className = "data-section";
+  section.innerHTML = `<h3>Обновления</h3><p>Установленная версия: ${info.version || "—"}</p>`;
+
+  const status = document.createElement("div");
+  status.className = "update-check-status";
+
+  const btn = document.createElement("button");
+  btn.className = "btn";
+  btn.textContent = "Проверить обновления";
+  btn.addEventListener("click", async () => {
+    btn.disabled = true;
+    status.textContent = "Проверяю…";
+    try {
+      status.textContent = updateStatusText(await apiPost("/api/app/check-update", {}));
+    } catch {
+      status.textContent = "Не удалось проверить обновления.";
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  section.append(btn, status);
+  return section;
 }
 
 const HISTORY_FILES = [
