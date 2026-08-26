@@ -71,15 +71,30 @@ function buildChapterList() {
   const list = document.createElement("div");
   list.className = "chapter-list";
 
+  let dragId = null;
+
   for (const ch of manuscript.chapters) {
     const item = document.createElement("div");
     item.className = "chapter-item" + (ch.id === manuscript.activeChapterId ? " active" : "");
+    item.draggable = true;
     item.innerHTML = `
       <span class="status-dot status-${ch.status}"></span>
       <span>${escapeHtml(ch.title || "Без названия")}</span>
     `;
     item.addEventListener("click", () => {
       manuscript.activeChapterId = ch.id;
+      draw();
+    });
+    item.addEventListener("dragstart", () => { dragId = ch.id; });
+    item.addEventListener("dragover", (e) => e.preventDefault());
+    item.addEventListener("drop", (e) => {
+      e.preventDefault();
+      if (dragId === null || dragId === ch.id) return;
+      const from = manuscript.chapters.findIndex((c) => c.id === dragId);
+      const to = manuscript.chapters.findIndex((c) => c.id === ch.id);
+      const [moved] = manuscript.chapters.splice(from, 1);
+      manuscript.chapters.splice(to, 0, moved);
+      persist();
       draw();
     });
     list.appendChild(item);
