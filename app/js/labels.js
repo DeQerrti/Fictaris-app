@@ -25,6 +25,7 @@ export const DEFAULT_LABELS = {
     graph: "Граф",
     continuity: "Проверка",
     trash: "Корзина",
+    settings: "⚙ Настройки",
     data: "Данные",
   },
 };

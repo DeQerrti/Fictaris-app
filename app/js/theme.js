@@ -108,6 +108,12 @@ export async function applyTheme() {
   const skin = THEME_PRESETS[settings.theme] ? settings.theme : "dark";
   const accent = resolveAccent(settings, skin);
   applyOverrides(skin, accent);
+  // Размер шрифта редактора (Настройки → Редактор) — читает --editor-font-size
+  // .chapter-content в style.css. Тоже «как выглядит приложение», поэтому
+  // применяется тут же, а не отдельным модулем.
+  if (Number.isFinite(settings.editorFontSize)) {
+    document.documentElement.style.setProperty("--editor-font-size", `${settings.editorFontSize}px`);
+  }
   try {
     localStorage.setItem(CACHE_KEY, JSON.stringify({ skin, accent }));
   } catch {

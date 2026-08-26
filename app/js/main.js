@@ -11,6 +11,7 @@ import { renderMap } from "./map.js";
 import { renderGraph } from "./graph.js";
 import { renderContinuity } from "./continuity.js";
 import { renderData } from "./data-panel.js";
+import { renderSettings } from "./settings-panel.js";
 import { renderTrash, trashCount } from "./trash.js";
 import { initProjectSwitcher } from "./project-switcher.js";
 import { initUpdateBanner } from "./update-banner.js";
@@ -31,6 +32,7 @@ const MODULES = {
   graph: renderGraph,
   continuity: renderContinuity,
   trash: renderTrash,
+  settings: renderSettings,
   data: renderData,
 };
 

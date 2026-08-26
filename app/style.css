@@ -512,6 +512,12 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
 .theme-accent-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; color: var(--text-dim); font-size: 0.85rem; }
 .theme-accent-row input[type="color"] { width: 40px; height: 28px; padding: 0; border: 1px solid var(--border); border-radius: 6px; background: none; cursor: pointer; }
 
+/* ── Редактор ──────────────────────────────── */
+
+.font-size-row { display: flex; gap: 8px; }
+.font-size-btn { min-width: 40px; }
+.font-size-btn.active { background: var(--accent); border-color: var(--accent); color: var(--panel); font-weight: 600; }
+
 /* ── Подписи интерфейса ────────────────────── */
 
 .labels-grid { display: grid; grid-template-columns: 160px 1fr; gap: 8px 12px; align-items: center; margin-bottom: 14px; max-width: 480px; }
@@ -752,7 +758,7 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
   border: none;
   color: var(--text);
   font-family: Newsreader, Georgia, serif;
-  font-size: 1.15rem;
+  font-size: var(--editor-font-size, 17px);
   line-height: 1.7;
   padding: 24px 48px;
   resize: none;
@@ -760,6 +766,8 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
 }
 
 .chapter-content:focus { outline: none; }
+
+.chapter-content-view { font-size: var(--editor-font-size, 17px); }
 
 .author-notes {
   border-top: 1px solid var(--border);
