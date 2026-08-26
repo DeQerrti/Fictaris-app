@@ -11,6 +11,7 @@ import { renderGraph } from "./graph.js";
 import { renderContinuity } from "./continuity.js";
 import { renderData } from "./data-panel.js";
 import { renderTrash, trashCount } from "./trash.js";
+import { initProjectSwitcher } from "./project-switcher.js";
 
 const MODULES = {
   manuscript: renderManuscript,
@@ -31,6 +32,10 @@ const content = document.getElementById("content");
 const navItems = document.querySelectorAll(".nav-item");
 
 async function openModule(name, arg) {
+  // Фокус-режим рукописи прячет сайдбар классом на body (manuscript.js) —
+  // сбрасываем его при любом переключении модуля, иначе уйти со
+  // страницы, скрывшей навигацию, можно было бы только через Esc.
+  document.body.classList.remove("focus-mode");
   navItems.forEach((btn) => btn.classList.toggle("active", btn.dataset.module === name));
   content.innerHTML = "";
   await MODULES[name](content, arg);
@@ -61,6 +66,7 @@ async function boot() {
   }
   openModule("manuscript");
   refreshTrashBadge();
+  initProjectSwitcher();
 }
 
 boot();

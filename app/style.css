@@ -46,12 +46,92 @@ html, body {
   padding: 16px 10px;
 }
 
+/* Фокус-режим рукописи (manuscript.js) — сайдбар и список глав уходят,
+   остаётся только сам текст. */
+body.focus-mode .sidebar { display: none; }
+
 .brand {
   font-family: Fraunces, Georgia, serif;
   font-weight: 600;
   font-size: 1.25rem;
   color: var(--accent-hover);
-  padding: 6px 10px 20px;
+  padding: 6px 10px 4px;
+}
+
+.project-switcher {
+  position: relative;
+  padding: 0 10px 16px;
+}
+
+.project-current {
+  width: 100%;
+  text-align: left;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-dim);
+  font-size: 0.78rem;
+  padding: 6px 8px;
+  cursor: pointer;
+  font-family: inherit;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-current:hover { border-color: var(--accent); color: var(--text); }
+
+.project-menu {
+  display: none;
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  top: calc(100% - 12px);
+  z-index: 30;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.project-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.project-row-name {
+  flex: 1;
+  text-align: left;
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  padding: 6px 8px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.project-row-name:hover { background: var(--panel-alt); color: var(--text); }
+.project-row.active .project-row-name { color: var(--accent-hover); font-weight: 600; }
+
+.project-row-del {
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  font-size: 0.72rem;
+  cursor: pointer;
+  padding: 4px 6px;
+}
+
+.project-row-del:hover { color: var(--color-3); }
+
+.project-menu-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
 }
 
 .nav-item {
@@ -155,6 +235,29 @@ html, body {
 }
 
 .add-card:hover { color: var(--accent-hover); border-color: var(--accent); }
+
+.map-home-card {
+  position: relative;
+  padding: 0;
+  cursor: default;
+}
+
+.map-home-open {
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  padding: 14px;
+  font-family: inherit;
+}
+
+.map-home-card .board-column-del {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}
 
 .drawer {
   width: 380px;
@@ -438,6 +541,13 @@ button.btn.danger:hover { border-color: var(--color-3); color: var(--color-3); }
 
 /* ── Доска ─────────────────────────────────── */
 
+.board-outer {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  overflow: hidden;
+}
+
 .board-view {
   display: flex;
   gap: 14px;
@@ -446,6 +556,37 @@ button.btn.danger:hover { border-color: var(--color-3); color: var(--color-3); }
   width: 100%;
   align-items: flex-start;
 }
+
+.board-template-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 20px 16px;
+}
+
+.board-template-bar select {
+  background: var(--panel-alt);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-dim);
+  padding: 6px 10px;
+  font-family: inherit;
+  font-size: 0.82rem;
+}
+
+.card-label-row {
+  display: flex;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.label-swatch {
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--border);
+}
+
+.label-swatch.selected { border-color: var(--text); }
 
 .board-column {
   width: 240px;
@@ -647,6 +788,32 @@ button.btn.danger:hover { border-color: var(--color-3); color: var(--color-3); }
   cursor: text;
 }
 
+.sticky-insert-btn {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+}
+
+.sticky-marker {
+  cursor: pointer;
+  font-size: 0.9em;
+}
+
+.sticky-popover {
+  display: none;
+  position: fixed;
+  z-index: 100;
+  max-width: 280px;
+  background: var(--card);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  white-space: pre-wrap;
+}
+
 .mention-autocomplete {
   position: absolute;
   left: 0;
@@ -671,6 +838,45 @@ button.btn.danger:hover { border-color: var(--color-3); color: var(--color-3); }
 .mention-autocomplete-item:hover {
   background: var(--panel-alt);
   color: var(--text);
+}
+
+.mention-preview {
+  display: none;
+  position: fixed;
+  z-index: 100;
+  align-items: center;
+  gap: 10px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  max-width: 260px;
+  pointer-events: none;
+}
+
+.mention-preview-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: Fraunces, serif;
+  font-weight: 600;
+  color: #14110d;
+}
+
+.mention-preview-name {
+  font-family: Fraunces, serif;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.mention-preview-role {
+  color: var(--text-faint);
+  font-size: 0.78rem;
 }
 
 /* ── Корзина ───────────────────────────────── */
@@ -767,6 +973,36 @@ button.btn.danger:hover { border-color: var(--color-3); color: var(--color-3); }
   color: var(--color-3);
   font-size: 0.82rem;
   flex: 1;
+}
+
+.data-section select {
+  background: var(--panel-alt);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-dim);
+  padding: 6px 10px;
+  font-family: inherit;
+  font-size: 0.85rem;
+}
+
+.history-list {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.history-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: var(--panel-alt);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.78rem;
+  color: var(--text-dim);
 }
 
 /* ── Граф проекта ──────────────────────────── */

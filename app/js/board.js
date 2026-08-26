@@ -3,6 +3,18 @@ import { debounceSave } from "./save-badge.js";
 import { characterSelect } from "./chips.js";
 import { pushTrash } from "./trash.js";
 
+const LABEL_COLORS = [
+  "#c9944a", "#4f7d74", "#a4483c", "#7d6a9e",
+  "#6a8fae", "#9a9250", "#b5636b", "#5a8a5f",
+];
+
+// Шаблоны структуры — только колонки, без карточек: наполнение всё
+// равно у каждой рукописи своё, шаблон задаёт только скелет доски.
+const TEMPLATES = [
+  ["three_act", "Три акта", ["Завязка", "Развитие", "Развязка"]],
+  ["hero_journey", "Путь героя", ["Обычный мир", "Зов к приключению", "Испытания", "Кризис", "Награда", "Возвращение"]],
+];
+
 let board = { columns: [], cards: {}, cardOrder: {} };
 let characters = [];
 let container = null;
@@ -12,11 +24,15 @@ function persist() {
   save(board);
 }
 
-function defaultBoard() {
-  const cols = ["Задумано", "В работе", "Готово"].map((title) => ({ id: uid(), title }));
+function columnsFromTitles(titles) {
+  const cols = titles.map((title) => ({ id: uid(), title }));
   const cardOrder = {};
   for (const c of cols) cardOrder[c.id] = [];
   return { columns: cols, cards: {}, cardOrder };
+}
+
+function defaultBoard() {
+  return columnsFromTitles(["Задумано", "В работе", "Готово"]);
 }
 
 function charById(id) {
@@ -35,6 +51,9 @@ export async function renderBoard(root) {
 
 function draw() {
   container.innerHTML = "";
+  const outer = document.createElement("div");
+  outer.className = "board-outer";
+
   const view = document.createElement("div");
   view.className = "board-view";
 
@@ -54,7 +73,52 @@ function draw() {
   });
   view.appendChild(addCol);
 
-  container.appendChild(view);
+  outer.appendChild(view);
+  outer.appendChild(buildTemplateBar());
+  container.appendChild(outer);
+}
+
+function buildTemplateBar() {
+  const bar = document.createElement("div");
+  bar.className = "board-template-bar";
+
+  const select = document.createElement("select");
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = "Шаблон структуры…";
+  select.appendChild(placeholder);
+  for (const [value, label] of TEMPLATES) {
+    const opt = document.createElement("option");
+    opt.value = value;
+    opt.textContent = label;
+    select.appendChild(opt);
+  }
+  bar.appendChild(select);
+
+  const applyBtn = document.createElement("button");
+  applyBtn.className = "btn";
+  applyBtn.textContent = "Применить";
+  applyBtn.disabled = true;
+  select.addEventListener("change", () => { applyBtn.disabled = !select.value; });
+  applyBtn.addEventListener("click", () => {
+    if (!select.value) return;
+    if (applyBtn.dataset.confirm === "1") {
+      const template = TEMPLATES.find((t) => t[0] === select.value);
+      board = columnsFromTitles(template[2]);
+      persist();
+      draw();
+      return;
+    }
+    applyBtn.dataset.confirm = "1";
+    applyBtn.textContent = "Заменит все колонки. Точно?";
+    setTimeout(() => {
+      applyBtn.dataset.confirm = "";
+      applyBtn.textContent = "Применить";
+    }, 4000);
+  });
+  bar.appendChild(applyBtn);
+
+  return bar;
 }
 
 let dragCardId = null;
@@ -120,7 +184,7 @@ function buildColumn(col) {
   addCard.className = "add-chapter";
   addCard.textContent = "+ Карточка";
   addCard.addEventListener("click", () => {
-    const card = { id: uid(), title: "Новая карточка", characterId: null };
+    const card = { id: uid(), title: "Новая карточка", characterId: null, labelColor: null };
     board.cards[card.id] = card;
     board.cardOrder[col.id].push(card.id);
     persist();
@@ -144,6 +208,7 @@ function buildCard(card, colId) {
   const el = document.createElement("div");
   el.className = "board-card";
   el.draggable = true;
+  if (card.labelColor) el.style.borderLeft = `3px solid ${card.labelColor}`;
   el.addEventListener("dragstart", () => { dragCardId = card.id; });
   el.addEventListener("dragover", (e) => {
     e.preventDefault();
@@ -165,6 +230,23 @@ function buildCard(card, colId) {
     persist();
   });
   el.appendChild(titleInput);
+
+  const labelRow = document.createElement("div");
+  labelRow.className = "card-label-row";
+  const noneSwatch = document.createElement("div");
+  noneSwatch.className = "swatch label-swatch" + (!card.labelColor ? " selected" : "");
+  noneSwatch.style.background = "var(--panel-alt)";
+  noneSwatch.title = "Без метки";
+  noneSwatch.addEventListener("click", () => { card.labelColor = null; persist(); draw(); });
+  labelRow.appendChild(noneSwatch);
+  for (const color of LABEL_COLORS) {
+    const sw = document.createElement("div");
+    sw.className = "swatch label-swatch" + (card.labelColor === color ? " selected" : "");
+    sw.style.background = color;
+    sw.addEventListener("click", () => { card.labelColor = color; persist(); draw(); });
+    labelRow.appendChild(sw);
+  }
+  el.appendChild(labelRow);
 
   if (characters.length) {
     const select = characterSelect(characters, card.characterId, "Без персонажа");

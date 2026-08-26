@@ -16,7 +16,7 @@ export class ApiError extends Error {
 
 const EMPTY_MANUSCRIPT = { chapters: [], activeChapterId: null };
 const EMPTY_BOARD = { columns: [], cards: {}, cardOrder: {} };
-const EMPTY_MAP = { rootId: null, maps: {} };
+const EMPTY_MAP = { rootIds: [], maps: {} };
 const IMAGE_EXT = /^(jpg|jpeg|png|webp)$/i;
 
 export const ROUTES = {
@@ -87,5 +87,12 @@ export const ROUTES = {
   "POST /api/trash": async ({ vault, body }) => {
     if (!Array.isArray(body)) throw new ApiError("Ожидался список удалённого");
     return vault.writeJson("trash.json", body);
+  },
+
+  "GET /api/history": async ({ vault, query }) => vault.history(query.get("file") || ""),
+  "POST /api/history/restore": async ({ vault, body }) => {
+    if (!body.file || !body.id) throw new ApiError("Не указан файл или версия");
+    const data = await vault.versionAt(body.file, body.id);
+    return vault.writeJson(body.file, data);
   },
 };

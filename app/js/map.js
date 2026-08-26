@@ -1,13 +1,13 @@
 import { apiGet, apiPost, uid } from "./api.js";
 import { debounceSave } from "./save-badge.js";
-import { characterSelect } from "./chips.js";
+import { characterSelect, escapeHtml } from "./chips.js";
 import { locationTypeInfo, iconSvg } from "./icons.js";
 import { compressImage } from "./image-compress.js";
 
-let map = { rootId: null, maps: {} };
+let map = { rootIds: [], maps: {} };
 let characters = [];
 let locations = [];
-let stack = [];
+let stack = []; // пусто — экран «все карты»; иначе путь от корневой карты до текущей
 let activePinId = null;
 let container = null;
 const save = debounceSave((data) => apiPost("/api/map", data));
@@ -29,7 +29,8 @@ function locById(id) {
 
 // Рекурсивно собирает id этой карты и всех вложенных под-карт,
 // доступных через метки-порталы, — чтобы удалить их все разом вместе
-// с родительской меткой, а не оставить осиротевшие карты в файле.
+// с родительской меткой или корневой картой, а не оставить осиротевшие
+// карты в файле.
 function collectMapIds(mapId, acc = new Set()) {
   if (acc.has(mapId)) return acc;
   acc.add(mapId);
@@ -48,21 +49,23 @@ export async function renderMap(root) {
     apiGet("/api/characters"),
     apiGet("/api/locations"),
   ]);
-  if (map.rootId && !stack.length) stack = [map.rootId];
-  if (map.rootId && !map.maps[stack[stack.length - 1]]) stack = [map.rootId];
+  // Совместимость со старой формой { rootId } на случай, если где-то
+  // остался map.json, записанный до перехода на несколько карт.
+  if (!Array.isArray(map.rootIds)) map.rootIds = map.rootId ? [map.rootId] : [];
+  if (stack.length && !map.maps[stack[stack.length - 1]]) stack = [];
   draw();
 }
 
 function draw() {
   container.innerHTML = "";
-  const view = document.createElement("div");
-  view.className = "map-view";
 
-  if (!map.rootId) {
-    view.appendChild(buildUploadPrompt(true));
-    container.appendChild(view);
+  if (!stack.length) {
+    container.appendChild(buildMapsHome());
     return;
   }
+
+  const view = document.createElement("div");
+  view.className = "map-view";
 
   const pane = document.createElement("div");
   pane.className = "map-pane";
@@ -76,50 +79,141 @@ function draw() {
   container.appendChild(view);
 }
 
-function buildUploadPrompt(isRoot) {
-  const wrap = document.createElement("div");
-  wrap.className = "empty-state map-upload";
-  wrap.innerHTML = `<p>${isRoot ? "Загрузи изображение, чтобы начать карту мира." : "У этой под-карты пока нет изображения."}</p>`;
+// Несколько независимых карт верхнего уровня — экран-витрина, с
+// которого входишь в одну из них; вложенные под-карты живут только
+// внутри своего дерева и здесь не перечисляются.
+function buildMapsHome() {
+  const view = document.createElement("div");
+  view.className = "characters-view";
+  const grid = document.createElement("div");
+  grid.className = "characters-grid";
+
+  if (!map.rootIds.length) {
+    const empty = document.createElement("div");
+    empty.className = "empty-state";
+    empty.style.gridColumn = "1 / -1";
+    empty.textContent = "Карт пока нет — загрузи изображение, чтобы создать первую.";
+    grid.appendChild(empty);
+  }
+
+  for (const id of map.rootIds) {
+    const m = map.maps[id];
+    if (!m) continue;
+    const card = document.createElement("div");
+    card.className = "char-card map-home-card";
+
+    const open = document.createElement("button");
+    open.className = "map-home-open";
+    open.innerHTML = `
+      <div class="char-avatar" style="background:#6a8fae">${iconSvg("pin", 20)}</div>
+      <div class="char-name">${escapeHtml(m.name || "Без названия")}</div>
+      <div class="char-role">${(m.pins || []).length} меток</div>
+    `;
+    open.addEventListener("click", () => {
+      stack = [id];
+      activePinId = null;
+      draw();
+    });
+    card.appendChild(open);
+
+    const delBtn = document.createElement("button");
+    delBtn.className = "board-column-del";
+    delBtn.textContent = "✕";
+    delBtn.title = "Удалить карту со всеми вложенными под-картами";
+    delBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (delBtn.dataset.confirm === "1") {
+        for (const mid of collectMapIds(id)) delete map.maps[mid];
+        map.rootIds = map.rootIds.filter((r) => r !== id);
+        persist();
+        draw();
+        return;
+      }
+      delBtn.dataset.confirm = "1";
+      delBtn.textContent = "?";
+      delBtn.title = "Удалит карту со всем вложенным. Точно?";
+      setTimeout(() => {
+        delBtn.dataset.confirm = "";
+        delBtn.textContent = "✕";
+      }, 3000);
+    });
+    card.appendChild(delBtn);
+
+    grid.appendChild(card);
+  }
+
+  const addCard = document.createElement("button");
+  addCard.className = "char-card add-card";
+  addCard.textContent = "+ Новая карта";
+  addCard.addEventListener("click", createRootMap);
+  grid.appendChild(addCard);
+
+  view.appendChild(grid);
+  return view;
+}
+
+function createRootMap() {
   const input = document.createElement("input");
   input.type = "file";
   input.accept = "image/*";
   input.addEventListener("change", async () => {
     const file = input.files[0];
     if (!file) return;
-    await uploadImage(file, isRoot);
+    const path = await uploadCompressed(file);
+    const id = uid();
+    map.maps[id] = { id, name: "Новая карта", imageRelPath: path, pins: [] };
+    map.rootIds.push(id);
+    persist();
+    stack = [id];
+    activePinId = null;
+    draw();
+  });
+  input.click();
+}
+
+async function uploadCompressed(file) {
+  const base64 = await compressImage(file);
+  const ext = /png/i.test(file.type) ? "png" : "jpg";
+  const { path } = await apiPost("/api/map/image", { data: base64, ext });
+  return path;
+}
+
+function buildUploadPrompt() {
+  const wrap = document.createElement("div");
+  wrap.className = "empty-state map-upload";
+  wrap.innerHTML = "<p>У этой под-карты пока нет изображения.</p>";
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = "image/*";
+  input.addEventListener("change", async () => {
+    const file = input.files[0];
+    if (!file) return;
+    currentMap().imageRelPath = await uploadCompressed(file);
+    persist();
+    draw();
   });
   wrap.appendChild(input);
   return wrap;
 }
 
-async function uploadImage(file, isRoot) {
-  const base64 = await compressImage(file);
-  const ext = /png/i.test(file.type) ? "png" : "jpg";
-  const { path } = await apiPost("/api/map/image", { data: base64, ext });
-  if (isRoot) {
-    const id = uid();
-    map.maps[id] = { id, name: "Карта мира", imageRelPath: path, pins: [] };
-    map.rootId = id;
-    stack = [id];
-  } else {
-    currentMap().imageRelPath = path;
-  }
-  persist();
-  draw();
-}
-
 function buildBreadcrumbs() {
   const bar = document.createElement("div");
   bar.className = "map-breadcrumbs";
+
+  const home = document.createElement("button");
+  home.className = "map-breadcrumb";
+  home.textContent = "← Все карты";
+  home.addEventListener("click", () => { stack = []; activePinId = null; draw(); });
+  bar.appendChild(home);
+
   stack.forEach((id, i) => {
     const m = map.maps[id];
     if (!m) return;
-    if (i > 0) {
-      const sep = document.createElement("span");
-      sep.className = "map-breadcrumb-sep";
-      sep.textContent = "›";
-      bar.appendChild(sep);
-    }
+    const sep = document.createElement("span");
+    sep.className = "map-breadcrumb-sep";
+    sep.textContent = "›";
+    bar.appendChild(sep);
+
     const btn = document.createElement("button");
     btn.className = "map-breadcrumb" + (i === stack.length - 1 ? " active" : "");
     btn.textContent = m.name;
@@ -159,7 +253,7 @@ function buildCanvas() {
   wrap.className = "map-canvas-wrap";
 
   if (!cm.imageRelPath) {
-    wrap.appendChild(buildUploadPrompt(false));
+    wrap.appendChild(buildUploadPrompt());
     return wrap;
   }
 

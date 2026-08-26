@@ -1,11 +1,12 @@
 // ══════════════════════════════════════════════
 //  ОКНО ПРИЛОЖЕНИЯ
 //
-//  v1: одно хранилище (одна папка проекта), без переключения между
-//  несколькими мирами/рукописями — многопроектность в брифе отмечена
-//  как отдельный пункт роадмапа, не костяк. Порядок запуска:
-//    папка известна и на месте  → сразу главная
-//    папки нет или пропала      → экран приветствия
+//  Несколько хранилищ (проектов) — список живёт в конфиге вместе с
+//  currentVaultId, по образцу TasteID (electron/main.js). Путь остаётся
+//  ключом: повторный выбор той же папки не заводит вторую запись, а
+//  переключает на уже существующую. Порядок запуска:
+//    текущее хранилище известно и на месте  → сразу главная
+//    хранилища нет, оно пропало, или это первый запуск → экран приветствия
 // ══════════════════════════════════════════════
 
 import { app, BrowserWindow, dialog, shell, Menu } from "electron";
@@ -70,19 +71,91 @@ async function askForVault() {
 async function useVault(root) {
   vault = new Vault(root);
   await vault.ensure();
-  await saveConfig({ vaultPath: root });
+}
+
+// ── Несколько проектов ─────────────────────────
+// Раньше был только vaultPath — при первом запуске после обновления он
+// переезжает сюда единственной записью и дальше не используется.
+
+function genVaultId() {
+  return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+}
+
+async function migrateVaults() {
+  if (config.vaults || !config.vaultPath) return;
+  const id = genVaultId();
+  await saveConfig({
+    vaults: [{ id, name: path.basename(config.vaultPath) || "Проект", path: config.vaultPath }],
+    currentVaultId: id,
+  });
+}
+
+function currentVaultEntry() {
+  return (config.vaults || []).find((v) => v.id === config.currentVaultId) || null;
+}
+
+async function addVaultEntry(root, name) {
+  const id = genVaultId();
+  const entry = { id, name: name || path.basename(root) || "Проект", path: root };
+  await useVault(root);
+  await saveConfig({ vaults: [...(config.vaults || []), entry], currentVaultId: id });
+  return entry;
+}
+
+async function switchVaultTo(id) {
+  const entry = (config.vaults || []).find((v) => v.id === id);
+  if (!entry) throw new Error("Хранилище не найдено");
+  await useVault(entry.path);
+  await saveConfig({ currentVaultId: id });
+  return entry;
+}
+
+// Тот же путь мог уже быть в списке под своим именем — тогда просто
+// переключаемся на запись, а не заводим дубликат с тем же адресом на
+// диске.
+async function useVaultPath(root, name) {
+  const existing = (config.vaults || []).find((v) => path.resolve(v.path) === path.resolve(root));
+  if (existing) return switchVaultTo(existing.id);
+  return addVaultEntry(root, name);
 }
 
 function appRoutes() {
   return {
-    "GET /api/app/info": async () => ({ vaultPath: vault?.root || null }),
+    "GET /api/app/info": async () => ({
+      vaultPath: vault?.root || null,
+      vaults: (config.vaults || []).map(({ id, name, path: p }) => ({ id, name, path: p })),
+      currentVaultId: config.currentVaultId || null,
+    }),
 
     "POST /api/app/pick-vault": async () => ({ path: await askForVault() }),
 
     "POST /api/app/use-vault": async ({ body }) => {
       if (!body.path) throw new Error("Не указана папка");
-      await useVault(body.path);
+      const entry = await useVaultPath(body.path, body.name);
       openMain();
+      return { ok: true, vault: entry };
+    },
+
+    "POST /api/app/switch-vault": async ({ body }) => {
+      if (!body.id) throw new Error("Хранилище не найдено");
+      const entry = await switchVaultTo(body.id);
+      return { ok: true, vault: entry };
+    },
+
+    "POST /api/app/rename-vault": async ({ body }) => {
+      const name = String(body.name || "").trim();
+      if (!body.id || !name) throw new Error("Хранилище не найдено");
+      const vaults = (config.vaults || []).map((v) => (v.id === body.id ? { ...v, name } : v));
+      await saveConfig({ vaults });
+      return { ok: true };
+    },
+
+    "POST /api/app/remove-vault": async ({ body }) => {
+      const vaults = config.vaults || [];
+      if (vaults.length <= 1) throw new Error("Нельзя убрать последний проект.");
+      if (body.id === config.currentVaultId) throw new Error("Сначала переключись на другой проект.");
+      if (!vaults.some((v) => v.id === body.id)) throw new Error("Хранилище не найдено");
+      await saveConfig({ vaults: vaults.filter((v) => v.id !== body.id) });
       return { ok: true };
     },
 
@@ -127,8 +200,15 @@ app.on("second-instance", () => {
 
 app.whenReady().then(async () => {
   config = await readConfig();
-  const known = config.vaultPath && (await exists(config.vaultPath));
-  if (known) await useVault(config.vaultPath);
+  await migrateVaults();
+
+  // Папка могла уехать на флешке или быть переименована. Молча завести
+  // взамен пустую — худшее, что можно сделать: человек решит, что
+  // данные пропали. Поэтому просто ведём на экран приветствия, где
+  // видно, что папку надо указать.
+  const current = currentVaultEntry();
+  const known = current && (await exists(current.path));
+  if (known) await useVault(current.path);
 
   const server = createServer({ appDir: APP_DIR, getVault: () => vault, appRoutes: appRoutes() });
   port = await listen(server);

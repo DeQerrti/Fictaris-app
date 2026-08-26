@@ -10,6 +10,7 @@ let characters = [];
 let locations = [];
 let activeId = null;
 let filterCharIds = new Set();
+let filterLocIds = new Set();
 let container = null;
 const save = debounceSave((list) => apiPost("/api/timeline", list));
 
@@ -78,38 +79,65 @@ function draw() {
 }
 
 function buildFilterBar() {
-  const bar = document.createElement("div");
-  bar.className = "timeline-filter-bar";
-  if (!characters.length) return bar;
+  const wrap = document.createElement("div");
 
-  for (const c of characters) {
-    const chip = document.createElement("button");
-    chip.className = "filter-chip" + (filterCharIds.has(c.id) ? " active" : "");
-    chip.style.setProperty("--chip-color", c.color || "#7c7157");
-    chip.textContent = c.name;
-    chip.addEventListener("click", () => {
-      if (filterCharIds.has(c.id)) filterCharIds.delete(c.id);
-      else filterCharIds.add(c.id);
-      draw();
-    });
-    bar.appendChild(chip);
+  if (characters.length) {
+    const bar = document.createElement("div");
+    bar.className = "timeline-filter-bar";
+    for (const c of characters) {
+      const chip = document.createElement("button");
+      chip.className = "filter-chip" + (filterCharIds.has(c.id) ? " active" : "");
+      chip.style.setProperty("--chip-color", c.color || "#7c7157");
+      chip.textContent = c.name;
+      chip.addEventListener("click", () => {
+        if (filterCharIds.has(c.id)) filterCharIds.delete(c.id);
+        else filterCharIds.add(c.id);
+        draw();
+      });
+      bar.appendChild(chip);
+    }
+    wrap.appendChild(bar);
   }
 
-  if (filterCharIds.size) {
-    const shown = events.filter((e) => e.characterIds?.some((id) => filterCharIds.has(id))).length;
-    const count = document.createElement("span");
+  if (locations.length) {
+    const bar = document.createElement("div");
+    bar.className = "timeline-filter-bar";
+    for (const l of locations) {
+      const chip = document.createElement("button");
+      chip.className = "filter-chip" + (filterLocIds.has(l.id) ? " active" : "");
+      chip.style.setProperty("--chip-color", locationTypeInfo(l.type)[3]);
+      chip.textContent = l.name;
+      chip.addEventListener("click", () => {
+        if (filterLocIds.has(l.id)) filterLocIds.delete(l.id);
+        else filterLocIds.add(l.id);
+        draw();
+      });
+      bar.appendChild(chip);
+    }
+    wrap.appendChild(bar);
+  }
+
+  if (filterCharIds.size || filterLocIds.size) {
+    const count = document.createElement("div");
     count.className = "filter-count";
-    count.textContent = `${shown} из ${events.length} событий`;
-    bar.appendChild(count);
+    count.textContent = `${visibleEvents().length} из ${events.length} событий`;
+    wrap.appendChild(count);
   }
 
-  return bar;
+  return wrap;
 }
 
+// Оба фильтра — персонажи и локации — сужают список одновременно
+// (событие должно подходить под каждый выбранный фильтр по отдельности,
+// а не под любой из них), иначе выбор локации без выбора персонажа не
+// работал бы вовсе.
 function visibleEvents() {
   const all = sorted();
-  if (!filterCharIds.size) return all;
-  return all.filter((e) => e.characterIds?.some((id) => filterCharIds.has(id)));
+  return all.filter((e) => {
+    if (filterCharIds.size && !e.characterIds?.some((id) => filterCharIds.has(id))) return false;
+    if (filterLocIds.size && !e.locationIds?.some((id) => filterLocIds.has(id))) return false;
+    return true;
+  });
 }
 
 function buildList() {

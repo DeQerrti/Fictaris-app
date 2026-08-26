@@ -101,3 +101,45 @@ export function attachMentionAutocomplete(field, getCharacters) {
   });
   field.addEventListener("blur", () => setTimeout(hide, 150));
 }
+
+// Hover-превью карточки при наведении на @упоминание в режиме просмотра.
+// Один тултип на всё приложение, добавленный в body, — чтобы не
+// обрезаться overflow:hidden/auto контейнеров рукописи и таймлайна.
+let tooltipEl = null;
+function ensureTooltip() {
+  if (!tooltipEl) {
+    tooltipEl = document.createElement("div");
+    tooltipEl.className = "mention-preview";
+    document.body.appendChild(tooltipEl);
+  }
+  return tooltipEl;
+}
+
+export function attachMentionHoverPreview(container, getCharacters) {
+  container.addEventListener("mouseover", (e) => {
+    const el = e.target.closest(".mention");
+    if (!el) return;
+    const c = getCharacters().find((x) => x.id === el.dataset.charId);
+    if (!c) return;
+
+    const tip = ensureTooltip();
+    const initial = (c.name || "?").trim().slice(0, 1).toUpperCase();
+    tip.innerHTML = `
+      <div class="mention-preview-avatar" style="background:${c.color || "#7c7157"}">${escapeHtml(initial)}</div>
+      <div>
+        <div class="mention-preview-name">${escapeHtml(c.name || "")}</div>
+        <div class="mention-preview-role">${escapeHtml(c.role || "")}</div>
+      </div>
+    `;
+    const rect = el.getBoundingClientRect();
+    tip.style.left = `${rect.left}px`;
+    tip.style.top = `${rect.bottom + 6}px`;
+    tip.style.display = "flex";
+  });
+
+  container.addEventListener("mouseout", (e) => {
+    const leavingMention = e.target.closest(".mention");
+    const enteringMention = e.relatedTarget && e.relatedTarget.closest && e.relatedTarget.closest(".mention");
+    if (leavingMention && !enteringMention && tooltipEl) tooltipEl.style.display = "none";
+  });
+}

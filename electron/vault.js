@@ -10,7 +10,7 @@
 
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import { isAllowedFile } from "../core/files.js";
+import { isAllowedFile, historyDate } from "../core/files.js";
 
 const HISTORY_LIMIT = 50;
 let writeCounter = 0;
@@ -89,6 +89,31 @@ export class Vault {
     for (const old of kept.slice(0, Math.max(0, kept.length - HISTORY_LIMIT))) {
       await fs.rm(path.join(dir, old), { force: true });
     }
+  }
+
+  // Список версий файла в .history — новые сначала. Имя версии и есть
+  // дата (см. #archive), отдельного stat() не нужно.
+  async history(name) {
+    if (!isAllowedFile(name)) throw new Error(`Неизвестный файл: ${name}`);
+    const dir = path.join(this.root, ".history", name);
+    let entries;
+    try {
+      entries = await fs.readdir(dir);
+    } catch {
+      return [];
+    }
+    return entries
+      .filter((f) => f.endsWith(".json"))
+      .sort()
+      .reverse()
+      .map((f) => ({ id: f.replace(/\.json$/, ""), date: historyDate(f) }));
+  }
+
+  async versionAt(name, id) {
+    if (!isAllowedFile(name)) throw new Error(`Неизвестный файл: ${name}`);
+    if (!/^[\w-]{1,48}$/.test(id)) throw new Error("Неизвестная версия");
+    const raw = await fs.readFile(path.join(this.root, ".history", name, `${id}.json`), "utf8");
+    return JSON.parse(raw);
   }
 
   // Изображения карты — отдельные файлы в maps/, а не base64 внутри

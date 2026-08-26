@@ -21,3 +21,12 @@ const KNOWN_FILES = new Set([
 export function isAllowedFile(name) {
   return KNOWN_FILES.has(name);
 }
+
+// Имя файла версии в .history — это её же дата с заменёнными на дефисы
+// двоеточиями/точками (см. #archive в vault.js); здесь — обратное
+// превращение назад в ISO-строку, чтобы список версий показывал дату,
+// а не сырое имя файла.
+export function historyDate(fileName) {
+  const stamp = fileName.replace(/\.json$/, "").replace(/-\d+$/, "");
+  return stamp.replace(/-(\d{2})-(\d{2})-(\d{3})Z$/, ":$1:$2.$3Z");
+}

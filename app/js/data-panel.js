@@ -4,7 +4,7 @@ import { buildDemoBundle } from "./demo-data.js";
 const SCHEMA_VERSION = 1;
 const EMPTY_MANUSCRIPT = { chapters: [], activeChapterId: null };
 const EMPTY_BOARD = { columns: [], cards: {}, cardOrder: {} };
-const EMPTY_MAP = { rootId: null, maps: {} };
+const EMPTY_MAP = { rootIds: [], maps: {} };
 
 async function fetchAll() {
   const [characters, locations, relationships, factions, timeline, board, map, manuscript] = await Promise.all([
@@ -68,8 +68,91 @@ export async function renderData(root) {
   wrap.appendChild(buildExportSection());
   wrap.appendChild(buildImportSection());
   wrap.appendChild(buildDemoSection());
+  wrap.appendChild(buildHistorySection());
 
   root.appendChild(wrap);
+}
+
+const HISTORY_FILES = [
+  ["characters.json", "Персонажи"],
+  ["locations.json", "Локации"],
+  ["relationships.json", "Связи"],
+  ["factions.json", "Фракции"],
+  ["timeline.json", "Таймлайн"],
+  ["board.json", "Доска"],
+  ["map.json", "Карта"],
+  ["manuscript.json", "Рукопись"],
+];
+
+// Vault пишет .history на каждое сохранение (см. electron/vault.js) —
+// здесь просто витрина для того, что уже лежит на диске: посмотреть
+// прошлые версии файла модуля и откатиться на любую из них.
+function buildHistorySection() {
+  const section = document.createElement("div");
+  section.className = "data-section";
+  section.innerHTML =
+    "<h3>История версий</h3><p>Каждое сохранение оставляет прошлую версию файла в папке <code>.history</code>. Выбери модуль, чтобы увидеть его версии.</p>";
+
+  const select = document.createElement("select");
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = "Выбери модуль…";
+  select.appendChild(placeholder);
+  for (const [file, label] of HISTORY_FILES) {
+    const opt = document.createElement("option");
+    opt.value = file;
+    opt.textContent = label;
+    select.appendChild(opt);
+  }
+  section.appendChild(select);
+
+  const list = document.createElement("div");
+  list.className = "history-list";
+  section.appendChild(list);
+
+  select.addEventListener("change", async () => {
+    list.innerHTML = "";
+    if (!select.value) return;
+    const versions = await apiGet(`/api/history?file=${encodeURIComponent(select.value)}`);
+    if (!versions.length) {
+      list.innerHTML = '<div class="empty-state">Пока нет прошлых версий — история появляется со второго сохранения.</div>';
+      return;
+    }
+    for (const v of versions) {
+      list.appendChild(buildHistoryRow(select.value, v));
+    }
+  });
+
+  return section;
+}
+
+function buildHistoryRow(file, version) {
+  const row = document.createElement("div");
+  row.className = "history-row";
+
+  const date = document.createElement("span");
+  const parsed = new Date(version.date);
+  date.textContent = Number.isNaN(parsed.getTime()) ? version.date : parsed.toLocaleString();
+  row.appendChild(date);
+
+  const btn = document.createElement("button");
+  btn.className = "btn";
+  btn.textContent = "Восстановить";
+  btn.addEventListener("click", () => {
+    if (btn.dataset.confirm === "1") {
+      apiPost("/api/history/restore", { file, id: version.id }).then(() => location.reload());
+      return;
+    }
+    btn.dataset.confirm = "1";
+    btn.textContent = "Заменит текущую версию. Точно?";
+    setTimeout(() => {
+      btn.dataset.confirm = "";
+      btn.textContent = "Восстановить";
+    }, 4000);
+  });
+  row.appendChild(btn);
+
+  return row;
 }
 
 function buildExportSection() {
