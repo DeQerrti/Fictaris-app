@@ -4,6 +4,7 @@ import { escapeHtml } from "./chips.js";
 import { pushTrash } from "./trash.js";
 import { buildReverseLinks } from "./reverse-links.js";
 import { loadTagsMap, buildTagsField } from "./tags.js";
+import { buildNameGeneratorButton } from "./name-generator.js";
 
 const PALETTE = [
   "#c9944a", "#4f7d74", "#a4483c", "#7d6a9e",
@@ -159,7 +160,8 @@ function buildDrawer(c) {
   const drawer = document.createElement("div");
   drawer.className = "drawer";
 
-  const title = document.createElement("h2");
+  const nameRow = document.createElement("div");
+  nameRow.className = "drawer-name-row";
   const nameField = document.createElement("input");
   nameField.value = c.name;
   nameField.style.cssText =
@@ -169,7 +171,16 @@ function buildDrawer(c) {
     updateCardLive();
     persist();
   });
-  drawer.appendChild(nameField);
+  nameRow.appendChild(nameField);
+  nameRow.appendChild(
+    buildNameGeneratorButton((name) => {
+      nameField.value = name;
+      c.name = name;
+      updateCardLive();
+      persist();
+    })
+  );
+  drawer.appendChild(nameRow);
 
   const colorRow = document.createElement("div");
   colorRow.className = "color-row";

@@ -5,6 +5,7 @@ import { pushTrash } from "./trash.js";
 import { LOCATION_TYPES, locationTypeInfo, iconSvg } from "./icons.js";
 import { buildReverseLinks } from "./reverse-links.js";
 import { loadTagsMap, buildTagsField } from "./tags.js";
+import { buildNameGeneratorButton } from "./name-generator.js";
 
 const FIELDS = [
   ["description", "Описание", "textarea"],
@@ -125,6 +126,8 @@ function buildDrawer(loc) {
   const drawer = document.createElement("div");
   drawer.className = "drawer";
 
+  const nameRow = document.createElement("div");
+  nameRow.className = "drawer-name-row";
   const nameField = document.createElement("input");
   nameField.value = loc.name;
   nameField.style.cssText =
@@ -133,7 +136,15 @@ function buildDrawer(loc) {
     loc.name = nameField.value;
     persist();
   });
-  drawer.appendChild(nameField);
+  nameRow.appendChild(nameField);
+  nameRow.appendChild(
+    buildNameGeneratorButton((name) => {
+      nameField.value = name;
+      loc.name = name;
+      persist();
+    }, "place")
+  );
+  drawer.appendChild(nameRow);
 
   const typeField = document.createElement("div");
   typeField.className = "field";

@@ -527,6 +527,11 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
   font-size: 0.85rem;
 }
 
+/* ── Генератор имён ────────────────────────── */
+
+.drawer-name-row { display: flex; align-items: center; gap: 6px; }
+.name-gen-btn { flex-shrink: 0; padding: 6px 10px; }
+
 /* ── Теги ──────────────────────────────────── */
 
 .tags-chip-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
