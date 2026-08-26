@@ -95,6 +95,15 @@ export const ROUTES = {
     return vault.writeJson("trash.json", body);
   },
 
+  // Тема, акцент — всё, что настраивает вид приложения, а не его данные
+  // (см. app/js/theme.js). Отдельный файл, а не часть какого-то модуля:
+  // он читается раньше всего остального, до того как выбран экран.
+  "GET /api/site-settings": async ({ vault }) => vault.readJson("site-settings.json", {}),
+  "POST /api/site-settings": async ({ vault, body }) => {
+    if (!body || typeof body !== "object") throw new ApiError("Некорректные настройки");
+    return vault.writeJson("site-settings.json", body);
+  },
+
   "GET /api/history": async ({ vault, query }) => vault.history(query.get("file") || ""),
   "POST /api/history/restore": async ({ vault, body }) => {
     if (!body.file || !body.id) throw new ApiError("Не указан файл или версия");

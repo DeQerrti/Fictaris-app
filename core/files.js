@@ -16,6 +16,7 @@ const KNOWN_FILES = new Set([
   "factions.json",
   "map.json",
   "trash.json",
+  "site-settings.json",
 ]);
 
 export function isAllowedFile(name) {

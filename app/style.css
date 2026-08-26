@@ -23,6 +23,26 @@
   --color-8: #5a8a5f;
 }
 
+/* ── Тема «Пергамент» ──────────────────────────
+   Светлая альтернатива тёмному «столу писателя ночью» — тёплая бумага
+   вместо тёмного дерева. Акцентный и предметные (--color-*) цвета не
+   меняются: они достаточно насыщенные, чтобы читаться на любом фоне, а
+   держать для них отдельную светлую палитру было бы лишней сущностью.
+   Применяется через [data-skin] на <html> — см. app/js/theme.js. */
+[data-skin="light"] {
+  --bg: #f3ead9;
+  --panel: #ece0c8;
+  --panel-alt: #e4d5b8;
+  --card: #faf3e4;
+  --border: #cbb98f;
+  --text: #2b2013;
+  --text-dim: #5c4d34;
+  --text-faint: #8a7856;
+  --placeholder: #a89878;
+  --accent: #a4653a;
+  --accent-hover: #8f5530;
+}
+
 * { box-sizing: border-box; }
 
 html, body {
@@ -347,6 +367,45 @@ button.btn.accent {
 }
 
 button.btn.accent:hover { background: var(--accent-hover); border-color: var(--accent-hover); color: var(--panel); }
+
+/* ── Оформление ────────────────────────────── */
+
+.theme-swatches { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+
+.theme-swatch {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 110px;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--panel-alt);
+  color: var(--text-dim);
+  font-family: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.theme-swatch:hover { border-color: var(--accent); }
+.theme-swatch.active { border-color: var(--accent); color: var(--text); box-shadow: 0 0 0 1px var(--accent); }
+
+.theme-swatch-preview {
+  display: block;
+  width: 100%;
+  height: 40px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
+.theme-swatch-preview[data-skin-preview="dark"] { background: linear-gradient(135deg, #14110d 50%, #c9944a 50%); }
+.theme-swatch-preview[data-skin-preview="light"] { background: linear-gradient(135deg, #f3ead9 50%, #a4653a 50%); }
+
+.theme-swatch-hint { color: var(--text-faint); font-size: 0.72rem; }
+
+.theme-accent-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; color: var(--text-dim); font-size: 0.85rem; }
+.theme-accent-row input[type="color"] { width: 40px; height: 28px; padding: 0; border: 1px solid var(--border); border-radius: 6px; background: none; cursor: pointer; }
 
 /* ── Обновления ────────────────────────────── */
 

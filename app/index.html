@@ -8,6 +8,25 @@
 <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16x16.png">
 <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png">
 <link rel="stylesheet" href="/style.css" />
+<script>
+  // Тема из кэша — синхронно, до первой отрисовки, иначе долю секунды
+  // видно тёмную тему по умолчанию, а потом она подменяется на
+  // выбранную (см. app/js/theme.js, applyTheme). Сеть на телефоне и на
+  // компьютере отвечает не мгновенно, а мигание темы при каждой
+  // загрузке страницы — то, чего этот кэш и должен избежать.
+  try {
+    const cached = JSON.parse(localStorage.getItem("fictaris_theme_cache") || "null");
+    if (cached && cached.skin) {
+      document.documentElement.setAttribute("data-skin", cached.skin);
+      if (cached.accent) {
+        const style = document.createElement("style");
+        style.id = "theme-overrides";
+        style.textContent = `:root { --accent: ${cached.accent}; }`;
+        document.head.appendChild(style);
+      }
+    }
+  } catch {}
+</script>
 </head>
 <body>
   <div id="app">

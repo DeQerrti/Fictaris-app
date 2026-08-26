@@ -1,5 +1,6 @@
 import { apiGet, apiPost } from "./api.js";
 import { buildDemoBundle } from "./demo-data.js";
+import { THEME_PRESETS, saveTheme } from "./theme.js";
 
 const SCHEMA_VERSION = 1;
 const EMPTY_MANUSCRIPT = { chapters: [], activeChapterId: null };
@@ -67,6 +68,7 @@ export async function renderData(root) {
 
   const info = await apiGet("/api/app/info").catch(() => ({}));
 
+  wrap.appendChild(await buildAppearanceSection());
   wrap.appendChild(buildUpdateSection(info));
   wrap.appendChild(buildExportSection());
   wrap.appendChild(buildImportSection());
@@ -74,6 +76,55 @@ export async function renderData(root) {
   wrap.appendChild(buildHistorySection());
 
   root.appendChild(wrap);
+}
+
+async function buildAppearanceSection() {
+  const section = document.createElement("div");
+  section.className = "data-section";
+  section.innerHTML = "<h3>Оформление</h3><p>Тема и акцентный цвет — применяются сразу, без перезагрузки.</p>";
+
+  const settings = await apiGet("/api/site-settings").catch(() => ({}));
+  const currentSkin = THEME_PRESETS[settings.theme] ? settings.theme : "dark";
+
+  const swatches = document.createElement("div");
+  swatches.className = "theme-swatches";
+
+  const buttons = new Map();
+  for (const [id, preset] of Object.entries(THEME_PRESETS)) {
+    const btn = document.createElement("button");
+    btn.className = "theme-swatch" + (id === currentSkin ? " active" : "");
+    btn.dataset.skin = id;
+    btn.innerHTML = `<span class="theme-swatch-preview" data-skin-preview="${id}"></span><span>${preset.label}</span><span class="theme-swatch-hint">${preset.hint}</span>`;
+    btn.addEventListener("click", async () => {
+      buttons.forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      await saveTheme({ theme: id });
+    });
+    buttons.set(id, btn);
+    swatches.appendChild(btn);
+  }
+
+  const accentRow = document.createElement("label");
+  accentRow.className = "theme-accent-row";
+  accentRow.textContent = "Акцентный цвет: ";
+  const accentInput = document.createElement("input");
+  accentInput.type = "color";
+  accentInput.value = /^#[0-9a-f]{6}$/i.test(settings.accent || "")
+    ? settings.accent
+    : THEME_PRESETS[currentSkin].defaultAccent || "#c9944a";
+  accentInput.addEventListener("input", () => saveTheme({ accent: accentInput.value }));
+  accentRow.appendChild(accentInput);
+
+  const resetBtn = document.createElement("button");
+  resetBtn.className = "btn";
+  resetBtn.textContent = "Сбросить акцент";
+  resetBtn.addEventListener("click", async () => {
+    await saveTheme({ accent: null });
+    location.reload(); // проще перечитать цвет темы по умолчанию, чем тянуть его сюда из style.css
+  });
+
+  section.append(swatches, accentRow, resetBtn);
+  return section;
 }
 
 function updateStatusText(res) {
