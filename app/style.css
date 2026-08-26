@@ -542,3 +542,48 @@ button.btn.danger:hover { border-color: var(--color-3); color: var(--color-3); }
 }
 
 .add-column:hover { color: var(--accent-hover); border-color: var(--accent); }
+
+/* ── Данные (экспорт/импорт/демо) ─────────────── */
+
+.data-panel {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 560px;
+}
+
+.data-section {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px 18px;
+}
+
+.data-section h3 {
+  font-family: Fraunces, serif;
+  margin: 0 0 6px;
+  font-size: 1.05rem;
+}
+
+.data-section p {
+  color: var(--text-faint);
+  font-size: 0.85rem;
+  margin: 0 0 12px;
+  line-height: 1.5;
+}
+
+.confirm-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.confirm-bar span {
+  color: var(--color-3);
+  font-size: 0.82rem;
+  flex: 1;
+}

@@ -5,6 +5,7 @@ import { renderLocations } from "./locations.js";
 import { renderRelationships } from "./relationships.js";
 import { renderTimeline } from "./timeline.js";
 import { renderBoard } from "./board.js";
+import { renderData } from "./data-panel.js";
 
 const MODULES = {
   manuscript: renderManuscript,
@@ -13,6 +14,7 @@ const MODULES = {
   relationships: renderRelationships,
   timeline: renderTimeline,
   board: renderBoard,
+  data: renderData,
 };
 
 const content = document.getElementById("content");
