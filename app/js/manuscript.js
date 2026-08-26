@@ -1,5 +1,6 @@
 import { apiGet, apiPost, uid } from "./api.js";
 import { debounceSave } from "./save-badge.js";
+import { escapeHtml } from "./chips.js";
 
 const STATUSES = [
   ["draft", "Черновик"],
@@ -166,10 +167,4 @@ function refreshChapterListTitles() {
   manuscript.chapters.forEach((ch, i) => {
     if (items[i]) items[i].textContent = ch.title || "Без названия";
   });
-}
-
-function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, (c) => ({
-    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
-  }[c]));
 }

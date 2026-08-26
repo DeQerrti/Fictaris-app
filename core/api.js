@@ -28,4 +28,16 @@ export const ROUTES = {
     if (!body || !Array.isArray(body.chapters)) throw new ApiError("Некорректная рукопись");
     return vault.writeJson("manuscript.json", body);
   },
+
+  "GET /api/locations": async ({ vault }) => vault.readJson("locations.json", []),
+  "POST /api/locations": async ({ vault, body }) => {
+    if (!Array.isArray(body)) throw new ApiError("Ожидался список локаций");
+    return vault.writeJson("locations.json", body);
+  },
+
+  "GET /api/relationships": async ({ vault }) => vault.readJson("relationships.json", []),
+  "POST /api/relationships": async ({ vault, body }) => {
+    if (!Array.isArray(body)) throw new ApiError("Ожидался список связей");
+    return vault.writeJson("relationships.json", body);
+  },
 };

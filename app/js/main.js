@@ -1,10 +1,14 @@
 import { apiGet } from "./api.js";
 import { renderManuscript } from "./manuscript.js";
 import { renderCharacters } from "./characters.js";
+import { renderLocations } from "./locations.js";
+import { renderRelationships } from "./relationships.js";
 
 const MODULES = {
   manuscript: renderManuscript,
   characters: renderCharacters,
+  locations: renderLocations,
+  relationships: renderRelationships,
 };
 
 const content = document.getElementById("content");

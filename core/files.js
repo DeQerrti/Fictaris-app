@@ -6,7 +6,12 @@
 //  случайно тронуть файл, который vault не ждёт.
 // ══════════════════════════════════════════════
 
-const KNOWN_FILES = new Set(["characters.json", "manuscript.json"]);
+const KNOWN_FILES = new Set([
+  "characters.json",
+  "manuscript.json",
+  "locations.json",
+  "relationships.json",
+]);
 
 export function isAllowedFile(name) {
   return KNOWN_FILES.has(name);

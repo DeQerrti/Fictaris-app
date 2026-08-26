@@ -1,5 +1,6 @@
 import { apiGet, apiPost, uid } from "./api.js";
 import { debounceSave } from "./save-badge.js";
+import { escapeHtml } from "./chips.js";
 
 const PALETTE = [
   "#c9944a", "#4f7d74", "#a4483c", "#7d6a9e",
@@ -175,10 +176,4 @@ function buildDrawer(c) {
   }
 
   return drawer;
-}
-
-function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, (c) => ({
-    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
-  }[c]));
 }
