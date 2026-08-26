@@ -3,6 +3,7 @@ import { debounceSave } from "./save-badge.js";
 import { characterSelect, escapeHtml } from "./chips.js";
 import { locationTypeInfo, iconSvg } from "./icons.js";
 import { compressImage } from "./image-compress.js";
+import { buildExportPngButton } from "./png-export.js";
 
 let map = { rootIds: [], maps: {} };
 let characters = [];
@@ -228,6 +229,7 @@ function buildBreadcrumbs() {
     });
     bar.appendChild(btn);
   });
+  bar.appendChild(buildExportPngButton(() => container.querySelector(".map-canvas-wrap"), currentMap()?.name || "карта"));
   return bar;
 }
 

@@ -2,6 +2,7 @@ import { apiGet, apiPost, uid } from "./api.js";
 import { debounceSave } from "./save-badge.js";
 import { characterSelect } from "./chips.js";
 import { pushTrash } from "./trash.js";
+import { buildExportPngButton } from "./png-export.js";
 
 const LABEL_COLORS = [
   "#c9944a", "#4f7d74", "#a4483c", "#7d6a9e",
@@ -117,6 +118,8 @@ function buildTemplateBar() {
     }, 4000);
   });
   bar.appendChild(applyBtn);
+
+  bar.appendChild(buildExportPngButton(() => container.querySelector(".board-view"), "доска"));
 
   return bar;
 }

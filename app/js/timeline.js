@@ -4,6 +4,7 @@ import { escapeHtml, buildToggleGroup } from "./chips.js";
 import { locationTypeInfo } from "./icons.js";
 import { attachMentionAutocomplete } from "./mentions.js";
 import { pushTrash } from "./trash.js";
+import { buildExportPngButton } from "./png-export.js";
 
 let events = [];
 let characters = [];
@@ -69,6 +70,10 @@ function draw() {
 
   const listPane = document.createElement("div");
   listPane.className = "timeline-list-pane";
+  const toolbar = document.createElement("div");
+  toolbar.className = "timeline-toolbar";
+  toolbar.appendChild(buildExportPngButton(() => container.querySelector(".timeline-list"), "таймлайн"));
+  listPane.appendChild(toolbar);
   listPane.appendChild(buildFilterBar());
   listPane.appendChild(buildList());
   view.appendChild(listPane);
