@@ -1,7 +1,7 @@
 // Связный тестовый сюжет для кнопки «Заполнить примером» — по духу
 // демо из брифа ("Хроники Раскола Троп"), но без карты (модуля карты
-// пока нет): персонажи, локации, связи, таймлайн, доска и пара глав
-// рукописи, всё ссылается друг на друга.
+// пока нет): персонажи, локации, связи, фракции, таймлайн, доска и
+// пара глав рукописи, всё ссылается друг на друга.
 
 export function buildDemoBundle() {
   const aster = { id: "demo-c-aster", name: "Астра Вирен", color: "#c9944a",
@@ -37,6 +37,17 @@ export function buildDemoBundle() {
     description: "Артефакт, легитимизирующий притязания на трон", notes: "Спрятан в крепости", tags: "артефакт" };
 
   const locations = [fortress, capital, harbor, blade];
+
+  const factions = [
+    { id: "demo-f-vieren", name: "Дом Вирен", type: "monarchy",
+      description: "Свергнутый правящий род, единственная законная наследница — Астра",
+      notes: "", tags: "изгнанники", leaderId: aster.id, headquartersId: fortress.id,
+      memberIds: [aster.id, kael.id] },
+    { id: "demo-f-legion", name: "Легион Варна", type: "military",
+      description: "Военная сила, которой держится узурпация",
+      notes: "", tags: "антагонисты", leaderId: varn.id, headquartersId: capital.id,
+      memberIds: [varn.id] },
+  ];
 
   const relationships = [
     { id: "demo-r-1", charA: kael.id, charB: aster.id, label: "наставник", score: 70, note: "Учит её десять лет" },
@@ -99,5 +110,5 @@ export function buildDemoBundle() {
     activeChapterId: "demo-ch-1",
   };
 
-  return { characters, locations, relationships, timeline, board, manuscript };
+  return { characters, locations, relationships, factions, timeline, board, manuscript };
 }

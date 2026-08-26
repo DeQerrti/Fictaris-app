@@ -3,6 +3,7 @@ import { renderManuscript } from "./manuscript.js";
 import { renderCharacters } from "./characters.js";
 import { renderLocations } from "./locations.js";
 import { renderRelationships } from "./relationships.js";
+import { renderFactions } from "./factions.js";
 import { renderTimeline } from "./timeline.js";
 import { renderBoard } from "./board.js";
 import { renderData } from "./data-panel.js";
@@ -12,6 +13,7 @@ const MODULES = {
   characters: renderCharacters,
   locations: renderLocations,
   relationships: renderRelationships,
+  factions: renderFactions,
   timeline: renderTimeline,
   board: renderBoard,
   data: renderData,

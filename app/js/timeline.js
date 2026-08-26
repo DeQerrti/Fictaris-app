@@ -1,6 +1,6 @@
 import { apiGet, apiPost, uid } from "./api.js";
 import { debounceSave } from "./save-badge.js";
-import { escapeHtml } from "./chips.js";
+import { escapeHtml, buildToggleGroup } from "./chips.js";
 import { locationTypeInfo } from "./icons.js";
 
 let events = [];
@@ -260,36 +260,4 @@ function buildDrawer(ev) {
   drawer.appendChild(actions);
 
   return drawer;
-}
-
-function buildToggleGroup(label, items, selectedIds, onChange, colorOf = (c) => c.color || "#7c7157") {
-  const field = document.createElement("div");
-  field.className = "field";
-  const lab = document.createElement("label");
-  lab.textContent = label;
-  field.appendChild(lab);
-
-  const row = document.createElement("div");
-  row.className = "timeline-filter-bar";
-  row.style.marginBottom = "0";
-  for (const it of items) {
-    const chip = document.createElement("button");
-    const active = selectedIds.includes(it.id);
-    chip.className = "filter-chip" + (active ? " active" : "");
-    chip.style.setProperty("--chip-color", colorOf(it));
-    chip.textContent = it.name;
-    chip.addEventListener("click", () => {
-      const next = active ? selectedIds.filter((id) => id !== it.id) : [...selectedIds, it.id];
-      onChange(next);
-    });
-    row.appendChild(chip);
-  }
-  if (!items.length) {
-    const none = document.createElement("span");
-    none.className = "filter-count";
-    none.textContent = "пока нет";
-    row.appendChild(none);
-  }
-  field.appendChild(row);
-  return field;
 }

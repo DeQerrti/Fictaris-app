@@ -6,24 +6,26 @@ const EMPTY_MANUSCRIPT = { chapters: [], activeChapterId: null };
 const EMPTY_BOARD = { columns: [], cards: {}, cardOrder: {} };
 
 async function fetchAll() {
-  const [characters, locations, relationships, timeline, board, manuscript] = await Promise.all([
+  const [characters, locations, relationships, factions, timeline, board, manuscript] = await Promise.all([
     apiGet("/api/characters"),
     apiGet("/api/locations"),
     apiGet("/api/relationships"),
+    apiGet("/api/factions"),
     apiGet("/api/timeline"),
     apiGet("/api/board"),
     apiGet("/api/manuscript"),
   ]);
-  return { characters, locations, relationships, timeline, board, manuscript };
+  return { characters, locations, relationships, factions, timeline, board, manuscript };
 }
 
 // Полная замена — импорт и «Заполнить примером» идут одним и тем же
-// путём, чтобы не держать два места, которые пишут во все шесть файлов.
+// путём, чтобы не держать два места, которые пишут во все семь файлов.
 async function applyAll(bundle) {
   await Promise.all([
     apiPost("/api/characters", Array.isArray(bundle.characters) ? bundle.characters : []),
     apiPost("/api/locations", Array.isArray(bundle.locations) ? bundle.locations : []),
     apiPost("/api/relationships", Array.isArray(bundle.relationships) ? bundle.relationships : []),
+    apiPost("/api/factions", Array.isArray(bundle.factions) ? bundle.factions : []),
     apiPost("/api/timeline", Array.isArray(bundle.timeline) ? bundle.timeline : []),
     apiPost("/api/board", bundle.board && Array.isArray(bundle.board.columns) ? bundle.board : EMPTY_BOARD),
     apiPost("/api/manuscript", bundle.manuscript && Array.isArray(bundle.manuscript.chapters) ? bundle.manuscript : EMPTY_MANUSCRIPT),
@@ -69,7 +71,7 @@ function buildExportSection() {
   const section = document.createElement("div");
   section.className = "data-section";
   section.innerHTML =
-    "<h3>Экспорт проекта</h3><p>Один JSON-файл со всеми модулями: персонажи, локации, связи, таймлайн, доска, рукопись.</p>";
+    "<h3>Экспорт проекта</h3><p>Один JSON-файл со всеми модулями: персонажи, локации, связи, фракции, таймлайн, доска, рукопись.</p>";
   const btn = document.createElement("button");
   btn.className = "btn";
   btn.textContent = "Экспортировать";
@@ -131,7 +133,7 @@ function buildDemoSection() {
   const section = document.createElement("div");
   section.className = "data-section";
   section.innerHTML =
-    "<h3>Заполнить примером</h3><p>Связный тестовый сюжет — персонажи, локации, связи, таймлайн, доска и две главы рукописи, чтобы сразу увидеть, как модули работают вместе.</p>";
+    "<h3>Заполнить примером</h3><p>Связный тестовый сюжет — персонажи, локации, связи, фракции, таймлайн, доска и две главы рукописи, чтобы сразу увидеть, как модули работают вместе.</p>";
 
   const btn = document.createElement("button");
   btn.className = "btn";

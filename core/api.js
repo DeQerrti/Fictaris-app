@@ -55,4 +55,10 @@ export const ROUTES = {
     }
     return vault.writeJson("board.json", body);
   },
+
+  "GET /api/factions": async ({ vault }) => vault.readJson("factions.json", []),
+  "POST /api/factions": async ({ vault, body }) => {
+    if (!Array.isArray(body)) throw new ApiError("Ожидался список фракций");
+    return vault.writeJson("factions.json", body);
+  },
 };
