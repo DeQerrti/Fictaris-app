@@ -16,6 +16,8 @@ export class ApiError extends Error {
 
 const EMPTY_MANUSCRIPT = { chapters: [], activeChapterId: null };
 const EMPTY_BOARD = { columns: [], cards: {}, cardOrder: {} };
+const EMPTY_MAP = { rootId: null, maps: {} };
+const IMAGE_EXT = /^(jpg|jpeg|png|webp)$/i;
 
 export const ROUTES = {
   "GET /api/characters": async ({ vault }) => vault.readJson("characters.json", []),
@@ -60,5 +62,24 @@ export const ROUTES = {
   "POST /api/factions": async ({ vault, body }) => {
     if (!Array.isArray(body)) throw new ApiError("Ожидался список фракций");
     return vault.writeJson("factions.json", body);
+  },
+
+  "GET /api/map": async ({ vault }) => vault.readJson("map.json", EMPTY_MAP),
+  "POST /api/map": async ({ vault, body }) => {
+    if (!body || typeof body.maps !== "object") throw new ApiError("Некорректная карта");
+    return vault.writeJson("map.json", body);
+  },
+
+  // Картинка приходит как base64 (сжата на клиенте через <canvas> перед
+  // отправкой — см. брифе про compressImage) и уезжает на диск отдельным
+  // файлом; map.json хранит только относительный путь к нему.
+  "POST /api/map/image": async ({ vault, body }) => {
+    if (!body.data) throw new ApiError("Нет данных изображения");
+    const ext = IMAGE_EXT.test(body.ext) ? body.ext.toLowerCase() : "jpg";
+    const name = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}.${ext}`;
+    const buffer = Buffer.from(body.data, "base64");
+    if (buffer.length > 20 * 1024 * 1024) throw new ApiError("Изображение слишком большое", 413);
+    const relPath = await vault.saveImage(name, buffer);
+    return { path: relPath };
   },
 };

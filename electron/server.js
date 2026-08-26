@@ -19,10 +19,17 @@ const MIME = {
   ".css": "text/css; charset=utf-8",
   ".json": "application/json; charset=utf-8",
   ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".webp": "image/webp",
   ".svg": "image/svg+xml",
   ".ico": "image/x-icon",
   ".woff2": "font/woff2",
 };
+
+// Картинки карты живут в хранилище (maps/), а не в составе приложения —
+// отдаём их отдельно, по тому же пути, что вернул /api/map/image.
+const VAULT_MEDIA = /^\/maps\//;
 
 // Сохранения выполняются строго по одному — иначе два подряд идущих
 // автосохранения (например, правка персонажа сразу после правки
@@ -120,6 +127,13 @@ export function createServer({ appDir, getVault, appRoutes = {} }) {
 
       if (req.method !== "GET" && req.method !== "HEAD") {
         return sendJson(res, { error: "Method Not Allowed" }, 405);
+      }
+
+      // ── Картинки карты — из хранилища ──
+      const vaultForMedia = getVault();
+      if (vaultForMedia && VAULT_MEDIA.test(pathname)) {
+        const target = resolveInside(vaultForMedia.root, pathname);
+        if (target && (await serveFile(res, target))) return;
       }
 
       // ── Экран приветствия ──

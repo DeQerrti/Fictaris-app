@@ -90,4 +90,19 @@ export class Vault {
       await fs.rm(path.join(dir, old), { force: true });
     }
   }
+
+  // Изображения карты — отдельные файлы в maps/, а не base64 внутри
+  // map.json: то самое, от чего предостерегал бриф (window.storage
+  // упирался в лимит 5MB на ключ именно потому, что все картинки
+  // одного модуля бандлились в один JSON-блоб). На файловой системе
+  // лимита нет, но привычка хранить бинарные данные файлами, а не
+  // строками в JSON, всё равно правильная — сам map.json остаётся
+  // маленьким и читаемым.
+  async saveImage(filename, buffer) {
+    const dir = path.join(this.root, "maps");
+    await fs.mkdir(dir, { recursive: true });
+    const safeName = filename.replace(/[/\\:*?"<>|\x00-\x1f]/g, "_").slice(-80);
+    await fs.writeFile(path.join(dir, safeName), buffer);
+    return `maps/${safeName}`;
+  }
 }

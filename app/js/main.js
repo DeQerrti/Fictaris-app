@@ -6,6 +6,7 @@ import { renderRelationships } from "./relationships.js";
 import { renderFactions } from "./factions.js";
 import { renderTimeline } from "./timeline.js";
 import { renderBoard } from "./board.js";
+import { renderMap } from "./map.js";
 import { renderData } from "./data-panel.js";
 
 const MODULES = {
@@ -16,6 +17,7 @@ const MODULES = {
   factions: renderFactions,
   timeline: renderTimeline,
   board: renderBoard,
+  map: renderMap,
   data: renderData,
 };
 

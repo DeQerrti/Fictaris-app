@@ -14,6 +14,7 @@ const KNOWN_FILES = new Set([
   "timeline.json",
   "board.json",
   "factions.json",
+  "map.json",
 ]);
 
 export function isAllowedFile(name) {
