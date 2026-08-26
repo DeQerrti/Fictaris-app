@@ -15,6 +15,7 @@ export class ApiError extends Error {
 }
 
 const EMPTY_MANUSCRIPT = { chapters: [], activeChapterId: null };
+const EMPTY_BOARD = { columns: [], cards: {}, cardOrder: {} };
 
 export const ROUTES = {
   "GET /api/characters": async ({ vault }) => vault.readJson("characters.json", []),
@@ -45,5 +46,13 @@ export const ROUTES = {
   "POST /api/timeline": async ({ vault, body }) => {
     if (!Array.isArray(body)) throw new ApiError("Ожидался список событий");
     return vault.writeJson("timeline.json", body);
+  },
+
+  "GET /api/board": async ({ vault }) => vault.readJson("board.json", EMPTY_BOARD),
+  "POST /api/board": async ({ vault, body }) => {
+    if (!body || !Array.isArray(body.columns) || !body.cards || !body.cardOrder) {
+      throw new ApiError("Некорректная доска");
+    }
+    return vault.writeJson("board.json", body);
   },
 };

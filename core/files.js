@@ -12,6 +12,7 @@ const KNOWN_FILES = new Set([
   "locations.json",
   "relationships.json",
   "timeline.json",
+  "board.json",
 ]);
 
 export function isAllowedFile(name) {

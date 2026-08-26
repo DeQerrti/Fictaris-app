@@ -4,6 +4,7 @@ import { renderCharacters } from "./characters.js";
 import { renderLocations } from "./locations.js";
 import { renderRelationships } from "./relationships.js";
 import { renderTimeline } from "./timeline.js";
+import { renderBoard } from "./board.js";
 
 const MODULES = {
   manuscript: renderManuscript,
@@ -11,6 +12,7 @@ const MODULES = {
   locations: renderLocations,
   relationships: renderRelationships,
   timeline: renderTimeline,
+  board: renderBoard,
 };
 
 const content = document.getElementById("content");
