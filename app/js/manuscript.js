@@ -28,6 +28,21 @@ function wordCount(text) {
   return m ? m.length : 0;
 }
 
+// Заметки автора не входят — они и на сайте, и здесь предназначены для
+// самого пишущего, а не для читателя итогового текста.
+function exportMarkdown() {
+  const body = manuscript.chapters
+    .map((ch) => `# ${ch.title || "Без названия"}\n\n${ch.content || ""}`)
+    .join("\n\n---\n\n");
+  const blob = new Blob([body], { type: "text/markdown" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "manuscript.md";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export async function renderManuscript(root) {
   container = root;
   [manuscript, characters] = await Promise.all([apiGet("/api/manuscript"), apiGet("/api/characters")]);
@@ -81,6 +96,12 @@ function buildChapterList() {
     draw();
   });
   list.appendChild(addBtn);
+
+  const exportBtn = document.createElement("button");
+  exportBtn.className = "add-chapter";
+  exportBtn.textContent = "Экспорт в .md";
+  exportBtn.addEventListener("click", exportMarkdown);
+  list.appendChild(exportBtn);
 
   return list;
 }
