@@ -1,0 +1,84 @@
+# Сборка приложения под три системы — по образцу TasteID
+# (https://github.com/DeQerrti/tasteid-app/blob/main/.github/workflows/build.yml).
+#
+# Синтаксис-проверка гоняется на каждый push и pull request — она быстрая.
+# Установщики собираются только по тегу вида v1.2.3 или вручную с вкладки
+# Actions: собирать их на каждый коммит значит тратить машинное время
+# впустую, а результат нужен только когда версию действительно выпускаешь.
+name: Проверки и сборка
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Версия для релиза (например 0.1.0)"
+        required: true
+        default: "0.1.0"
+
+jobs:
+  check:
+    name: Проверки
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: |
+          for f in $(find core electron app/js -name '*.js'); do
+            node --check "$f" || exit 1
+          done
+
+  build:
+    name: Установщики
+    needs: check
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    # Без этого шаг с релизом падает на 403: по умолчанию токен рабочего
+    # процесса умеет только читать, а ему нужно создать релиз и залить
+    # в него установщики.
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: win
+          - os: macos-latest
+            target: mac
+          - os: ubuntu-latest
+            target: linux
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build:${{ matrix.target }}
+        env:
+          # Приложение не подписано, и это осознанно: подпись стоит денег
+          # и всё равно не убирает предупреждение Windows целиком. Без
+          # этой переменной electron-builder попробует подписать сам и
+          # упадёт на отсутствующем сертификате.
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+      - uses: softprops/action-gh-release@v2
+        with:
+          # По тегу имя релиза берётся из него самого; при ручном запуске
+          # тега нет, поэтому версию спрашиваем во входных данных.
+          tag_name: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', inputs.version) || github.ref_name }}
+          files: |
+            dist/*.exe
+            dist/*.dmg
+            dist/*.AppImage
+            dist/*.blockmap
+            dist/latest*.yml
+          draft: true
+          fail_on_unmatched_files: false
