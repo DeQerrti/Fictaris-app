@@ -1,5 +1,12 @@
 apply plugin: 'com.android.application'
 
+// Версия у приложения одна на все платформы, и живёт она в package.json.
+// Держать её здесь копией значило бы однажды выпустить телефонную сборку
+// со старым номером — а проверка обновлений (mobile/src/main.js) как раз
+// сравнивает себя с App.getInfo().version, то есть с этим числом.
+def appVersion = new groovy.json.JsonSlurper().parse(file("../../package.json")).version
+def (major, minor, patch) = appVersion.tokenize('.').collect { it.toInteger() }
+
 android {
     namespace = "ru.fictaris.app"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -7,8 +14,10 @@ android {
         applicationId "ru.fictaris.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        // versionCode должен только расти и быть целым — складываем его
+        // из тех же трёх чисел: 0.2.0 -> 200, 1.4.12 -> 10412.
+        versionCode major * 10000 + minor * 100 + patch
+        versionName appVersion
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
