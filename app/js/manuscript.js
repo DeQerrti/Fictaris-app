@@ -68,7 +68,7 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
-export async function renderManuscript(root) {
+export async function renderManuscript(root, focusChapterId) {
   container = root;
   focusMode = false; // модуль всегда открывается в обычном виде, фокус — временное состояние сессии просмотра
   [manuscript, characters] = await Promise.all([apiGet("/api/manuscript"), apiGet("/api/characters")]);
@@ -78,7 +78,11 @@ export async function renderManuscript(root) {
     manuscript.activeChapterId = c.id;
     persist();
   }
-  if (!manuscript.activeChapterId) manuscript.activeChapterId = manuscript.chapters[0]?.id || null;
+  if (focusChapterId && manuscript.chapters.some((c) => c.id === focusChapterId)) {
+    manuscript.activeChapterId = focusChapterId;
+  } else if (!manuscript.activeChapterId) {
+    manuscript.activeChapterId = manuscript.chapters[0]?.id || null;
+  }
   draw();
 }
 

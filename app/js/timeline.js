@@ -51,13 +51,14 @@ function locById(id) {
   return locations.find((l) => l.id === id);
 }
 
-export async function renderTimeline(root) {
+export async function renderTimeline(root, focusId) {
   container = root;
   [events, characters, locations] = await Promise.all([
     apiGet("/api/timeline"),
     apiGet("/api/characters"),
     apiGet("/api/locations"),
   ]);
+  if (focusId && events.some((e) => e.id === focusId)) activeId = focusId;
   draw();
 }
 

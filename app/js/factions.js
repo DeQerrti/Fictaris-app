@@ -27,13 +27,14 @@ function blank() {
   };
 }
 
-export async function renderFactions(root) {
+export async function renderFactions(root, focusId) {
   container = root;
   [factions, characters, locations] = await Promise.all([
     apiGet("/api/factions"),
     apiGet("/api/characters"),
     apiGet("/api/locations"),
   ]);
+  if (focusId && factions.some((f) => f.id === focusId)) activeId = focusId;
   draw();
 }
 

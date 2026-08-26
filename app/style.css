@@ -368,6 +368,111 @@ button.btn.accent {
 
 button.btn.accent:hover { background: var(--accent-hover); border-color: var(--accent-hover); color: var(--panel); }
 
+/* ── Поиск ─────────────────────────────────── */
+
+.search-trigger {
+  margin: 0 12px 12px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--panel-alt);
+  color: var(--text-dim);
+  font-family: inherit;
+  font-size: 0.82rem;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.search-trigger:hover { border-color: var(--accent); color: var(--text); }
+
+.search-trigger-hint {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.7rem;
+  color: var(--text-faint);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0 5px;
+}
+
+.search-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 12vh;
+}
+
+.search-overlay.hidden { display: none; }
+
+.search-modal {
+  width: min(560px, 90vw);
+  max-height: 70vh;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+  display: flex;
+  flex-direction: column;
+}
+
+.search-input {
+  padding: 14px 16px;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.95rem;
+  outline: none;
+}
+
+.search-results { overflow-y: auto; }
+
+.search-result {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 16px;
+  border: none;
+  border-left: 3px solid var(--result-color, var(--accent));
+  background: none;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.88rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.search-result:hover { background: var(--panel-alt); }
+
+.search-result-type {
+  flex-shrink: 0;
+  font-size: 0.7rem;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.search-result-title { font-weight: 600; }
+
+.search-result-sub {
+  color: var(--text-dim);
+  font-size: 0.82rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-empty { padding: 16px; color: var(--text-faint); font-size: 0.85rem; }
+
 /* ── Оформление ────────────────────────────── */
 
 .theme-swatches { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }

@@ -32,7 +32,7 @@ function blank() {
   };
 }
 
-export async function renderLocations(root) {
+export async function renderLocations(root, focusId) {
   container = root;
   [locations, timeline, factions, mapData] = await Promise.all([
     apiGet("/api/locations"),
@@ -40,6 +40,7 @@ export async function renderLocations(root) {
     apiGet("/api/factions"),
     apiGet("/api/map"),
   ]);
+  if (focusId && locations.some((l) => l.id === focusId)) activeId = focusId;
   draw();
 }
 

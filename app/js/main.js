@@ -14,6 +14,7 @@ import { renderTrash, trashCount } from "./trash.js";
 import { initProjectSwitcher } from "./project-switcher.js";
 import { initUpdateBanner } from "./update-banner.js";
 import { applyTheme } from "./theme.js";
+import { initSearch, openSearch } from "./search.js";
 
 const MODULES = {
   manuscript: renderManuscript,
@@ -53,6 +54,9 @@ navItems.forEach((btn) => {
 
 sidebarToggle.addEventListener("click", () => appEl.classList.toggle("sidebar-open"));
 sidebarBackdrop.addEventListener("click", () => appEl.classList.remove("sidebar-open"));
+
+document.getElementById("searchTrigger").addEventListener("click", () => openSearch());
+initSearch((module, focusId) => openModule(module, focusId));
 
 // Клик по @упоминанию в тексте главы (mentions.js) — открывает карточку
 // персонажа в модуле «Персонажи», а не только подсвечивает имя.
