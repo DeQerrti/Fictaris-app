@@ -2,6 +2,7 @@ import { apiGet, apiPost, uid } from "./api.js";
 import { debounceSave } from "./save-badge.js";
 import { escapeHtml } from "./chips.js";
 import { pushTrash } from "./trash.js";
+import { buildReverseLinks } from "./reverse-links.js";
 
 const PALETTE = [
   "#c9944a", "#4f7d74", "#a4483c", "#7d6a9e",
@@ -21,6 +22,11 @@ const FIELDS = [
 ];
 
 let characters = [];
+let relationships = [];
+let timeline = [];
+let factions = [];
+let board = { cards: {} };
+let mapData = { maps: {} };
 let activeId = null;
 let container = null;
 const save = debounceSave((list) => apiPost("/api/characters", list));
@@ -45,9 +51,53 @@ function initials(name) {
 
 export async function renderCharacters(root, focusId) {
   container = root;
-  characters = await apiGet("/api/characters");
+  [characters, relationships, timeline, factions, board, mapData] = await Promise.all([
+    apiGet("/api/characters"),
+    apiGet("/api/relationships"),
+    apiGet("/api/timeline"),
+    apiGet("/api/factions"),
+    apiGet("/api/board"),
+    apiGet("/api/map"),
+  ]);
   if (focusId && characters.some((c) => c.id === focusId)) activeId = focusId;
   draw();
+}
+
+function reverseLinksFor(c) {
+  const relRows = relationships
+    .filter((r) => r.charA === c.id || r.charB === c.id)
+    .map((r) => {
+      const other = characters.find((x) => x.id === (r.charA === c.id ? r.charB : r.charA));
+      return other ? `${other.name}${r.label ? " — " + r.label : ""}` : null;
+    })
+    .filter(Boolean);
+
+  const eventRows = timeline
+    .filter((e) => (e.characterIds || []).includes(c.id))
+    .map((e) => `${e.title}${e.date ? ` (${e.date})` : ""}`);
+
+  const factionRows = factions
+    .filter((f) => f.leaderId === c.id || (f.memberIds || []).includes(c.id))
+    .map((f) => `${f.name}${f.leaderId === c.id ? " (глава)" : ""}`);
+
+  const cardRows = Object.values(board.cards || {})
+    .filter((card) => card.characterId === c.id)
+    .map((card) => card.title);
+
+  const pinRows = [];
+  for (const m of Object.values(mapData.maps || {})) {
+    for (const pin of m.pins || []) {
+      if (pin.characterId === c.id) pinRows.push(`${pin.label} (карта «${m.name}»)`);
+    }
+  }
+
+  return buildReverseLinks([
+    ["Связи", relRows],
+    ["Таймлайн", eventRows],
+    ["Фракции", factionRows],
+    ["Карточки доски", cardRows],
+    ["Метки на карте", pinRows],
+  ]);
 }
 
 function draw() {
@@ -148,6 +198,9 @@ function buildDrawer(c) {
     field.appendChild(input);
     drawer.appendChild(field);
   }
+
+  const reverse = reverseLinksFor(c);
+  if (reverse) drawer.appendChild(reverse);
 
   const actions = document.createElement("div");
   actions.className = "drawer-actions";

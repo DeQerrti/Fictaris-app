@@ -824,3 +824,30 @@ button.btn.danger:hover { border-color: var(--color-3); color: var(--color-3); }
   font-size: 0.85rem;
   line-height: 1.7;
 }
+
+/* ── Реверс-связи в карточках ──────────────────── */
+
+.reverse-links {
+  margin-top: 20px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.reverse-links-title {
+  font-size: 0.75rem;
+  color: var(--text-faint);
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.reverse-links-group {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  line-height: 1.6;
+}
+
+.reverse-links-group strong {
+  color: var(--text);
+  font-weight: 600;
+}

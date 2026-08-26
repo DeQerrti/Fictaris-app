@@ -3,6 +3,7 @@ import { debounceSave } from "./save-badge.js";
 import { escapeHtml } from "./chips.js";
 import { pushTrash } from "./trash.js";
 import { LOCATION_TYPES, locationTypeInfo, iconSvg } from "./icons.js";
+import { buildReverseLinks } from "./reverse-links.js";
 
 const FIELDS = [
   ["description", "Описание", "textarea"],
@@ -11,6 +12,9 @@ const FIELDS = [
 ];
 
 let locations = [];
+let timeline = [];
+let factions = [];
+let mapData = { maps: {} };
 let activeId = null;
 let container = null;
 const save = debounceSave((list) => apiPost("/api/locations", list));
@@ -30,8 +34,36 @@ function blank() {
 
 export async function renderLocations(root) {
   container = root;
-  locations = await apiGet("/api/locations");
+  [locations, timeline, factions, mapData] = await Promise.all([
+    apiGet("/api/locations"),
+    apiGet("/api/timeline"),
+    apiGet("/api/factions"),
+    apiGet("/api/map"),
+  ]);
   draw();
+}
+
+function reverseLinksFor(loc) {
+  const eventRows = timeline
+    .filter((e) => (e.locationIds || []).includes(loc.id))
+    .map((e) => `${e.title}${e.date ? ` (${e.date})` : ""}`);
+
+  const factionRows = factions
+    .filter((f) => f.headquartersId === loc.id)
+    .map((f) => `${f.name} (штаб-квартира)`);
+
+  const pinRows = [];
+  for (const m of Object.values(mapData.maps || {})) {
+    for (const pin of m.pins || []) {
+      if (pin.locationId === loc.id) pinRows.push(`${pin.label} (карта «${m.name}»)`);
+    }
+  }
+
+  return buildReverseLinks([
+    ["Таймлайн", eventRows],
+    ["Фракции", factionRows],
+    ["Метки на карте", pinRows],
+  ]);
 }
 
 function draw() {
@@ -137,6 +169,9 @@ function buildDrawer(loc) {
     field.appendChild(input);
     drawer.appendChild(field);
   }
+
+  const reverse = reverseLinksFor(loc);
+  if (reverse) drawer.appendChild(reverse);
 
   const actions = document.createElement("div");
   actions.className = "drawer-actions";
