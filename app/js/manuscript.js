@@ -1,6 +1,7 @@
 import { apiGet, apiPost, uid } from "./api.js";
 import { debounceSave } from "./save-badge.js";
 import { escapeHtml } from "./chips.js";
+import { mentionsToHtml, attachMentionAutocomplete } from "./mentions.js";
 
 const STATUSES = [
   ["draft", "Черновик"],
@@ -9,6 +10,8 @@ const STATUSES = [
 ];
 
 let manuscript = { chapters: [], activeChapterId: null };
+let characters = [];
+let viewMode = false;
 let container = null;
 const save = debounceSave((data) => apiPost("/api/manuscript", data));
 
@@ -27,7 +30,7 @@ function wordCount(text) {
 
 export async function renderManuscript(root) {
   container = root;
-  manuscript = await apiGet("/api/manuscript");
+  [manuscript, characters] = await Promise.all([apiGet("/api/manuscript"), apiGet("/api/characters")]);
   if (!manuscript.chapters.length) {
     const c = blankChapter();
     manuscript.chapters = [c];
@@ -125,6 +128,15 @@ function buildEditor() {
   });
   header.appendChild(statusSelect);
 
+  const modeBtn = document.createElement("button");
+  modeBtn.className = "btn";
+  modeBtn.textContent = viewMode ? "Правка" : "Просмотр";
+  modeBtn.addEventListener("click", () => {
+    viewMode = !viewMode;
+    draw();
+  });
+  header.appendChild(modeBtn);
+
   const wc = document.createElement("div");
   wc.className = "word-count";
   const total = manuscript.chapters.reduce((sum, c) => sum + wordCount(c.content), 0);
@@ -133,16 +145,31 @@ function buildEditor() {
 
   pane.appendChild(header);
 
-  const textarea = document.createElement("textarea");
-  textarea.className = "chapter-content";
-  textarea.value = chapter.content;
-  textarea.placeholder = "Пиши здесь…";
-  textarea.addEventListener("input", () => {
-    chapter.content = textarea.value;
-    wc.textContent = `${wordCount(chapter.content)} слов · всего ${manuscript.chapters.reduce((s, c) => s + wordCount(c.content), 0)}`;
-    persist();
-  });
-  pane.appendChild(textarea);
+  if (viewMode) {
+    const view = document.createElement("div");
+    view.className = "chapter-content chapter-content-view";
+    view.innerHTML = mentionsToHtml(chapter.content, characters) || '<span class="empty-state">Глава пуста.</span>';
+    view.addEventListener("click", (e) => {
+      const charId = e.target.dataset?.charId;
+      if (charId) document.dispatchEvent(new CustomEvent("fictaris:open-character", { detail: { id: charId } }));
+    });
+    pane.appendChild(view);
+  } else {
+    const wrap = document.createElement("div");
+    wrap.style.cssText = "position:relative;flex:1;display:flex;overflow:hidden;";
+    const textarea = document.createElement("textarea");
+    textarea.className = "chapter-content";
+    textarea.value = chapter.content;
+    textarea.placeholder = "Пиши здесь… @имя вставит упоминание персонажа";
+    textarea.addEventListener("input", () => {
+      chapter.content = textarea.value;
+      wc.textContent = `${wordCount(chapter.content)} слов · всего ${manuscript.chapters.reduce((s, c) => s + wordCount(c.content), 0)}`;
+      persist();
+    });
+    wrap.appendChild(textarea);
+    attachMentionAutocomplete(textarea, () => characters);
+    pane.appendChild(wrap);
+  }
 
   const notes = document.createElement("details");
   notes.className = "author-notes";

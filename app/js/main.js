@@ -24,14 +24,20 @@ const MODULES = {
 const content = document.getElementById("content");
 const navItems = document.querySelectorAll(".nav-item");
 
-async function openModule(name) {
+async function openModule(name, arg) {
   navItems.forEach((btn) => btn.classList.toggle("active", btn.dataset.module === name));
   content.innerHTML = "";
-  await MODULES[name](content);
+  await MODULES[name](content, arg);
 }
 
 navItems.forEach((btn) => {
   btn.addEventListener("click", () => openModule(btn.dataset.module));
+});
+
+// Клик по @упоминанию в тексте главы (mentions.js) — открывает карточку
+// персонажа в модуле «Персонажи», а не только подсвечивает имя.
+document.addEventListener("fictaris:open-character", (e) => {
+  openModule("characters", e.detail.id);
 });
 
 async function boot() {

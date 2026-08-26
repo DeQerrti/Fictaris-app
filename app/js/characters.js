@@ -42,9 +42,10 @@ function initials(name) {
   return (name || "?").trim().slice(0, 1).toUpperCase();
 }
 
-export async function renderCharacters(root) {
+export async function renderCharacters(root, focusId) {
   container = root;
   characters = await apiGet("/api/characters");
+  if (focusId && characters.some((c) => c.id === focusId)) activeId = focusId;
   draw();
 }
 

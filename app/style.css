@@ -632,6 +632,47 @@ button.btn.danger:hover { border-color: var(--color-3); color: var(--color-3); }
   font-size: 0.82rem;
 }
 
+/* ── @упоминания ───────────────────────────── */
+
+.mention {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.mention:hover { text-decoration: underline; }
+
+.chapter-content-view {
+  white-space: pre-wrap;
+  overflow-y: auto;
+  cursor: text;
+}
+
+.mention-autocomplete {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  z-index: 20;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  min-width: 160px;
+  overflow: hidden;
+}
+
+.mention-autocomplete-item {
+  padding: 7px 12px;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  cursor: pointer;
+  border-left: 3px solid var(--chip-color, var(--accent));
+}
+
+.mention-autocomplete-item:hover {
+  background: var(--panel-alt);
+  color: var(--text);
+}
+
 /* ── Данные (экспорт/импорт/демо) ─────────────── */
 
 .data-panel {

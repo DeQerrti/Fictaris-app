@@ -2,6 +2,7 @@ import { apiGet, apiPost, uid } from "./api.js";
 import { debounceSave } from "./save-badge.js";
 import { escapeHtml, buildToggleGroup } from "./chips.js";
 import { locationTypeInfo } from "./icons.js";
+import { attachMentionAutocomplete } from "./mentions.js";
 
 let events = [];
 let characters = [];
@@ -225,6 +226,7 @@ function buildDrawer(ev) {
   descArea.value = ev.description || "";
   descArea.addEventListener("input", () => { ev.description = descArea.value; persist(); });
   descField.appendChild(descArea);
+  attachMentionAutocomplete(descArea, () => characters);
   drawer.appendChild(descField);
 
   drawer.appendChild(buildToggleGroup("Персонажи", characters, ev.characterIds || [], (ids) => {
