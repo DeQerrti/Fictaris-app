@@ -40,4 +40,10 @@ export const ROUTES = {
     if (!Array.isArray(body)) throw new ApiError("Ожидался список связей");
     return vault.writeJson("relationships.json", body);
   },
+
+  "GET /api/timeline": async ({ vault }) => vault.readJson("timeline.json", []),
+  "POST /api/timeline": async ({ vault, body }) => {
+    if (!Array.isArray(body)) throw new ApiError("Ожидался список событий");
+    return vault.writeJson("timeline.json", body);
+  },
 };
