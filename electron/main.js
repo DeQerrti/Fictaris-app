@@ -27,6 +27,16 @@ const { autoUpdater } = pkg;
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const APP_DIR = path.join(HERE, "..", "app");
 
+// Масштаб — проценты, а не «уровни» setZoomLevel: тот множит на 1.2 за
+// шаг, поэтому от 100% сразу прыгает на 120%, потом на 144% — с таким
+// шагом не попасть ни на 110%, ни на 140%. setZoomFactor принимает
+// множитель напрямую (1.4 = 140%), отсюда и везде проценты. Предел в
+// обе стороны — чтобы нельзя было довести окно до нечитаемого и не
+// суметь вернуть обратно. По образцу TasteID (electron/main.js).
+const ZOOM_MIN = 50;
+const ZOOM_MAX = 200;
+const ZOOM_STEP = 10;
+
 // Без замка на один экземпляр второй запуск при уже открытом окне
 // заводит второй процесс поверх первого — тот же случай, что и в
 // TasteID (electron/main.js), см. комментарий там.
@@ -287,6 +297,45 @@ function checkForUpdates() {
   });
 }
 
+// ── Масштаб и меню ───────────────────────────────
+// Раньше в v1 меню не было вовсе (Menu.setApplicationMenu(null)) — без
+// него не работали ни зум, ни F5, ни девтулы, а системная рамка окна и
+// так уже осталась (в отличие от безрамочного TasteID), так что своя
+// полоса меню сюда встаёт без лишней возни с electron/chrome.js.
+function applyZoom(percent) {
+  win?.webContents.setZoomFactor(percent / 100);
+}
+
+async function bumpZoom(deltaPercent) {
+  const percent = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, (config.zoom ?? 100) + deltaPercent));
+  applyZoom(percent);
+  await saveConfig({ zoom: percent });
+}
+
+function buildMenu() {
+  Menu.setApplicationMenu(
+    Menu.buildFromTemplate([
+      {
+        label: "Файл",
+        submenu: [
+          { role: "quit", label: "Выход" },
+          { label: "Обновить", accelerator: "F5", click: () => win?.reload() },
+          { label: "Инструменты разработчика", accelerator: "F12", click: () => win?.webContents.toggleDevTools() },
+        ],
+      },
+      {
+        label: "Вид",
+        submenu: [
+          { label: "Крупнее", accelerator: "CommandOrControl+=", click: () => bumpZoom(ZOOM_STEP) },
+          { label: "Мельче", accelerator: "CommandOrControl+-", click: () => bumpZoom(-ZOOM_STEP) },
+          { label: "Обычный размер", accelerator: "CommandOrControl+0", click: () => bumpZoom(100 - (config.zoom ?? 100)) },
+          { role: "togglefullscreen", label: "Во весь экран" },
+        ],
+      },
+    ])
+  );
+}
+
 function openMain() {
   win?.loadURL(`http://127.0.0.1:${port}/`);
 }
@@ -310,6 +359,7 @@ function createWindow() {
     shell.openExternal(url);
     return { action: "deny" };
   });
+  win.webContents.on("did-finish-load", () => applyZoom(config.zoom ?? 100));
 
   // Дать автосинхронизации (app/js/sync.js) недолго доработать перед
   // закрытием окна — закрыв Fictaris, человек с большой вероятностью не
@@ -358,9 +408,9 @@ app.whenReady().then(async () => {
   port = await listen(server);
 
   // Безрамочного окна нет (в отличие от TasteID) — оставляем системную
-  // рамку в v1, чтобы не тащить electron/chrome.js ради минимального
-  // костяка; полоса меню не нужна и без своих сочетаний клавиш.
-  Menu.setApplicationMenu(null);
+  // рамку, чтобы не тащить electron/chrome.js; полоса меню — только
+  // ради зума/F5/девтулов, сама себя не показывает поверх контента.
+  buildMenu();
 
   createWindow();
   if (known) openMain();
