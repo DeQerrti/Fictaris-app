@@ -1,5 +1,6 @@
 import { apiGet, apiPost } from "./api.js";
 import { buildDemoBundle } from "./demo-data.js";
+import { i18n } from "./i18n.js";
 
 const SCHEMA_VERSION = 1;
 const EMPTY_MANUSCRIPT = { chapters: [], activeChapterId: null };
@@ -54,14 +55,14 @@ function showConfirmBar(bar, message, onConfirm) {
   text.textContent = message;
   const yes = document.createElement("button");
   yes.className = "btn danger";
-  yes.textContent = "Да, заменить";
+  yes.textContent = i18n("Да, заменить");
   yes.addEventListener("click", () => {
     bar.innerHTML = "";
     onConfirm();
   });
   const no = document.createElement("button");
   no.className = "btn";
-  no.textContent = "Отмена";
+  no.textContent = i18n("Отмена");
   no.addEventListener("click", () => {
     bar.innerHTML = "";
   });
@@ -81,16 +82,18 @@ export async function renderData(root) {
   root.appendChild(wrap);
 }
 
-const HISTORY_FILES = [
-  ["characters.json", "Персонажи"],
-  ["locations.json", "Локации"],
-  ["relationships.json", "Связи"],
-  ["factions.json", "Фракции"],
-  ["timeline.json", "Таймлайн"],
-  ["board.json", "Доска"],
-  ["map.json", "Карта"],
-  ["manuscript.json", "Рукопись"],
-];
+function historyFiles() {
+  return [
+    ["characters.json", i18n("Персонажи")],
+    ["locations.json", i18n("Локации")],
+    ["relationships.json", i18n("Связи")],
+    ["factions.json", i18n("Фракции")],
+    ["timeline.json", i18n("Таймлайн")],
+    ["board.json", i18n("Доска")],
+    ["map.json", i18n("Карта")],
+    ["manuscript.json", i18n("Рукопись")],
+  ];
+}
 
 // Vault пишет .history на каждое сохранение (см. electron/vault.js) —
 // здесь просто витрина для того, что уже лежит на диске: посмотреть
@@ -98,15 +101,14 @@ const HISTORY_FILES = [
 function buildHistorySection() {
   const section = document.createElement("div");
   section.className = "data-section";
-  section.innerHTML =
-    "<h3>История версий</h3><p>Каждое сохранение оставляет прошлую версию файла в папке <code>.history</code>. Выбери модуль, чтобы увидеть его версии.</p>";
+  section.innerHTML = `<h3>${i18n("История версий")}</h3><p>${i18n("Каждое сохранение оставляет прошлую версию файла в папке")} <code>.history</code>. ${i18n("Выбери модуль, чтобы увидеть его версии.")}</p>`;
 
   const select = document.createElement("select");
   const placeholder = document.createElement("option");
   placeholder.value = "";
-  placeholder.textContent = "Выбери модуль…";
+  placeholder.textContent = i18n("Выбери модуль…");
   select.appendChild(placeholder);
-  for (const [file, label] of HISTORY_FILES) {
+  for (const [file, label] of historyFiles()) {
     const opt = document.createElement("option");
     opt.value = file;
     opt.textContent = label;
@@ -123,7 +125,7 @@ function buildHistorySection() {
     if (!select.value) return;
     const versions = await apiGet(`/api/history?file=${encodeURIComponent(select.value)}`);
     if (!versions.length) {
-      list.innerHTML = '<div class="empty-state">Пока нет прошлых версий — история появляется со второго сохранения.</div>';
+      list.innerHTML = `<div class="empty-state">${i18n("Пока нет прошлых версий — история появляется со второго сохранения.")}</div>`;
       return;
     }
     for (const v of versions) {
@@ -145,17 +147,17 @@ function buildHistoryRow(file, version) {
 
   const btn = document.createElement("button");
   btn.className = "btn";
-  btn.textContent = "Восстановить";
+  btn.textContent = i18n("Восстановить");
   btn.addEventListener("click", () => {
     if (btn.dataset.confirm === "1") {
       apiPost("/api/history/restore", { file, id: version.id }).then(() => location.reload());
       return;
     }
     btn.dataset.confirm = "1";
-    btn.textContent = "Заменит текущую версию. Точно?";
+    btn.textContent = i18n("Заменит текущую версию. Точно?");
     setTimeout(() => {
       btn.dataset.confirm = "";
-      btn.textContent = "Восстановить";
+      btn.textContent = i18n("Восстановить");
     }, 4000);
   });
   row.appendChild(btn);
@@ -166,11 +168,10 @@ function buildHistoryRow(file, version) {
 function buildExportSection() {
   const section = document.createElement("div");
   section.className = "data-section";
-  section.innerHTML =
-    "<h3>Экспорт проекта</h3><p>Один JSON-файл со всеми модулями: персонажи, локации, связи, фракции, таймлайн, доска, карта (только метки — картинки остаются файлами на диске), рукопись.</p>";
+  section.innerHTML = `<h3>${i18n("Экспорт проекта")}</h3><p>${i18n("Один JSON-файл со всеми модулями: персонажи, локации, связи, фракции, таймлайн, доска, карта (только метки — картинки остаются файлами на диске), рукопись.")}</p>`;
   const btn = document.createElement("button");
   btn.className = "btn";
-  btn.textContent = "Экспортировать";
+  btn.textContent = i18n("Экспортировать");
   btn.addEventListener("click", async () => {
     const data = await fetchAll();
     const bundle = { schemaVersion: SCHEMA_VERSION, exportedAt: new Date().toISOString(), ...data };
@@ -189,8 +190,7 @@ function buildExportSection() {
 function buildImportSection() {
   const section = document.createElement("div");
   section.className = "data-section";
-  section.innerHTML =
-    "<h3>Импорт проекта</h3><p>Полностью заменяет текущие данные содержимым файла. Сохрани экспорт перед импортом, если сомневаешься — отменить нельзя.</p>";
+  section.innerHTML = `<h3>${i18n("Импорт проекта")}</h3><p>${i18n("Полностью заменяет текущие данные содержимым файла. Сохрани экспорт перед импортом, если сомневаешься — отменить нельзя.")}</p>`;
 
   const fileInput = document.createElement("input");
   fileInput.type = "file";
@@ -199,7 +199,7 @@ function buildImportSection() {
 
   const btn = document.createElement("button");
   btn.className = "btn";
-  btn.textContent = "Импортировать…";
+  btn.textContent = i18n("Импортировать…");
   btn.addEventListener("click", () => fileInput.click());
 
   const confirmBar = document.createElement("div");
@@ -212,10 +212,10 @@ function buildImportSection() {
     try {
       bundle = JSON.parse(await file.text());
     } catch {
-      alert("Файл повреждён или это не JSON.");
+      alert(i18n("Файл повреждён или это не JSON."));
       return;
     }
-    showConfirmBar(confirmBar, "Заменить все текущие данные содержимым файла?", async () => {
+    showConfirmBar(confirmBar, i18n("Заменить все текущие данные содержимым файла?"), async () => {
       await applyAll(bundle);
       location.reload();
     });
@@ -228,15 +228,14 @@ function buildImportSection() {
 function buildDemoSection() {
   const section = document.createElement("div");
   section.className = "data-section";
-  section.innerHTML =
-    "<h3>Заполнить примером</h3><p>Связный тестовый сюжет — персонажи, локации, связи, фракции, таймлайн, доска и две главы рукописи, чтобы сразу увидеть, как модули работают вместе.</p>";
+  section.innerHTML = `<h3>${i18n("Заполнить примером")}</h3><p>${i18n("Связный тестовый сюжет — персонажи, локации, связи, фракции, таймлайн, доска и две главы рукописи, чтобы сразу увидеть, как модули работают вместе.")}</p>`;
 
   const btn = document.createElement("button");
   btn.className = "btn";
-  btn.textContent = "Заполнить примером…";
+  btn.textContent = i18n("Заполнить примером…");
   const confirmBar = document.createElement("div");
   btn.addEventListener("click", () => {
-    showConfirmBar(confirmBar, "Текущие данные будут заменены примером. Продолжить?", async () => {
+    showConfirmBar(confirmBar, i18n("Текущие данные будут заменены примером. Продолжить?"), async () => {
       await applyAll(buildDemoBundle());
       location.reload();
     });

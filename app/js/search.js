@@ -1,6 +1,7 @@
 import { apiGet } from "./api.js";
 import { escapeHtml } from "./chips.js";
 import { locationTypeInfo, factionTypeInfo } from "./icons.js";
+import { i18n } from "./i18n.js";
 
 // ══════════════════════════════════════════════
 //  ГЛОБАЛЬНЫЙ ПОИСК
@@ -15,14 +16,16 @@ import { locationTypeInfo, factionTypeInfo } from "./icons.js";
 //  велик, чтобы это стало узким местом.
 // ══════════════════════════════════════════════
 
-const MODULE_LABELS = {
-  characters: "Персонаж",
-  locations: "Локация",
-  factions: "Фракция",
-  timeline: "Событие",
-  manuscript: "Глава",
-  board: "Карточка",
-};
+function moduleLabels() {
+  return {
+    characters: i18n("Персонаж"),
+    locations: i18n("Локация"),
+    factions: i18n("Фракция"),
+    timeline: i18n("Событие"),
+    manuscript: i18n("Глава"),
+    board: i18n("Карточка"),
+  };
+}
 
 let overlay = null;
 let input = null;
@@ -65,7 +68,7 @@ async function buildIndex() {
     entries.push({
       module: "manuscript",
       id: c.id,
-      title: c.title || "Без названия",
+      title: c.title || i18n("Без названия"),
       subtitle: snippet(c.content),
       color: "#c9944a",
     });
@@ -91,8 +94,7 @@ function ensureOverlay() {
   if (overlay) return;
   overlay = document.createElement("div");
   overlay.className = "search-overlay hidden";
-  overlay.innerHTML =
-    '<div class="search-modal"><input type="text" class="search-input" placeholder="Персонажи, локации, фракции, таймлайн, рукопись…" /><div class="search-results"></div></div>';
+  overlay.innerHTML = `<div class="search-modal"><input type="text" class="search-input" placeholder="${i18n("Персонажи, локации, фракции, таймлайн, рукопись…")}" /><div class="search-results"></div></div>`;
   document.body.appendChild(overlay);
   input = overlay.querySelector(".search-input");
   list = overlay.querySelector(".search-results");
@@ -115,16 +117,17 @@ function renderResults(query) {
     .filter((e) => (e.title || "").toLowerCase().includes(q) || (e.subtitle || "").toLowerCase().includes(q))
     .slice(0, 30);
   if (!matches.length) {
-    list.innerHTML = '<div class="search-empty">Ничего не найдено</div>';
+    list.innerHTML = `<div class="search-empty">${i18n("Ничего не найдено")}</div>`;
     return;
   }
+  const labels = moduleLabels();
   for (const m of matches) {
     const row = document.createElement("button");
     row.className = "search-result";
     row.style.setProperty("--result-color", m.color);
     row.innerHTML =
-      `<span class="search-result-type">${MODULE_LABELS[m.module] || m.module}</span>` +
-      `<span class="search-result-title">${escapeHtml(m.title || "Без названия")}</span>` +
+      `<span class="search-result-type">${labels[m.module] || m.module}</span>` +
+      `<span class="search-result-title">${escapeHtml(m.title || i18n("Без названия"))}</span>` +
       (m.subtitle ? `<span class="search-result-sub">${escapeHtml(m.subtitle)}</span>` : "");
     row.addEventListener("click", () => {
       close();

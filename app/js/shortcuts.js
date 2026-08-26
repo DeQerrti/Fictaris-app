@@ -1,4 +1,5 @@
 import { apiGet, apiPost } from "./api.js";
+import { i18n } from "./i18n.js";
 
 // ══════════════════════════════════════════════
 //  ГОРЯЧИЕ КЛАВИШИ
@@ -67,7 +68,7 @@ export async function loadShortcuts() {
 // клавишу…», следующий keydown — и есть новое значение, Escape отменяет.
 export function captureKey(button, onCaptured) {
   const original = button.textContent;
-  button.textContent = "Нажми клавишу…";
+  button.textContent = i18n("Нажми клавишу…");
   button.disabled = true;
 
   const finish = (result) => {

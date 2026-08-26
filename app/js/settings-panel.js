@@ -1,6 +1,7 @@
 import { apiGet, apiPost } from "./api.js";
+import { i18n, currentLang, setLang } from "./i18n.js";
 import { THEME_PRESETS, saveTheme } from "./theme.js";
-import { DEFAULT_LABELS, saveLabels, resetLabels } from "./labels.js";
+import { defaultLabels, saveLabels, resetLabels } from "./labels.js";
 import { captureKey, saveShortcut, clearShortcut } from "./shortcuts.js";
 import { DEFAULT_TAGS_MAP, CATEGORY_LABELS } from "./tags.js";
 import { DEFAULT_MONTHS, loadCalendar, saveCalendar } from "./calendar.js";
@@ -36,6 +37,7 @@ export async function renderSettings(root) {
   const info = await apiGet("/api/app/info").catch(() => ({}));
 
   wrap.appendChild(await buildAppearanceSection());
+  wrap.appendChild(buildLanguageSection());
   wrap.appendChild(await buildEditorSection());
   wrap.appendChild(await buildLabelsSection());
   wrap.appendChild(await buildShortcutsSection());
@@ -51,7 +53,7 @@ export async function renderSettings(root) {
 async function buildAppearanceSection() {
   const section = document.createElement("div");
   section.className = "data-section";
-  section.innerHTML = "<h3>Оформление</h3><p>Тема и акцентный цвет — применяются сразу, без перезагрузки.</p>";
+  section.innerHTML = `<h3>${i18n("Оформление")}</h3><p>${i18n("Тема и акцентный цвет — применяются сразу, без перезагрузки.")}</p>`;
 
   const settings = await apiGet("/api/site-settings").catch(() => ({}));
   const currentSkin = THEME_PRESETS[settings.theme] ? settings.theme : "dark";
@@ -64,7 +66,7 @@ async function buildAppearanceSection() {
     const btn = document.createElement("button");
     btn.className = "theme-swatch" + (id === currentSkin ? " active" : "");
     btn.dataset.skin = id;
-    btn.innerHTML = `<span class="theme-swatch-preview" data-skin-preview="${id}"></span><span>${preset.label}</span><span class="theme-swatch-hint">${preset.hint}</span>`;
+    btn.innerHTML = `<span class="theme-swatch-preview" data-skin-preview="${id}"></span><span>${i18n(preset.label)}</span><span class="theme-swatch-hint">${i18n(preset.hint)}</span>`;
     btn.addEventListener("click", async () => {
       buttons.forEach((b) => b.classList.remove("active"));
       btn.classList.add("active");
@@ -76,7 +78,7 @@ async function buildAppearanceSection() {
 
   const accentRow = document.createElement("label");
   accentRow.className = "theme-accent-row";
-  accentRow.textContent = "Акцентный цвет: ";
+  accentRow.textContent = i18n("Акцентный цвет: ");
   const accentInput = document.createElement("input");
   accentInput.type = "color";
   accentInput.value = /^#[0-9a-f]{6}$/i.test(settings.accent || "")
@@ -87,13 +89,42 @@ async function buildAppearanceSection() {
 
   const resetBtn = document.createElement("button");
   resetBtn.className = "btn";
-  resetBtn.textContent = "Сбросить акцент";
+  resetBtn.textContent = i18n("Сбросить акцент");
   resetBtn.addEventListener("click", async () => {
     await saveTheme({ accent: null });
     location.reload(); // проще перечитать цвет темы по умолчанию, чем тянуть его сюда из style.css
   });
 
   section.append(swatches, accentRow, resetBtn);
+  return section;
+}
+
+// ── Язык ──────────────────────────────────────
+// Переводится оболочка приложения (навигация, настройки, данные,
+// поиск, первый запуск, уведомления об обновлении) — формы внутри
+// модулей (Персонажи/Локации/Таймлайн и т.д.) пока остаются на
+// русском, это следующий заход (см. i18n.js/i18n-en.js).
+function buildLanguageSection() {
+  const section = document.createElement("div");
+  section.className = "data-section";
+  section.innerHTML = `<h3>${i18n("Язык")}</h3><p>${i18n("Язык интерфейса — применяется сразу после перезагрузки страницы. Общий на проект: открыв его с другого устройства через синхронизацию, увидишь тот же язык.")}</p>`;
+
+  const row = document.createElement("div");
+  row.className = "sync-actions";
+  const lang = currentLang();
+
+  const ruBtn = document.createElement("button");
+  ruBtn.className = "btn" + (lang === "ru" ? " accent" : "");
+  ruBtn.textContent = i18n("Русский");
+  ruBtn.addEventListener("click", () => setLang("ru"));
+
+  const enBtn = document.createElement("button");
+  enBtn.className = "btn" + (lang === "en" ? " accent" : "");
+  enBtn.textContent = i18n("English");
+  enBtn.addEventListener("click", () => setLang("en"));
+
+  row.append(ruBtn, enBtn);
+  section.appendChild(row);
   return section;
 }
 
@@ -108,7 +139,7 @@ const DEFAULT_FONT_SIZE = 17;
 async function buildEditorSection() {
   const section = document.createElement("div");
   section.className = "data-section";
-  section.innerHTML = "<h3>Редактор</h3><p>Размер шрифта в тексте главы.</p>";
+  section.innerHTML = `<h3>${i18n("Редактор")}</h3><p>${i18n("Размер шрифта в тексте главы.")}</p>`;
 
   const settings = await apiGet("/api/site-settings").catch(() => ({}));
   const current = FONT_SIZES.includes(settings.editorFontSize) ? settings.editorFontSize : DEFAULT_FONT_SIZE;
@@ -138,15 +169,15 @@ async function buildEditorSection() {
 async function buildLabelsSection() {
   const section = document.createElement("div");
   section.className = "data-section";
-  section.innerHTML =
-    "<h3>Подписи интерфейса</h3><p>Переименуй пункты меню под свою терминологию — применяется сразу, без перезагрузки.</p>";
+  section.innerHTML = `<h3>${i18n("Подписи интерфейса")}</h3><p>${i18n("Переименуй пункты меню под свою терминологию — применяется сразу, без перезагрузки.")}</p>`;
 
-  const current = window.SITE_LABELS || DEFAULT_LABELS;
+  const defaults = defaultLabels();
+  const current = window.SITE_LABELS || defaults;
   const grid = document.createElement("div");
   grid.className = "labels-grid";
 
-  grid.appendChild(buildLabelRow("Название приложения", DEFAULT_LABELS.brand, current.brand, (value) => saveLabels({ brand: value })));
-  for (const [key, defaultLabel] of Object.entries(DEFAULT_LABELS.nav)) {
+  grid.appendChild(buildLabelRow(i18n("Название приложения"), defaults.brand, current.brand, (value) => saveLabels({ brand: value })));
+  for (const [key, defaultLabel] of Object.entries(defaults.nav)) {
     grid.appendChild(
       buildLabelRow(defaultLabel, defaultLabel, current.nav[key], (value) => saveLabels({ nav: { [key]: value } }))
     );
@@ -154,7 +185,7 @@ async function buildLabelsSection() {
 
   const resetBtn = document.createElement("button");
   resetBtn.className = "btn";
-  resetBtn.textContent = "Сбросить все подписи";
+  resetBtn.textContent = i18n("Сбросить все подписи");
   resetBtn.addEventListener("click", async () => {
     await resetLabels();
     location.reload(); // проще перечитать раздел заново, чем гонять новые значения по всем полям формы
@@ -185,22 +216,22 @@ function buildLabelRow(caption, defaultValue, currentValue, onSave) {
 async function buildShortcutsSection() {
   const section = document.createElement("div");
   section.className = "data-section";
-  section.innerHTML =
-    "<h3>Горячие клавиши</h3><p>Цифры 1–9 переключают модули по порядку в сайдбаре. Любой модуль можно назначить на свою клавишу — она сработает независимо от позиции в списке.</p>";
+  section.innerHTML = `<h3>${i18n("Горячие клавиши")}</h3><p>${i18n("Цифры 1–9 переключают модули по порядку в сайдбаре. Любой модуль можно назначить на свою клавишу — она сработает независимо от позиции в списке.")}</p>`;
 
   const settings = await apiGet("/api/site-settings").catch(() => ({}));
   const custom = settings.keyBindings?.nav || {};
-  const navLabels = window.SITE_LABELS?.nav || DEFAULT_LABELS.nav;
+  const defaults = defaultLabels();
+  const navLabels = window.SITE_LABELS?.nav || defaults.nav;
 
   const list = document.createElement("div");
   list.className = "shortcuts-list";
 
-  Object.keys(DEFAULT_LABELS.nav).forEach((key, index) => {
+  Object.keys(defaults.nav).forEach((key, index) => {
     const row = document.createElement("div");
     row.className = "shortcut-row";
 
     const label = document.createElement("span");
-    label.textContent = navLabels[key] || DEFAULT_LABELS.nav[key];
+    label.textContent = navLabels[key] || defaults.nav[key];
 
     const keyBtn = document.createElement("button");
     keyBtn.className = "btn shortcut-key";
@@ -210,7 +241,7 @@ async function buildShortcutsSection() {
     const clearBtn = document.createElement("button");
     clearBtn.className = "btn shortcut-clear";
     clearBtn.textContent = "×";
-    clearBtn.title = "Сбросить на клавишу по умолчанию";
+    clearBtn.title = i18n("Сбросить на клавишу по умолчанию");
     clearBtn.style.visibility = custom[key] ? "visible" : "hidden";
 
     keyBtn.addEventListener("click", () => {
@@ -248,8 +279,7 @@ function bindingLabel(binding) {
 async function buildTagsSection() {
   const section = document.createElement("div");
   section.className = "data-section";
-  section.innerHTML =
-    "<h3>Теги</h3><p>Спрячь ненужный встроенный тег или добавь свой — оба применяются сразу во всех модулях.</p>";
+  section.innerHTML = `<h3>${i18n("Теги")}</h3><p>${i18n("Спрячь ненужный встроенный тег или добавь свой — оба применяются сразу во всех модулях.")}</p>`;
 
   const settings = await apiGet("/api/site-settings").catch(() => ({}));
   const hidden = new Set(settings.hiddenTags || []);
@@ -265,17 +295,17 @@ async function buildTagsSection() {
   addRow.className = "tags-manage-add";
   const nameInput = document.createElement("input");
   nameInput.type = "text";
-  nameInput.placeholder = "Название тега";
+  nameInput.placeholder = i18n("Название тега");
   const catSelect = document.createElement("select");
   for (const [cat, label] of Object.entries(CATEGORY_LABELS)) {
     const opt = document.createElement("option");
     opt.value = cat;
-    opt.textContent = label;
+    opt.textContent = i18n(label);
     catSelect.appendChild(opt);
   }
   const addBtn = document.createElement("button");
   addBtn.className = "btn";
-  addBtn.textContent = "Добавить тег";
+  addBtn.textContent = i18n("Добавить тег");
   addBtn.addEventListener("click", async () => {
     const name = nameInput.value.trim();
     if (!name) return;
@@ -303,17 +333,17 @@ function renderTagsManageList(list, merged, hidden, custom) {
     group.className = "tags-manage-group";
     const title = document.createElement("div");
     title.className = "tags-manage-group-title";
-    title.textContent = CATEGORY_LABELS[cat] || cat;
+    title.textContent = i18n(CATEGORY_LABELS[cat] || cat);
     group.appendChild(title);
     for (const name of names) {
       const row = document.createElement("div");
       row.className = "tags-manage-row" + (hidden.has(name) ? " hidden-tag" : "");
       const label = document.createElement("span");
-      label.textContent = name + (custom[name] ? " (своя)" : "");
+      label.textContent = name + (custom[name] ? i18n(" (своя)") : "");
       const toggle = document.createElement("button");
       toggle.className = "btn shortcut-clear";
       toggle.textContent = hidden.has(name) ? "↺" : "×";
-      toggle.title = hidden.has(name) ? "Вернуть" : "Спрятать";
+      toggle.title = hidden.has(name) ? i18n("Вернуть") : i18n("Спрятать");
       toggle.addEventListener("click", async () => {
         const s = (await apiGet("/api/site-settings").catch(() => ({}))) || {};
         const nextHidden = new Set(s.hiddenTags || []);
@@ -339,13 +369,12 @@ function renderTagsManageList(list, merged, hidden, custom) {
 async function buildCalendarSection() {
   const section = document.createElement("div");
   section.className = "data-section";
-  section.innerHTML =
-    "<h3>Календарь</h3><p>Своё летоисчисление для таймлайна — свои месяцы вместо реальных, произвольная длина года.</p>";
+  section.innerHTML = `<h3>${i18n("Календарь")}</h3><p>${i18n("Своё летоисчисление для таймлайна — свои месяцы вместо реальных, произвольная длина года.")}</p>`;
 
   const calendar = await loadCalendar();
   const toggleBtn = document.createElement("button");
   toggleBtn.className = "btn";
-  toggleBtn.textContent = calendar ? "Отключить свой календарь" : "Включить свой календарь";
+  toggleBtn.textContent = calendar ? i18n("Отключить свой календарь") : i18n("Включить свой календарь");
 
   const body = document.createElement("div");
   body.className = "calendar-editor";
@@ -356,7 +385,7 @@ async function buildCalendarSection() {
 
     const eraRow = document.createElement("div");
     eraRow.className = "field";
-    eraRow.innerHTML = "<label>Название года</label>";
+    eraRow.innerHTML = `<label>${i18n("Название года")}</label>`;
     const eraInput = document.createElement("input");
     eraInput.type = "text";
     eraInput.value = cal.eraLabel || "год";
@@ -402,12 +431,12 @@ async function buildCalendarSection() {
 
       const daysLabel = document.createElement("span");
       daysLabel.className = "calendar-days-label";
-      daysLabel.textContent = "дней";
+      daysLabel.textContent = i18n("дней");
 
       const removeBtn = document.createElement("button");
       removeBtn.className = "btn shortcut-clear";
       removeBtn.textContent = "×";
-      removeBtn.title = "Убрать месяц";
+      removeBtn.title = i18n("Убрать месяц");
       removeBtn.addEventListener("click", async () => {
         if (cal.months.length <= 1) return;
         cal.months.splice(i, 1);
@@ -422,7 +451,7 @@ async function buildCalendarSection() {
 
     const addBtn = document.createElement("button");
     addBtn.className = "btn";
-    addBtn.textContent = "Добавить месяц";
+    addBtn.textContent = i18n("Добавить месяц");
     addBtn.addEventListener("click", async () => {
       cal.months.push({ name: `Месяц ${cal.months.length + 1}`, days: 30 });
       await saveCalendar(cal);
@@ -438,11 +467,11 @@ async function buildCalendarSection() {
     if (current) {
       current = null;
       await saveCalendar(null);
-      toggleBtn.textContent = "Включить свой календарь";
+      toggleBtn.textContent = i18n("Включить свой календарь");
     } else {
       current = { months: DEFAULT_MONTHS.map((m) => ({ ...m })), eraLabel: "год" };
       await saveCalendar(current);
-      toggleBtn.textContent = "Отключить свой календарь";
+      toggleBtn.textContent = i18n("Отключить свой календарь");
     }
     renderBody(current);
   });
@@ -464,7 +493,7 @@ function buildSyncSection() {
 }
 
 function fillSyncSection(section) {
-  section.innerHTML = "<h3>Синхронизация</h3>";
+  section.innerHTML = `<h3>${i18n("Синхронизация")}</h3>`;
   const config = getSyncConfig();
   section.appendChild(config ? buildSyncConnected(section, config) : buildSyncSetup(section));
 }
@@ -473,36 +502,38 @@ function buildSyncSetup(section) {
   const wrap = document.createElement("div");
 
   const intro = document.createElement("p");
-  intro.textContent =
-    "Свободно и без своего сервера: приватный репозиторий на GitHub как общее хранилище для всех твоих устройств — телефона, компьютера, ещё одного компьютера. Токен и служебные данные синхронизации остаются только на этом устройстве.";
+  intro.textContent = i18n(
+    "Свободно и без своего сервера: приватный репозиторий на GitHub как общее хранилище для всех твоих устройств — телефона, компьютера, ещё одного компьютера. Токен и служебные данные синхронизации остаются только на этом устройстве."
+  );
 
   const steps = document.createElement("ol");
   steps.className = "sync-steps";
   steps.innerHTML =
-    "<li>Заведи аккаунт на github.com, если его ещё нет — бесплатно.</li>" +
-    '<li>Создай токен доступа — <a href="https://github.com/settings/tokens/new?scopes=repo&description=Fictaris" target="_blank" rel="noopener">по этой ссылке</a>, галочка «repo» уже отмечена. Внизу страницы — «Generate token».</li>' +
-    "<li>Скопируй токен (показывается один раз) и вставь сюда.</li>";
+    `<li>${i18n("Заведи аккаунт на github.com, если его ещё нет — бесплатно.")}</li>` +
+    `<li>${i18n("Создай токен доступа —")} <a href="https://github.com/settings/tokens/new?scopes=repo&description=Fictaris" target="_blank" rel="noopener">${i18n("по этой ссылке")}</a>, ${i18n('галочка «repo» уже отмечена. Внизу страницы — «Generate token».')}</li>` +
+    `<li>${i18n("Скопируй токен (показывается один раз) и вставь сюда.")}</li>`;
 
   const tokenLabel = document.createElement("label");
-  tokenLabel.textContent = "Токен доступа";
+  tokenLabel.textContent = i18n("Токен доступа");
   const tokenInput = document.createElement("input");
   tokenInput.type = "password";
   tokenInput.placeholder = "ghp_…";
   tokenInput.autocomplete = "off";
 
   const repoLabel = document.createElement("label");
-  repoLabel.textContent = "Название репозитория";
+  repoLabel.textContent = i18n("Название репозитория");
   const repoInput = document.createElement("input");
   repoInput.type = "text";
   repoInput.value = "fictaris-vault";
   const repoHint = document.createElement("p");
   repoHint.className = "sync-hint";
-  repoHint.textContent =
-    "Если такого репозитория ещё нет на твоём GitHub — создадим сами, приватным. Если уже есть (например, второе устройство его уже завело) — подключимся к нему.";
+  repoHint.textContent = i18n(
+    "Если такого репозитория ещё нет на твоём GitHub — создадим сами, приватным. Если уже есть (например, второе устройство его уже завело) — подключимся к нему."
+  );
 
   const btn = document.createElement("button");
   btn.className = "btn";
-  btn.textContent = "Подключить";
+  btn.textContent = i18n("Подключить");
   const status = document.createElement("div");
   status.className = "sync-status";
 
@@ -510,17 +541,17 @@ function buildSyncSetup(section) {
     const token = tokenInput.value.trim();
     const repo = repoInput.value.trim();
     if (!token || !repo) {
-      status.textContent = "Заполни токен и название репозитория.";
+      status.textContent = i18n("Заполни токен и название репозитория.");
       return;
     }
     btn.disabled = true;
-    status.textContent = "Проверяем токен…";
+    status.textContent = i18n("Проверяем токен…");
     try {
       const user = await checkGithubUser(token);
       const config = { token, owner: user.login, repo };
-      status.textContent = "Проверяем репозиторий…";
+      status.textContent = i18n("Проверяем репозиторий…");
       if (!(await repoExists(config))) {
-        status.textContent = "Репозитория ещё нет — создаём…";
+        status.textContent = i18n("Репозитория ещё нет — создаём…");
         await createRepo(config);
       }
       saveSyncConfig(config);
@@ -542,17 +573,17 @@ function buildSyncConnected(section, config) {
 
   const intro = document.createElement("p");
   const link = `https://github.com/${config.owner}/${config.repo}`;
-  const last = state.lastSyncAt ? new Date(state.lastSyncAt).toLocaleString() : "ещё не было";
-  intro.innerHTML = `Подключено к <a href="${link}" target="_blank" rel="noopener">${config.owner}/${config.repo}</a>. Последняя синхронизация: ${last}.`;
+  const last = state.lastSyncAt ? new Date(state.lastSyncAt).toLocaleString() : i18n("ещё не было");
+  intro.innerHTML = `${i18n("Подключено к")} <a href="${link}" target="_blank" rel="noopener">${config.owner}/${config.repo}</a>. ${i18n("Последняя синхронизация: {when}.", { when: last })}`;
 
   const row = document.createElement("div");
   row.className = "sync-actions";
   const nowBtn = document.createElement("button");
   nowBtn.className = "btn accent";
-  nowBtn.textContent = "Синхронизировать сейчас";
+  nowBtn.textContent = i18n("Синхронизировать сейчас");
   const disconnectBtn = document.createElement("button");
   disconnectBtn.className = "btn";
-  disconnectBtn.textContent = "Отключить";
+  disconnectBtn.textContent = i18n("Отключить");
   row.append(nowBtn, disconnectBtn);
 
   const status = document.createElement("div");
@@ -568,10 +599,10 @@ function buildSyncConnected(section, config) {
   disconnectBtn.addEventListener("click", () => {
     if (!disconnectArmed) {
       disconnectArmed = true;
-      disconnectBtn.textContent = "Точно отключить?";
+      disconnectBtn.textContent = i18n("Точно отключить?");
       setTimeout(() => {
         disconnectArmed = false;
-        disconnectBtn.textContent = "Отключить";
+        disconnectBtn.textContent = i18n("Отключить");
       }, 3000);
       return;
     }
@@ -594,7 +625,7 @@ function buildSyncConnected(section, config) {
 async function startSync(config, btn, status, progress, conflictsBox) {
   btn.disabled = true;
   conflictsBox.innerHTML = "";
-  status.textContent = "Синхронизируем…";
+  status.textContent = i18n("Синхронизируем…");
   try {
     const result = await runSync(config, (done, total, path) => {
       progress.textContent = `${done} / ${total}: ${path}`;
@@ -610,10 +641,12 @@ async function startSync(config, btn, status, progress, conflictsBox) {
     }
 
     if (result.conflicts.length) {
-      status.textContent = `Готово, но ${result.conflicts.length} файл(ов) изменились и здесь, и в репозитории — выбери, что оставить.`;
+      status.textContent = i18n("Готово, но {n} файл(ов) изменились и здесь, и в репозитории — выбери, что оставить.", {
+        n: result.conflicts.length,
+      });
       renderConflicts(conflictsBox, config, result.conflicts);
     } else {
-      status.textContent = `Готово: отправлено ${result.pushed}, забрано ${result.pulled}, без изменений ${result.skipped}.`;
+      status.textContent = i18n("Готово: отправлено {pushed}, забрано {pulled}, без изменений {skipped}.", result);
     }
 
     if (Object.keys(result.pulledFiles).length || Object.keys(result.pulledImages).length) {
@@ -635,10 +668,10 @@ function renderConflicts(box, config, conflicts) {
     title.textContent = conflict.path;
     const localBtn = document.createElement("button");
     localBtn.className = "btn";
-    localBtn.textContent = "Оставить моё";
+    localBtn.textContent = i18n("Оставить моё");
     const remoteBtn = document.createElement("button");
     remoteBtn.className = "btn";
-    remoteBtn.textContent = "Взять оттуда";
+    remoteBtn.textContent = i18n("Взять оттуда");
     localBtn.addEventListener("click", () => pickConflict(config, conflict, "local", row));
     remoteBtn.addEventListener("click", () => pickConflict(config, conflict, "remote", row));
     row.append(title, localBtn, remoteBtn);
@@ -661,31 +694,31 @@ async function pickConflict(config, conflict, choice, row) {
 }
 
 function updateStatusText(res) {
-  if (res.status === "latest") return "У тебя последняя версия.";
-  if (res.status === "downloading") return `Скачивается обновление ${res.version}…`;
-  if (res.status === "available") return `Доступно обновление ${res.version}.`;
-  if (res.status === "dev") return "Проверка недоступна в режиме разработки (npm start).";
-  return "Не удалось проверить обновления — нет сети или GitHub недоступен.";
+  if (res.status === "latest") return i18n("У тебя последняя версия.");
+  if (res.status === "downloading") return i18n("Скачивается обновление {version}…", res);
+  if (res.status === "available") return i18n("Доступно обновление {version}.", res);
+  if (res.status === "dev") return i18n("Проверка недоступна в режиме разработки (npm start).");
+  return i18n("Не удалось проверить обновления — нет сети или GitHub недоступен.");
 }
 
 function buildUpdateSection(info) {
   const section = document.createElement("div");
   section.className = "data-section";
-  section.innerHTML = `<h3>Обновления</h3><p>Установленная версия: ${info.version || "—"}</p>`;
+  section.innerHTML = `<h3>${i18n("Обновления")}</h3><p>${i18n("Установленная версия: {version}", { version: info.version || "—" })}</p>`;
 
   const status = document.createElement("div");
   status.className = "update-check-status";
 
   const btn = document.createElement("button");
   btn.className = "btn";
-  btn.textContent = "Проверить обновления";
+  btn.textContent = i18n("Проверить обновления");
   btn.addEventListener("click", async () => {
     btn.disabled = true;
-    status.textContent = "Проверяю…";
+    status.textContent = i18n("Проверяю…");
     try {
       status.textContent = updateStatusText(await apiPost("/api/app/check-update", {}));
     } catch {
-      status.textContent = "Не удалось проверить обновления.";
+      status.textContent = i18n("Не удалось проверить обновления.");
     } finally {
       btn.disabled = false;
     }
@@ -701,12 +734,12 @@ function buildAboutSection(info) {
   section.className = "data-section";
   const platform = info.mobile ? "Android" : info.platform === "darwin" ? "macOS" : info.platform === "win32" ? "Windows" : "Linux";
   section.innerHTML = `
-    <h3>О приложении</h3>
+    <h3>${i18n("О приложении")}</h3>
     <p>Fictaris ${info.version || ""} · ${platform}</p>
-    <p>Инструмент для писателей и мастеров миров: данные лежат обычной папкой на твоём диске, без своего сервера и без привязки к аккаунту.</p>
-    <p><a href="https://github.com/DeQerrti/Fictaris-app" target="_blank" rel="noopener">Репозиторий на GitHub</a> ·
-       <a href="https://github.com/DeQerrti/Fictaris-app/issues" target="_blank" rel="noopener">Сообщить о проблеме</a> ·
-       <a href="https://github.com/DeQerrti/Fictaris-app/releases" target="_blank" rel="noopener">Все версии</a></p>
+    <p>${i18n("Инструмент для писателей и мастеров миров: данные лежат обычной папкой на твоём диске, без своего сервера и без привязки к аккаунту.")}</p>
+    <p><a href="https://github.com/DeQerrti/Fictaris-app" target="_blank" rel="noopener">${i18n("Репозиторий на GitHub")}</a> ·
+       <a href="https://github.com/DeQerrti/Fictaris-app/issues" target="_blank" rel="noopener">${i18n("Сообщить о проблеме")}</a> ·
+       <a href="https://github.com/DeQerrti/Fictaris-app/releases" target="_blank" rel="noopener">${i18n("Все версии")}</a></p>
   `;
   return section;
 }

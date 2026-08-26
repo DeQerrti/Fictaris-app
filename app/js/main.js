@@ -22,6 +22,7 @@ import { applyLabels } from "./labels.js";
 import { initSearch, openSearch } from "./search.js";
 import { initShortcuts, loadShortcuts } from "./shortcuts.js";
 import { maybeShowOnboarding } from "./onboarding.js";
+import { loadLang, i18n } from "./i18n.js";
 
 const MODULES = {
   manuscript: renderManuscript,
@@ -83,9 +84,12 @@ async function refreshTrashBadge() {
 document.addEventListener("fictaris:trash-changed", refreshTrashBadge);
 
 async function boot() {
+  await loadLang(); // до всего остального — applyLabels и любой другой i18n() ниже должны видеть уже загруженный язык
   applyTheme(); // независимо от info — кэш уже применён инлайн-скриптом, здесь только свежие данные
   applyLabels();
   loadShortcuts();
+  const searchTriggerText = document.getElementById("searchTrigger").childNodes[0];
+  if (searchTriggerText) searchTriggerText.textContent = `${i18n("🔍 Поиск")} `;
   const info = await apiGet("/api/app/info").catch(() => ({ vaultPath: null }));
   if (!info.vaultPath) {
     location.href = "/welcome";

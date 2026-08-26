@@ -1,4 +1,5 @@
 import { apiGet, apiPost } from "./api.js";
+import { i18n } from "./i18n.js";
 
 // ══════════════════════════════════════════════
 //  ПОДПИСИ ИНТЕРФЕЙСА
@@ -11,29 +12,36 @@ import { apiGet, apiPost } from "./api.js";
 //  «Фракции», и упираться в чужие слова незачем.
 // ══════════════════════════════════════════════
 
-export const DEFAULT_LABELS = {
-  brand: "Fictaris",
-  nav: {
-    manuscript: "Рукопись",
-    characters: "Персонажи",
-    locations: "Локации",
-    relationships: "Связи",
-    factions: "Фракции",
-    timeline: "Таймлайн",
-    board: "Доска",
-    map: "Карта",
-    graph: "Граф",
-    familytree: "Родословная",
-    stats: "Статистика",
-    continuity: "Проверка",
-    trash: "Корзина",
-    settings: "⚙ Настройки",
-    data: "Данные",
-  },
-};
+// Функция, а не готовый объект: значения идут через i18n(), а его язык
+// известен только после loadLang() (main.js, boot()) — на момент
+// импорта этого модуля он ещё не загружен, и застывший объект навсегда
+// остался бы на языке по умолчанию.
+export function defaultLabels() {
+  return {
+    brand: "Fictaris",
+    nav: {
+      manuscript: i18n("Рукопись"),
+      characters: i18n("Персонажи"),
+      locations: i18n("Локации"),
+      relationships: i18n("Связи"),
+      factions: i18n("Фракции"),
+      timeline: i18n("Таймлайн"),
+      board: i18n("Доска"),
+      map: i18n("Карта"),
+      graph: i18n("Граф"),
+      familytree: i18n("Родословная"),
+      stats: i18n("Статистика"),
+      continuity: i18n("Проверка"),
+      trash: i18n("Корзина"),
+      settings: i18n("⚙ Настройки"),
+      data: i18n("Данные"),
+    },
+  };
+}
 
 function mergeLabels(overrides) {
-  const merged = { brand: DEFAULT_LABELS.brand, nav: { ...DEFAULT_LABELS.nav } };
+  const defaults = defaultLabels();
+  const merged = { brand: defaults.brand, nav: { ...defaults.nav } };
   if (typeof overrides?.brand === "string" && overrides.brand.trim()) merged.brand = overrides.brand.trim();
   if (overrides?.nav) {
     for (const key of Object.keys(merged.nav)) {

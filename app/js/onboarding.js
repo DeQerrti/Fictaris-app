@@ -11,6 +11,8 @@
 //  приложение.
 // ══════════════════════════════════════════════
 
+import { i18n } from "./i18n.js";
+
 const SEEN_KEY = "fictaris_onboarding_seen";
 
 export function maybeShowOnboarding({ onFillDemo }) {
@@ -21,11 +23,11 @@ export function maybeShowOnboarding({ onFillDemo }) {
   const card = document.createElement("div");
   card.className = "onboarding-card";
   card.innerHTML = `
-    <h2>Добро пожаловать в Fictaris</h2>
+    <h2>${i18n("Добро пожаловать в Fictaris")}</h2>
     <ul>
-      <li><b>Поиск</b> — клавиша <kbd>/</kbd> или кнопка в сайдбаре ищет сразу по всем модулям.</li>
-      <li><b>⚙ Настройки</b> — тема, акцент, подписи меню, горячие клавиши, синхронизация между устройствами.</li>
-      <li><b>«Данные» → «Заполнить примером»</b> — связный тестовый сюжет, чтобы сразу увидеть, как модули работают вместе.</li>
+      <li>${i18n("<b>Поиск</b> — клавиша <kbd>/</kbd> или кнопка в сайдбаре ищет сразу по всем модулям.")}</li>
+      <li>${i18n("<b>⚙ Настройки</b> — тема, акцент, подписи меню, горячие клавиши, синхронизация между устройствами.")}</li>
+      <li>${i18n("<b>«Данные» → «Заполнить примером»</b> — связный тестовый сюжет, чтобы сразу увидеть, как модули работают вместе.")}</li>
     </ul>
   `;
 
@@ -34,7 +36,7 @@ export function maybeShowOnboarding({ onFillDemo }) {
 
   const demoBtn = document.createElement("button");
   demoBtn.className = "btn accent";
-  demoBtn.textContent = "Заполнить примером";
+  demoBtn.textContent = i18n("Заполнить примером");
   demoBtn.addEventListener("click", () => {
     dismiss();
     onFillDemo();
@@ -42,7 +44,7 @@ export function maybeShowOnboarding({ onFillDemo }) {
 
   const skipBtn = document.createElement("button");
   skipBtn.className = "btn";
-  skipBtn.textContent = "Понятно, дальше сам";
+  skipBtn.textContent = i18n("Понятно, дальше сам");
   skipBtn.addEventListener("click", dismiss);
 
   actions.append(demoBtn, skipBtn);

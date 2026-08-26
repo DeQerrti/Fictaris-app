@@ -1,4 +1,5 @@
 import { apiGet, apiPost } from "./api.js";
+import { i18n } from "./i18n.js";
 
 // ══════════════════════════════════════════════
 //  ПОЛОСКА ОБНОВЛЕНИЯ (десктоп)
@@ -36,7 +37,7 @@ function showBanner({ text, actionLabel, onAction, version }) {
 
   const laterBtn = document.createElement("button");
   laterBtn.className = "btn";
-  laterBtn.textContent = "Позже";
+  laterBtn.textContent = i18n("Позже");
   laterBtn.addEventListener("click", async () => {
     bar.remove();
     shown = false;
@@ -59,16 +60,16 @@ async function poll() {
   if (status.type === "ready") {
     shown = true;
     showBanner({
-      text: `Обновление готово: ${status.version}`,
-      actionLabel: "Перезапустить",
+      text: i18n("Обновление готово: {version}", status),
+      actionLabel: i18n("Перезапустить"),
       version: status.version,
       onAction: () => apiPost("/api/app/update-restart", {}),
     });
   } else if (status.type === "available") {
     shown = true;
     showBanner({
-      text: `Доступно обновление: ${status.version}`,
-      actionLabel: "Скачать",
+      text: i18n("Доступно обновление: {version}", status),
+      actionLabel: i18n("Скачать"),
       version: status.version,
       onAction: () => apiPost("/api/app/update-download", {}),
     });
