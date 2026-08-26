@@ -7,6 +7,8 @@ import { renderFactions } from "./factions.js";
 import { renderTimeline } from "./timeline.js";
 import { renderBoard } from "./board.js";
 import { renderMap } from "./map.js";
+import { renderGraph } from "./graph.js";
+import { renderContinuity } from "./continuity.js";
 import { renderData } from "./data-panel.js";
 import { renderTrash, trashCount } from "./trash.js";
 
@@ -19,6 +21,8 @@ const MODULES = {
   timeline: renderTimeline,
   board: renderBoard,
   map: renderMap,
+  graph: renderGraph,
+  continuity: renderContinuity,
   trash: renderTrash,
   data: renderData,
 };
