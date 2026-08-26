@@ -1,0 +1,49 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<style>
+  html, body { margin: 0; padding: 0; background: transparent; }
+  .canvas {
+    width: 1024px;
+    height: 1024px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+</style>
+</head>
+<body>
+  <div class="canvas">
+    <!-- ~64% ширины канваса — внутри safe zone адаптивной иконки Android
+         (внешние ~33% обрезаются маской формы: круг/squircle/скруглённый
+         квадрат), с той же геометрией, что и полная иконка. -->
+    <svg width="660" height="660" viewBox="0 0 640 640" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="quill" x1="120" y1="560" x2="520" y2="80" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stop-color="#dba760"/>
+          <stop offset="0.55" stop-color="#c9944a"/>
+          <stop offset="1" stop-color="#9a7238"/>
+        </linearGradient>
+        <linearGradient id="ink" x1="150" y1="520" x2="300" y2="440" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stop-color="#6a8fae"/>
+          <stop offset="1" stop-color="#4f7d74"/>
+        </linearGradient>
+      </defs>
+      <ellipse cx="188" cy="502" rx="46" ry="20" fill="url(#ink)" opacity="0.85"/>
+      <path d="M170 510
+               C 230 460, 300 380, 360 300
+               C 420 220, 460 150, 500 90
+               C 440 110, 370 150, 300 220
+               C 230 290, 180 380, 155 470
+               Z"
+            fill="url(#quill)" stroke="#14110d" stroke-width="6" stroke-linejoin="round"/>
+      <path d="M175 495 C 260 410, 380 280, 495 95"
+            stroke="#ece0c3" stroke-width="5" stroke-linecap="round" opacity="0.55"/>
+      <path d="M235 430 L 190 460 M275 385 L 225 410 M315 340 L 265 362 M355 295 L 305 315 M395 250 L 345 270 M435 205 L 385 225"
+            stroke="#14110d" stroke-width="6" stroke-linecap="round" opacity="0.5"/>
+      <path d="M150 520 L 172 508 L 160 486 Z" fill="#ece0c3"/>
+    </svg>
+  </div>
+</body>
+</html>
