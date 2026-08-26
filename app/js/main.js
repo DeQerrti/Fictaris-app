@@ -9,6 +9,7 @@ import { renderTimeline } from "./timeline.js";
 import { renderBoard } from "./board.js";
 import { renderMap } from "./map.js";
 import { renderGraph } from "./graph.js";
+import { renderStats } from "./stats.js";
 import { renderContinuity } from "./continuity.js";
 import { renderData, fillWithDemoData } from "./data-panel.js";
 import { renderSettings } from "./settings-panel.js";
@@ -31,6 +32,7 @@ const MODULES = {
   board: renderBoard,
   map: renderMap,
   graph: renderGraph,
+  stats: renderStats,
   continuity: renderContinuity,
   trash: renderTrash,
   settings: renderSettings,

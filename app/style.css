@@ -473,6 +473,28 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
 
 .search-empty { padding: 16px; color: var(--text-faint); font-size: 0.85rem; }
 
+/* ── Статистика ────────────────────────────── */
+
+.stat-tiles { display: flex; flex-wrap: wrap; gap: 12px; }
+
+.stat-tile {
+  min-width: 110px;
+  padding: 14px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--panel-alt);
+}
+
+.stat-tile-value { font-family: "JetBrains Mono", monospace; font-size: 1.5rem; font-weight: 600; color: var(--accent-hover); }
+.stat-tile-label { color: var(--text-dim); font-size: 0.78rem; margin-top: 2px; }
+
+.stat-bar-list { display: flex; flex-direction: column; gap: 8px; max-width: 640px; }
+.stat-bar-row { display: grid; grid-template-columns: 140px 1fr 36px; align-items: center; gap: 10px; }
+.stat-bar-label { color: var(--text-dim); font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stat-bar-track { height: 8px; border-radius: 999px; background: var(--panel-alt); overflow: hidden; }
+.stat-bar-fill { display: block; height: 100%; border-radius: 999px; }
+.stat-bar-value { font-family: "JetBrains Mono", monospace; font-size: 0.8rem; color: var(--text-faint); text-align: right; }
+
 /* ── Первый запуск ─────────────────────────── */
 
 .onboarding-card {

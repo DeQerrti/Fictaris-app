@@ -23,6 +23,7 @@ export const DEFAULT_LABELS = {
     board: "Доска",
     map: "Карта",
     graph: "Граф",
+    stats: "Статистика",
     continuity: "Проверка",
     trash: "Корзина",
     settings: "⚙ Настройки",
