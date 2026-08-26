@@ -2,6 +2,7 @@ import { apiGet, apiPost } from "./api.js";
 import { buildDemoBundle } from "./demo-data.js";
 import { THEME_PRESETS, saveTheme } from "./theme.js";
 import { DEFAULT_LABELS, saveLabels, resetLabels } from "./labels.js";
+import { captureKey, saveShortcut, clearShortcut } from "./shortcuts.js";
 import {
   getSyncConfig,
   saveSyncConfig,
@@ -83,6 +84,7 @@ export async function renderData(root) {
 
   wrap.appendChild(await buildAppearanceSection());
   wrap.appendChild(await buildLabelsSection());
+  wrap.appendChild(await buildShortcutsSection());
   wrap.appendChild(buildUpdateSection(info));
   wrap.appendChild(buildSyncSection());
   wrap.appendChild(buildExportSection());
@@ -187,6 +189,63 @@ function buildLabelRow(caption, defaultValue, currentValue, onSave) {
   });
   row.append(label, input);
   return row;
+}
+
+async function buildShortcutsSection() {
+  const section = document.createElement("div");
+  section.className = "data-section";
+  section.innerHTML =
+    "<h3>Горячие клавиши</h3><p>Цифры 1–9 переключают модули по порядку в сайдбаре. Любой модуль можно назначить на свою клавишу — она сработает независимо от позиции в списке.</p>";
+
+  const settings = await apiGet("/api/site-settings").catch(() => ({}));
+  const custom = settings.keyBindings?.nav || {};
+  const navLabels = window.SITE_LABELS?.nav || DEFAULT_LABELS.nav;
+
+  const list = document.createElement("div");
+  list.className = "shortcuts-list";
+
+  Object.keys(DEFAULT_LABELS.nav).forEach((key, index) => {
+    const row = document.createElement("div");
+    row.className = "shortcut-row";
+
+    const label = document.createElement("span");
+    label.textContent = navLabels[key] || DEFAULT_LABELS.nav[key];
+
+    const keyBtn = document.createElement("button");
+    keyBtn.className = "btn shortcut-key";
+    const defaultLabel = index < 9 ? String(index + 1) : "—";
+    keyBtn.textContent = custom[key] ? bindingLabel(custom[key]) : defaultLabel;
+
+    const clearBtn = document.createElement("button");
+    clearBtn.className = "btn shortcut-clear";
+    clearBtn.textContent = "×";
+    clearBtn.title = "Сбросить на клавишу по умолчанию";
+    clearBtn.style.visibility = custom[key] ? "visible" : "hidden";
+
+    keyBtn.addEventListener("click", () => {
+      captureKey(keyBtn, async (result) => {
+        await saveShortcut(key, result);
+        keyBtn.textContent = bindingLabel(result);
+        clearBtn.style.visibility = "visible";
+      });
+    });
+
+    clearBtn.addEventListener("click", async () => {
+      await clearShortcut(key);
+      keyBtn.textContent = defaultLabel;
+      clearBtn.style.visibility = "hidden";
+    });
+
+    row.append(label, keyBtn, clearBtn);
+    list.appendChild(row);
+  });
+
+  section.appendChild(list);
+  return section;
+}
+
+function bindingLabel(binding) {
+  return (binding.shift ? "Shift+" : "") + binding.label;
 }
 
 // ── Синхронизация ────────────────────────────

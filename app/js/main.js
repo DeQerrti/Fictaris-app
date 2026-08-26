@@ -17,6 +17,7 @@ import { initUpdateBanner } from "./update-banner.js";
 import { applyTheme } from "./theme.js";
 import { applyLabels } from "./labels.js";
 import { initSearch, openSearch } from "./search.js";
+import { initShortcuts, loadShortcuts } from "./shortcuts.js";
 
 const MODULES = {
   manuscript: renderManuscript,
@@ -59,6 +60,7 @@ sidebarBackdrop.addEventListener("click", () => appEl.classList.remove("sidebar-
 
 document.getElementById("searchTrigger").addEventListener("click", () => openSearch());
 initSearch((module, focusId) => openModule(module, focusId));
+initShortcuts((module) => openModule(module));
 
 // Клик по @упоминанию в тексте главы (mentions.js) — открывает карточку
 // персонажа в модуле «Персонажи», а не только подсвечивает имя.
@@ -76,6 +78,7 @@ document.addEventListener("fictaris:trash-changed", refreshTrashBadge);
 async function boot() {
   applyTheme(); // независимо от info — кэш уже применён инлайн-скриптом, здесь только свежие данные
   applyLabels();
+  loadShortcuts();
   const info = await apiGet("/api/app/info").catch(() => ({ vaultPath: null }));
   if (!info.vaultPath) {
     location.href = "/welcome";
