@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<title>Fictaris</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; height: 100%;
+    background: #14110d;
+    color: #ece0c3;
+    font-family: Inter, system-ui, sans-serif;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .card {
+    width: 420px;
+    background: #1e1912;
+    border: 1px solid #3a3020;
+    border-radius: 12px;
+    padding: 32px;
+    text-align: center;
+  }
+  h1 {
+    font-family: Fraunces, Georgia, serif;
+    font-weight: 600;
+    font-size: 1.8rem;
+    color: #dba760;
+    margin: 0 0 4px;
+  }
+  p { color: #a99977; font-size: 0.9rem; margin: 0 0 24px; }
+  button {
+    width: 100%;
+    padding: 12px 16px;
+    background: #c9944a;
+    color: #14110d;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button:hover { background: #dba760; }
+  .error { color: #b5636b; font-size: 0.85rem; margin-top: 14px; min-height: 1.2em; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>Fictaris</h1>
+    <p>Инструмент для писателей и мастеров миров. Выбери папку, где будет жить проект.</p>
+    <button id="pick">Выбрать папку</button>
+    <div class="error" id="error"></div>
+  </div>
+  <script>
+    const errorEl = document.getElementById("error");
+    document.getElementById("pick").addEventListener("click", async () => {
+      errorEl.textContent = "";
+      const picked = await fetch("/api/app/pick-vault", { method: "POST" }).then((r) => r.json());
+      if (!picked.path) return;
+      const used = await fetch("/api/app/use-vault", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: picked.path }),
+      }).then((r) => r.json());
+      if (used.error) { errorEl.textContent = used.error; return; }
+      location.href = "/";
+    });
+  </script>
+</body>
+</html>
