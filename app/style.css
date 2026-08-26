@@ -512,6 +512,43 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
 .theme-accent-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; color: var(--text-dim); font-size: 0.85rem; }
 .theme-accent-row input[type="color"] { width: 40px; height: 28px; padding: 0; border: 1px solid var(--border); border-radius: 6px; background: none; cursor: pointer; }
 
+/* ── Синхронизация ─────────────────────────── */
+
+.sync-steps { padding-left: 1.2em; display: flex; flex-direction: column; gap: 6px; color: var(--text-dim); font-size: 0.85rem; }
+.sync-steps a { color: var(--accent-hover); }
+
+.data-section label { display: block; margin-top: 10px; margin-bottom: 4px; color: var(--text-dim); font-size: 0.82rem; }
+.data-section input[type="password"],
+.data-section input[type="text"] {
+  width: 100%;
+  max-width: 320px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--panel-alt);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.85rem;
+}
+
+.sync-hint { color: var(--text-faint); font-size: 0.78rem; margin: 4px 0 0; }
+.sync-status { margin-top: 10px; color: var(--text-dim); font-size: 0.85rem; min-height: 1.2em; }
+.sync-progress { color: var(--text-faint); font-size: 0.78rem; font-family: "JetBrains Mono", monospace; }
+.sync-actions { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+
+.sync-conflicts { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.sync-conflict-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--color-3);
+  background: var(--panel-alt);
+  flex-wrap: wrap;
+}
+.sync-conflict-row span { flex: 1; font-size: 0.85rem; color: var(--text); word-break: break-all; }
+
 /* ── Обновления ────────────────────────────── */
 
 .update-check-status { margin-top: 8px; color: var(--text-dim); font-size: 0.85rem; }

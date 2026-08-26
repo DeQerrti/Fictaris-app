@@ -154,6 +154,36 @@ export class MobileVault {
     return `maps/${safeName}`;
   }
 
+  // Для резервной копии/синхронизации (app/js/sync.js) — та же папка
+  // maps/, но по конкретному относительному пути.
+  #imagePath(relPath) {
+    const clean = String(relPath).replace(/^\/+/, "");
+    if (!clean.startsWith("maps/") || clean.includes("..")) {
+      throw new Error(`Недопустимый путь изображения: ${relPath}`);
+    }
+    return clean;
+  }
+
+  async listImages() {
+    let files;
+    try {
+      ({ files } = await Filesystem.readdir({ path: `${this.root}/maps`, directory: DIR }));
+    } catch {
+      return [];
+    }
+    return files.map((f) => (typeof f === "string" ? f : f.name)).map((n) => `maps/${n}`);
+  }
+
+  async readImage(relPath) {
+    const { data } = await Filesystem.readFile({ path: `${this.root}/${this.#imagePath(relPath)}`, directory: DIR });
+    return data;
+  }
+
+  async writeImage(relPath, base64) {
+    await ensureDir(`${this.root}/maps`);
+    await Filesystem.writeFile({ path: `${this.root}/${this.#imagePath(relPath)}`, directory: DIR, data: base64 });
+  }
+
   // Удаление проекта на телефоне — настоящее стирание файлов, а не
   // снятие записи с полки: заново открыть отвязанную папку тут нечем,
   // проводника нет (см. комментарий у remove-vault в mobile/src/main.js).

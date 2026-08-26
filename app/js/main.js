@@ -1,3 +1,4 @@
+import "./sync.js"; // устанавливает автосинхронизацию — см. её же комментарий про перехват fetch
 import { apiGet } from "./api.js";
 import { renderManuscript } from "./manuscript.js";
 import { renderCharacters } from "./characters.js";

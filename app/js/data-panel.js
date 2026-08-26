@@ -1,6 +1,18 @@
 import { apiGet, apiPost } from "./api.js";
 import { buildDemoBundle } from "./demo-data.js";
 import { THEME_PRESETS, saveTheme } from "./theme.js";
+import {
+  getSyncConfig,
+  saveSyncConfig,
+  clearSyncConfig,
+  getSyncState,
+  checkGithubUser,
+  repoExists,
+  createRepo,
+  runSync,
+  resolveConflict,
+  AUTOSYNC_CONFLICTS_KEY,
+} from "./sync.js";
 
 const SCHEMA_VERSION = 1;
 const EMPTY_MANUSCRIPT = { chapters: [], activeChapterId: null };
@@ -70,6 +82,7 @@ export async function renderData(root) {
 
   wrap.appendChild(await buildAppearanceSection());
   wrap.appendChild(buildUpdateSection(info));
+  wrap.appendChild(buildSyncSection());
   wrap.appendChild(buildExportSection());
   wrap.appendChild(buildImportSection());
   wrap.appendChild(buildDemoSection());
@@ -125,6 +138,215 @@ async function buildAppearanceSection() {
 
   section.append(swatches, accentRow, resetBtn);
   return section;
+}
+
+// ── Синхронизация ────────────────────────────
+// Сама логика (протокол, автосинхронизация) — в app/js/sync.js, здесь
+// только экран: форма подключения либо статус + кнопки, плюс разбор
+// конфликтов, если runSync их нашёл.
+
+function buildSyncSection() {
+  const section = document.createElement("div");
+  section.className = "data-section";
+  fillSyncSection(section);
+  return section;
+}
+
+function fillSyncSection(section) {
+  section.innerHTML = "<h3>Синхронизация</h3>";
+  const config = getSyncConfig();
+  section.appendChild(config ? buildSyncConnected(section, config) : buildSyncSetup(section));
+}
+
+function buildSyncSetup(section) {
+  const wrap = document.createElement("div");
+
+  const intro = document.createElement("p");
+  intro.textContent =
+    "Свободно и без своего сервера: приватный репозиторий на GitHub как общее хранилище для всех твоих устройств — телефона, компьютера, ещё одного компьютера. Токен и служебные данные синхронизации остаются только на этом устройстве.";
+
+  const steps = document.createElement("ol");
+  steps.className = "sync-steps";
+  steps.innerHTML =
+    "<li>Заведи аккаунт на github.com, если его ещё нет — бесплатно.</li>" +
+    '<li>Создай токен доступа — <a href="https://github.com/settings/tokens/new?scopes=repo&description=Fictaris" target="_blank" rel="noopener">по этой ссылке</a>, галочка «repo» уже отмечена. Внизу страницы — «Generate token».</li>' +
+    "<li>Скопируй токен (показывается один раз) и вставь сюда.</li>";
+
+  const tokenLabel = document.createElement("label");
+  tokenLabel.textContent = "Токен доступа";
+  const tokenInput = document.createElement("input");
+  tokenInput.type = "password";
+  tokenInput.placeholder = "ghp_…";
+  tokenInput.autocomplete = "off";
+
+  const repoLabel = document.createElement("label");
+  repoLabel.textContent = "Название репозитория";
+  const repoInput = document.createElement("input");
+  repoInput.type = "text";
+  repoInput.value = "fictaris-vault";
+  const repoHint = document.createElement("p");
+  repoHint.className = "sync-hint";
+  repoHint.textContent =
+    "Если такого репозитория ещё нет на твоём GitHub — создадим сами, приватным. Если уже есть (например, второе устройство его уже завело) — подключимся к нему.";
+
+  const btn = document.createElement("button");
+  btn.className = "btn";
+  btn.textContent = "Подключить";
+  const status = document.createElement("div");
+  status.className = "sync-status";
+
+  btn.addEventListener("click", async () => {
+    const token = tokenInput.value.trim();
+    const repo = repoInput.value.trim();
+    if (!token || !repo) {
+      status.textContent = "Заполни токен и название репозитория.";
+      return;
+    }
+    btn.disabled = true;
+    status.textContent = "Проверяем токен…";
+    try {
+      const user = await checkGithubUser(token);
+      const config = { token, owner: user.login, repo };
+      status.textContent = "Проверяем репозиторий…";
+      if (!(await repoExists(config))) {
+        status.textContent = "Репозитория ещё нет — создаём…";
+        await createRepo(config);
+      }
+      saveSyncConfig(config);
+      fillSyncSection(section);
+    } catch (e) {
+      status.textContent = e.message;
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  wrap.append(intro, steps, tokenLabel, tokenInput, repoLabel, repoInput, repoHint, btn, status);
+  return wrap;
+}
+
+function buildSyncConnected(section, config) {
+  const state = getSyncState();
+  const wrap = document.createElement("div");
+
+  const intro = document.createElement("p");
+  const link = `https://github.com/${config.owner}/${config.repo}`;
+  const last = state.lastSyncAt ? new Date(state.lastSyncAt).toLocaleString() : "ещё не было";
+  intro.innerHTML = `Подключено к <a href="${link}" target="_blank" rel="noopener">${config.owner}/${config.repo}</a>. Последняя синхронизация: ${last}.`;
+
+  const row = document.createElement("div");
+  row.className = "sync-actions";
+  const nowBtn = document.createElement("button");
+  nowBtn.className = "btn accent";
+  nowBtn.textContent = "Синхронизировать сейчас";
+  const disconnectBtn = document.createElement("button");
+  disconnectBtn.className = "btn";
+  disconnectBtn.textContent = "Отключить";
+  row.append(nowBtn, disconnectBtn);
+
+  const status = document.createElement("div");
+  status.className = "sync-status";
+  const progress = document.createElement("div");
+  progress.className = "sync-progress";
+  const conflictsBox = document.createElement("div");
+  conflictsBox.className = "sync-conflicts";
+
+  nowBtn.addEventListener("click", () => startSync(config, nowBtn, status, progress, conflictsBox));
+
+  let disconnectArmed = false;
+  disconnectBtn.addEventListener("click", () => {
+    if (!disconnectArmed) {
+      disconnectArmed = true;
+      disconnectBtn.textContent = "Точно отключить?";
+      setTimeout(() => {
+        disconnectArmed = false;
+        disconnectBtn.textContent = "Отключить";
+      }, 3000);
+      return;
+    }
+    clearSyncConfig();
+    fillSyncSection(section);
+  });
+
+  wrap.append(intro, row, status, progress, conflictsBox);
+
+  // Конфликт, найденный автосинхронизацией в фоне, мог случиться, пока
+  // человек не смотрел на этот раздел вовсе — открыв его, сразу
+  // досчитываем ещё раз, а не заставляем сперва самому нажать кнопку.
+  if (localStorage.getItem(AUTOSYNC_CONFLICTS_KEY) === "1") {
+    startSync(config, nowBtn, status, progress, conflictsBox);
+  }
+
+  return wrap;
+}
+
+async function startSync(config, btn, status, progress, conflictsBox) {
+  btn.disabled = true;
+  conflictsBox.innerHTML = "";
+  status.textContent = "Синхронизируем…";
+  try {
+    const result = await runSync(config, (done, total, path) => {
+      progress.textContent = `${done} / ${total}: ${path}`;
+    });
+    progress.textContent = "";
+
+    if (Object.keys(result.pulledFiles).length || Object.keys(result.pulledImages).length) {
+      await apiPost("/api/restore-backup", {
+        format: "fictaris-backup",
+        files: result.pulledFiles,
+        images: result.pulledImages,
+      });
+    }
+
+    if (result.conflicts.length) {
+      status.textContent = `Готово, но ${result.conflicts.length} файл(ов) изменились и здесь, и в репозитории — выбери, что оставить.`;
+      renderConflicts(conflictsBox, config, result.conflicts);
+    } else {
+      status.textContent = `Готово: отправлено ${result.pushed}, забрано ${result.pulled}, без изменений ${result.skipped}.`;
+    }
+
+    if (Object.keys(result.pulledFiles).length || Object.keys(result.pulledImages).length) {
+      setTimeout(() => location.reload(), 1200);
+    }
+  } catch (e) {
+    status.textContent = e.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function renderConflicts(box, config, conflicts) {
+  box.innerHTML = "";
+  for (const conflict of conflicts) {
+    const row = document.createElement("div");
+    row.className = "sync-conflict-row";
+    const title = document.createElement("span");
+    title.textContent = conflict.path;
+    const localBtn = document.createElement("button");
+    localBtn.className = "btn";
+    localBtn.textContent = "Оставить моё";
+    const remoteBtn = document.createElement("button");
+    remoteBtn.className = "btn";
+    remoteBtn.textContent = "Взять оттуда";
+    localBtn.addEventListener("click", () => pickConflict(config, conflict, "local", row));
+    remoteBtn.addEventListener("click", () => pickConflict(config, conflict, "remote", row));
+    row.append(title, localBtn, remoteBtn);
+    box.appendChild(row);
+  }
+}
+
+async function pickConflict(config, conflict, choice, row) {
+  try {
+    const remoteValue = await resolveConflict(config, conflict, choice);
+    if (choice === "remote") {
+      const payload = conflict.kind === "images" ? { images: { [conflict.path]: remoteValue } } : { files: { [conflict.path]: remoteValue } };
+      await apiPost("/api/restore-backup", { format: "fictaris-backup", ...payload });
+    }
+    row.remove();
+    if (choice === "remote") setTimeout(() => location.reload(), 800);
+  } catch (e) {
+    alert(e.message);
+  }
 }
 
 function updateStatusText(res) {

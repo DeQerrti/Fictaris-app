@@ -7,6 +7,8 @@
 //  брифе для файлового хранилища.
 // ══════════════════════════════════════════════
 
+import { isAllowedFile } from "./files.js";
+
 export class ApiError extends Error {
   constructor(message, status = 400) {
     super(message);
@@ -18,6 +20,80 @@ const EMPTY_MANUSCRIPT = { chapters: [], activeChapterId: null };
 const EMPTY_BOARD = { columns: [], cards: {}, cardOrder: {} };
 const EMPTY_MAP = { rootIds: [], maps: {} };
 const IMAGE_EXT = /^(jpg|jpeg|png|webp)$/i;
+
+// Резервная копия/синхронизация (app/js/sync.js) — весь проект одним
+// объектом: JSON-файлы как есть, картинки карты как base64. Формат
+// специально не зовётся "backup", а помечен версией — на случай, если
+// однажды понадобится развести схему на несовместимые.
+const BACKUP_FORMAT = "fictaris-backup";
+const BACKUP_VERSION = 1;
+const BACKUP_FILES = [
+  "characters.json",
+  "manuscript.json",
+  "locations.json",
+  "relationships.json",
+  "timeline.json",
+  "board.json",
+  "factions.json",
+  "map.json",
+];
+
+async function exportBackup({ vault }) {
+  const files = {};
+  for (const name of BACKUP_FILES) {
+    files[name] = await vault.readJson(name, name === "manuscript.json" ? EMPTY_MANUSCRIPT : name === "board.json" ? EMPTY_BOARD : name === "map.json" ? EMPTY_MAP : []);
+  }
+
+  // По одной и с перехватом: копия без одной картинки несравнимо лучше,
+  // чем отсутствие копии вообще (тот же приём, что у TasteID).
+  const images = {};
+  let skippedImages = 0;
+  for (const relPath of await vault.listImages()) {
+    try {
+      images[relPath] = await vault.readImage(relPath);
+    } catch {
+      skippedImages++;
+    }
+  }
+
+  return {
+    format: BACKUP_FORMAT,
+    version: BACKUP_VERSION,
+    exportedAt: new Date().toISOString(),
+    files,
+    images,
+    ...(skippedImages ? { skippedImages } : {}),
+  };
+}
+
+async function restoreBackup({ vault, body }) {
+  if (body?.format !== BACKUP_FORMAT) throw new ApiError("Это не файл резервной копии Fictaris");
+
+  const files = body.files;
+  if (files && typeof files === "object" && !Array.isArray(files)) {
+    // site-settings.json (тема, акцент) — не в BACKUP_FILES и сюда не
+    // попадает нарочно: это предпочтение конкретного устройства, а не
+    // часть мира, и синхронизация не должна перекрашивать чужой экран.
+    const names = Object.keys(files).filter((name) => isAllowedFile(name) && name !== "site-settings.json");
+    for (const name of names) await vault.writeJson(name, files[name]);
+  }
+
+  let restoredImages = 0;
+  const images = body.images;
+  if (images && typeof images === "object" && !Array.isArray(images)) {
+    for (const [relPath, base64] of Object.entries(images)) {
+      if (typeof base64 !== "string" || !base64) continue;
+      try {
+        await vault.writeImage(relPath, base64);
+        restoredImages++;
+      } catch {
+        // Порченый или подставной путь — пропускаем один файл, а не всё восстановление.
+      }
+    }
+  }
+
+  return { ok: true, restoredImages };
+}
 
 export const ROUTES = {
   "GET /api/characters": async ({ vault }) => vault.readJson("characters.json", []),
@@ -103,6 +179,9 @@ export const ROUTES = {
     if (!body || typeof body !== "object") throw new ApiError("Некорректные настройки");
     return vault.writeJson("site-settings.json", body);
   },
+
+  "GET /api/export-backup": exportBackup,
+  "POST /api/restore-backup": restoreBackup,
 
   "GET /api/history": async ({ vault, query }) => vault.history(query.get("file") || ""),
   "POST /api/history/restore": async ({ vault, body }) => {

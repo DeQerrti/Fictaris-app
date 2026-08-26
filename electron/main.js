@@ -310,6 +310,29 @@ function createWindow() {
     shell.openExternal(url);
     return { action: "deny" };
   });
+
+  // Дать автосинхронизации (app/js/sync.js) недолго доработать перед
+  // закрытием окна — закрыв Fictaris, человек с большой вероятностью не
+  // откроет его снова в ближайшие минуты, чтобы обычная отложенная
+  // синхронизация успела сама. Перехватываем закрытие ОКНА, а не
+  // app.on("before-quit"): к этому моменту webContents уже уничтожены.
+  // Закрыться нужно в любом случае — сеть может быть недоступна, и
+  // зависать из-за этого нельзя.
+  const closingWin = win;
+  let closingForReal = false;
+  closingWin.on("close", (e) => {
+    if (closingForReal || closingWin.webContents.isDestroyed()) return;
+    e.preventDefault();
+    const finish = () => {
+      closingForReal = true;
+      closingWin.close();
+    };
+    const timeout = new Promise((resolve) => setTimeout(resolve, 6000));
+    const synced = closingWin.webContents
+      .executeJavaScript("window.__syncBeforeQuit ? window.__syncBeforeQuit() : null")
+      .catch(() => {});
+    Promise.race([synced, timeout]).then(finish);
+  });
 }
 
 app.on("second-instance", () => {

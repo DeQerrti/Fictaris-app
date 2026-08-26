@@ -130,4 +130,36 @@ export class Vault {
     await fs.writeFile(path.join(dir, safeName), Buffer.from(base64, "base64"));
     return `maps/${safeName}`;
   }
+
+  // Для резервной копии/синхронизации (app/js/sync.js) — та же папка
+  // maps/, но по конкретному относительному пути, а не с новым
+  // сгенерированным именем, как в saveImage выше.
+  #imagePath(relPath) {
+    const clean = String(relPath).replace(/^\/+/, "");
+    if (!clean.startsWith("maps/") || clean.includes("..")) {
+      throw new Error(`Недопустимый путь изображения: ${relPath}`);
+    }
+    return path.join(this.root, clean);
+  }
+
+  async listImages() {
+    let entries;
+    try {
+      entries = await fs.readdir(path.join(this.root, "maps"));
+    } catch {
+      return [];
+    }
+    return entries.filter((f) => !f.startsWith(".")).map((f) => `maps/${f}`);
+  }
+
+  async readImage(relPath) {
+    const buf = await fs.readFile(this.#imagePath(relPath));
+    return buf.toString("base64");
+  }
+
+  async writeImage(relPath, base64) {
+    const target = this.#imagePath(relPath);
+    await fs.mkdir(path.dirname(target), { recursive: true });
+    await fs.writeFile(target, Buffer.from(base64, "base64"));
+  }
 }
