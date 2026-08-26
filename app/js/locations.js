@@ -1,6 +1,7 @@
 import { apiGet, apiPost, uid } from "./api.js";
 import { debounceSave } from "./save-badge.js";
 import { escapeHtml } from "./chips.js";
+import { pushTrash } from "./trash.js";
 import { LOCATION_TYPES, locationTypeInfo, iconSvg } from "./icons.js";
 
 const FIELDS = [
@@ -149,7 +150,8 @@ function buildDrawer(loc) {
   const delBtn = document.createElement("button");
   delBtn.className = "btn danger";
   delBtn.textContent = "Удалить";
-  delBtn.addEventListener("click", () => {
+  delBtn.addEventListener("click", async () => {
+    await pushTrash("location", loc);
     locations = locations.filter((x) => x.id !== loc.id);
     activeId = null;
     persist();

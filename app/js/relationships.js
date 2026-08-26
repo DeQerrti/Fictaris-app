@@ -1,6 +1,7 @@
 import { apiGet, apiPost, uid } from "./api.js";
 import { debounceSave } from "./save-badge.js";
 import { escapeHtml, characterSelect } from "./chips.js";
+import { pushTrash } from "./trash.js";
 
 let characters = [];
 let relationships = [];
@@ -146,7 +147,8 @@ function buildRelRow(rel) {
   const delBtn = document.createElement("button");
   delBtn.className = "btn danger";
   delBtn.textContent = "✕";
-  delBtn.addEventListener("click", () => {
+  delBtn.addEventListener("click", async () => {
+    await pushTrash("relationship", rel);
     relationships = relationships.filter((r) => r.id !== rel.id);
     persist();
     draw();

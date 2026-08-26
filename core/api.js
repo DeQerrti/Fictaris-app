@@ -82,4 +82,10 @@ export const ROUTES = {
     const relPath = await vault.saveImage(name, buffer);
     return { path: relPath };
   },
+
+  "GET /api/trash": async ({ vault }) => vault.readJson("trash.json", []),
+  "POST /api/trash": async ({ vault, body }) => {
+    if (!Array.isArray(body)) throw new ApiError("Ожидался список удалённого");
+    return vault.writeJson("trash.json", body);
+  },
 };

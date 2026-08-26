@@ -1,6 +1,7 @@
 import { apiGet, apiPost, uid } from "./api.js";
 import { debounceSave } from "./save-badge.js";
 import { characterSelect } from "./chips.js";
+import { pushTrash } from "./trash.js";
 
 let board = { columns: [], cards: {}, cardOrder: {} };
 let characters = [];
@@ -190,7 +191,8 @@ function buildCard(card, colId) {
   const delBtn = document.createElement("button");
   delBtn.className = "board-card-del";
   delBtn.textContent = "✕";
-  delBtn.addEventListener("click", () => {
+  delBtn.addEventListener("click", async () => {
+    await pushTrash("board-card", card);
     board.cardOrder[colId] = board.cardOrder[colId].filter((id) => id !== card.id);
     delete board.cards[card.id];
     persist();

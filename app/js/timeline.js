@@ -3,6 +3,7 @@ import { debounceSave } from "./save-badge.js";
 import { escapeHtml, buildToggleGroup } from "./chips.js";
 import { locationTypeInfo } from "./icons.js";
 import { attachMentionAutocomplete } from "./mentions.js";
+import { pushTrash } from "./trash.js";
 
 let events = [];
 let characters = [];
@@ -252,7 +253,8 @@ function buildDrawer(ev) {
   const delBtn = document.createElement("button");
   delBtn.className = "btn danger";
   delBtn.textContent = "Удалить";
-  delBtn.addEventListener("click", () => {
+  delBtn.addEventListener("click", async () => {
+    await pushTrash("timeline", ev);
     events = events.filter((x) => x.id !== ev.id);
     activeId = null;
     persist();

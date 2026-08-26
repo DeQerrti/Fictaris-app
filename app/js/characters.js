@@ -1,6 +1,7 @@
 import { apiGet, apiPost, uid } from "./api.js";
 import { debounceSave } from "./save-badge.js";
 import { escapeHtml } from "./chips.js";
+import { pushTrash } from "./trash.js";
 
 const PALETTE = [
   "#c9944a", "#4f7d74", "#a4483c", "#7d6a9e",
@@ -160,7 +161,8 @@ function buildDrawer(c) {
   const delBtn = document.createElement("button");
   delBtn.className = "btn danger";
   delBtn.textContent = "Удалить";
-  delBtn.addEventListener("click", () => {
+  delBtn.addEventListener("click", async () => {
+    await pushTrash("character", c);
     characters = characters.filter((x) => x.id !== c.id);
     activeId = null;
     persist();

@@ -8,6 +8,7 @@ import { renderTimeline } from "./timeline.js";
 import { renderBoard } from "./board.js";
 import { renderMap } from "./map.js";
 import { renderData } from "./data-panel.js";
+import { renderTrash, trashCount } from "./trash.js";
 
 const MODULES = {
   manuscript: renderManuscript,
@@ -18,6 +19,7 @@ const MODULES = {
   timeline: renderTimeline,
   board: renderBoard,
   map: renderMap,
+  trash: renderTrash,
   data: renderData,
 };
 
@@ -40,6 +42,13 @@ document.addEventListener("fictaris:open-character", (e) => {
   openModule("characters", e.detail.id);
 });
 
+const trashBadge = document.getElementById("trashBadge");
+async function refreshTrashBadge() {
+  const n = await trashCount().catch(() => 0);
+  trashBadge.textContent = n > 0 ? String(n) : "";
+}
+document.addEventListener("fictaris:trash-changed", refreshTrashBadge);
+
 async function boot() {
   const info = await apiGet("/api/app/info").catch(() => ({ vaultPath: null }));
   if (!info.vaultPath) {
@@ -47,6 +56,7 @@ async function boot() {
     return;
   }
   openModule("manuscript");
+  refreshTrashBadge();
 }
 
 boot();

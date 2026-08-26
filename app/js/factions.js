@@ -2,6 +2,7 @@ import { apiGet, apiPost, uid } from "./api.js";
 import { debounceSave } from "./save-badge.js";
 import { escapeHtml, characterSelect, buildToggleGroup } from "./chips.js";
 import { FACTION_TYPES, factionTypeInfo, iconSvg } from "./icons.js";
+import { pushTrash } from "./trash.js";
 
 let factions = [];
 let characters = [];
@@ -177,7 +178,8 @@ function buildDrawer(f) {
   const delBtn = document.createElement("button");
   delBtn.className = "btn danger";
   delBtn.textContent = "Удалить";
-  delBtn.addEventListener("click", () => {
+  delBtn.addEventListener("click", async () => {
+    await pushTrash("faction", f);
     factions = factions.filter((x) => x.id !== f.id);
     activeId = null;
     persist();
