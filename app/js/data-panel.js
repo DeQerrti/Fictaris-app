@@ -1,6 +1,7 @@
 import { apiGet, apiPost } from "./api.js";
 import { buildDemoBundle } from "./demo-data.js";
 import { THEME_PRESETS, saveTheme } from "./theme.js";
+import { DEFAULT_LABELS, saveLabels, resetLabels } from "./labels.js";
 import {
   getSyncConfig,
   saveSyncConfig,
@@ -81,6 +82,7 @@ export async function renderData(root) {
   const info = await apiGet("/api/app/info").catch(() => ({}));
 
   wrap.appendChild(await buildAppearanceSection());
+  wrap.appendChild(await buildLabelsSection());
   wrap.appendChild(buildUpdateSection(info));
   wrap.appendChild(buildSyncSection());
   wrap.appendChild(buildExportSection());
@@ -138,6 +140,53 @@ async function buildAppearanceSection() {
 
   section.append(swatches, accentRow, resetBtn);
   return section;
+}
+
+async function buildLabelsSection() {
+  const section = document.createElement("div");
+  section.className = "data-section";
+  section.innerHTML =
+    "<h3>Подписи интерфейса</h3><p>Переименуй пункты меню под свою терминологию — применяется сразу, без перезагрузки.</p>";
+
+  const current = window.SITE_LABELS || DEFAULT_LABELS;
+  const grid = document.createElement("div");
+  grid.className = "labels-grid";
+
+  grid.appendChild(buildLabelRow("Название приложения", DEFAULT_LABELS.brand, current.brand, (value) => saveLabels({ brand: value })));
+  for (const [key, defaultLabel] of Object.entries(DEFAULT_LABELS.nav)) {
+    grid.appendChild(
+      buildLabelRow(defaultLabel, defaultLabel, current.nav[key], (value) => saveLabels({ nav: { [key]: value } }))
+    );
+  }
+
+  const resetBtn = document.createElement("button");
+  resetBtn.className = "btn";
+  resetBtn.textContent = "Сбросить все подписи";
+  resetBtn.addEventListener("click", async () => {
+    await resetLabels();
+    location.reload(); // проще перечитать раздел заново, чем гонять новые значения по всем полям формы
+  });
+
+  section.append(grid, resetBtn);
+  return section;
+}
+
+function buildLabelRow(caption, defaultValue, currentValue, onSave) {
+  const row = document.createElement("div");
+  row.className = "label-row";
+  const label = document.createElement("span");
+  label.className = "label-row-caption";
+  label.textContent = caption;
+  const input = document.createElement("input");
+  input.type = "text";
+  input.value = currentValue || defaultValue;
+  let timer;
+  input.addEventListener("input", () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => onSave(input.value.trim() || defaultValue), 500);
+  });
+  row.append(label, input);
+  return row;
 }
 
 // ── Синхронизация ────────────────────────────

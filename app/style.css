@@ -512,6 +512,21 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
 .theme-accent-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; color: var(--text-dim); font-size: 0.85rem; }
 .theme-accent-row input[type="color"] { width: 40px; height: 28px; padding: 0; border: 1px solid var(--border); border-radius: 6px; background: none; cursor: pointer; }
 
+/* ── Подписи интерфейса ────────────────────── */
+
+.labels-grid { display: grid; grid-template-columns: 160px 1fr; gap: 8px 12px; align-items: center; margin-bottom: 14px; max-width: 480px; }
+.label-row { display: contents; }
+.label-row-caption { color: var(--text-dim); font-size: 0.85rem; }
+.label-row input[type="text"] {
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--panel-alt);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.85rem;
+}
+
 /* ── Синхронизация ─────────────────────────── */
 
 .sync-steps { padding-left: 1.2em; display: flex; flex-direction: column; gap: 6px; color: var(--text-dim); font-size: 0.85rem; }

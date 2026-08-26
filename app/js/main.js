@@ -15,6 +15,7 @@ import { renderTrash, trashCount } from "./trash.js";
 import { initProjectSwitcher } from "./project-switcher.js";
 import { initUpdateBanner } from "./update-banner.js";
 import { applyTheme } from "./theme.js";
+import { applyLabels } from "./labels.js";
 import { initSearch, openSearch } from "./search.js";
 
 const MODULES = {
@@ -74,6 +75,7 @@ document.addEventListener("fictaris:trash-changed", refreshTrashBadge);
 
 async function boot() {
   applyTheme(); // независимо от info — кэш уже применён инлайн-скриптом, здесь только свежие данные
+  applyLabels();
   const info = await apiGet("/api/app/info").catch(() => ({ vaultPath: null }));
   if (!info.vaultPath) {
     location.href = "/welcome";
