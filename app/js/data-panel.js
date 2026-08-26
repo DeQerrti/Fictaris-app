@@ -37,6 +37,14 @@ async function applyAll(bundle) {
   ]);
 }
 
+// Используется онбордингом (onboarding.js) — тот же путь, что и кнопка
+// «Заполнить примером» ниже, но без подтверждения: на первом запуске
+// заменять нечего, проект и так пуст.
+export async function fillWithDemoData() {
+  await applyAll(buildDemoBundle());
+  location.reload();
+}
+
 // Инлайн-подтверждение вместо browser confirm() — общая полоска
 // «сообщение + Да/Отмена», которую показывает и импорт, и демо-данные.
 function showConfirmBar(bar, message, onConfirm) {

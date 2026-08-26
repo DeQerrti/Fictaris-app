@@ -10,7 +10,7 @@ import { renderBoard } from "./board.js";
 import { renderMap } from "./map.js";
 import { renderGraph } from "./graph.js";
 import { renderContinuity } from "./continuity.js";
-import { renderData } from "./data-panel.js";
+import { renderData, fillWithDemoData } from "./data-panel.js";
 import { renderSettings } from "./settings-panel.js";
 import { renderTrash, trashCount } from "./trash.js";
 import { initProjectSwitcher } from "./project-switcher.js";
@@ -19,6 +19,7 @@ import { applyTheme } from "./theme.js";
 import { applyLabels } from "./labels.js";
 import { initSearch, openSearch } from "./search.js";
 import { initShortcuts, loadShortcuts } from "./shortcuts.js";
+import { maybeShowOnboarding } from "./onboarding.js";
 
 const MODULES = {
   manuscript: renderManuscript,
@@ -89,6 +90,7 @@ async function boot() {
   openModule("manuscript");
   refreshTrashBadge();
   initProjectSwitcher();
+  maybeShowOnboarding({ onFillDemo: fillWithDemoData });
   // На телефоне обновления проверяет сам mobile.bundle.js (полностью на
   // клиенте, без /api/app/update-status) — там своя полоска.
   if (!info.mobile) initUpdateBanner();
