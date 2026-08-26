@@ -3,6 +3,7 @@ import { THEME_PRESETS, saveTheme } from "./theme.js";
 import { DEFAULT_LABELS, saveLabels, resetLabels } from "./labels.js";
 import { captureKey, saveShortcut, clearShortcut } from "./shortcuts.js";
 import { DEFAULT_TAGS_MAP, CATEGORY_LABELS } from "./tags.js";
+import { DEFAULT_MONTHS, loadCalendar, saveCalendar } from "./calendar.js";
 import {
   getSyncConfig,
   saveSyncConfig,
@@ -39,6 +40,7 @@ export async function renderSettings(root) {
   wrap.appendChild(await buildLabelsSection());
   wrap.appendChild(await buildShortcutsSection());
   wrap.appendChild(await buildTagsSection());
+  wrap.appendChild(await buildCalendarSection());
   wrap.appendChild(buildSyncSection());
   wrap.appendChild(buildUpdateSection(info));
   wrap.appendChild(buildAboutSection(info));
@@ -325,6 +327,128 @@ function renderTagsManageList(list, merged, hidden, custom) {
     }
     list.appendChild(group);
   }
+}
+
+// ── Календарь ─────────────────────────────────
+// Выключен по умолчанию — таймлайн работает как раньше, свободный
+// текст с числом внутри двигает событие по шкале (timeline.js,
+// orderFromDate). Включив, получаешь три поля вместо текста: год/
+// месяц/день по названиям месяцев отсюда, и точный порядок на шкале
+// вместо эвристики.
+
+async function buildCalendarSection() {
+  const section = document.createElement("div");
+  section.className = "data-section";
+  section.innerHTML =
+    "<h3>Календарь</h3><p>Своё летоисчисление для таймлайна — свои месяцы вместо реальных, произвольная длина года.</p>";
+
+  const calendar = await loadCalendar();
+  const toggleBtn = document.createElement("button");
+  toggleBtn.className = "btn";
+  toggleBtn.textContent = calendar ? "Отключить свой календарь" : "Включить свой календарь";
+
+  const body = document.createElement("div");
+  body.className = "calendar-editor";
+
+  function renderBody(cal) {
+    body.innerHTML = "";
+    if (!cal) return;
+
+    const eraRow = document.createElement("div");
+    eraRow.className = "field";
+    eraRow.innerHTML = "<label>Название года</label>";
+    const eraInput = document.createElement("input");
+    eraInput.type = "text";
+    eraInput.value = cal.eraLabel || "год";
+    let eraTimer;
+    eraInput.addEventListener("input", () => {
+      clearTimeout(eraTimer);
+      eraTimer = setTimeout(async () => {
+        cal.eraLabel = eraInput.value.trim() || "год";
+        await saveCalendar(cal);
+      }, 500);
+    });
+    eraRow.appendChild(eraInput);
+    body.appendChild(eraRow);
+
+    const monthsList = document.createElement("div");
+    monthsList.className = "calendar-months";
+    cal.months.forEach((m, i) => {
+      const row = document.createElement("div");
+      row.className = "calendar-month-row";
+
+      const nameInput = document.createElement("input");
+      nameInput.type = "text";
+      nameInput.value = m.name;
+      let nameTimer;
+      nameInput.addEventListener("input", () => {
+        clearTimeout(nameTimer);
+        nameTimer = setTimeout(async () => {
+          m.name = nameInput.value.trim() || m.name;
+          await saveCalendar(cal);
+        }, 500);
+      });
+
+      const daysInput = document.createElement("input");
+      daysInput.type = "number";
+      daysInput.min = "1";
+      daysInput.max = "99";
+      daysInput.value = m.days;
+      daysInput.addEventListener("change", async () => {
+        m.days = Math.max(1, Math.min(99, Number(daysInput.value) || 30));
+        daysInput.value = m.days;
+        await saveCalendar(cal);
+      });
+
+      const daysLabel = document.createElement("span");
+      daysLabel.className = "calendar-days-label";
+      daysLabel.textContent = "дней";
+
+      const removeBtn = document.createElement("button");
+      removeBtn.className = "btn shortcut-clear";
+      removeBtn.textContent = "×";
+      removeBtn.title = "Убрать месяц";
+      removeBtn.addEventListener("click", async () => {
+        if (cal.months.length <= 1) return;
+        cal.months.splice(i, 1);
+        await saveCalendar(cal);
+        renderBody(cal);
+      });
+
+      row.append(nameInput, daysInput, daysLabel, removeBtn);
+      monthsList.appendChild(row);
+    });
+    body.appendChild(monthsList);
+
+    const addBtn = document.createElement("button");
+    addBtn.className = "btn";
+    addBtn.textContent = "Добавить месяц";
+    addBtn.addEventListener("click", async () => {
+      cal.months.push({ name: `Месяц ${cal.months.length + 1}`, days: 30 });
+      await saveCalendar(cal);
+      renderBody(cal);
+    });
+    body.appendChild(addBtn);
+  }
+
+  let current = calendar;
+  renderBody(current);
+
+  toggleBtn.addEventListener("click", async () => {
+    if (current) {
+      current = null;
+      await saveCalendar(null);
+      toggleBtn.textContent = "Включить свой календарь";
+    } else {
+      current = { months: DEFAULT_MONTHS.map((m) => ({ ...m })), eraLabel: "год" };
+      await saveCalendar(current);
+      toggleBtn.textContent = "Отключить свой календарь";
+    }
+    renderBody(current);
+  });
+
+  section.append(toggleBtn, body);
+  return section;
 }
 
 // ── Синхронизация ────────────────────────────

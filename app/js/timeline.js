@@ -5,10 +5,12 @@ import { locationTypeInfo } from "./icons.js";
 import { attachMentionAutocomplete } from "./mentions.js";
 import { pushTrash } from "./trash.js";
 import { buildExportPngButton } from "./png-export.js";
+import { loadCalendar, absoluteDay, formatDate } from "./calendar.js";
 
 let events = [];
 let characters = [];
 let locations = [];
+let calendar = null;
 let activeId = null;
 let filterCharIds = new Set();
 let filterLocIds = new Set();
@@ -54,10 +56,11 @@ function locById(id) {
 
 export async function renderTimeline(root, focusId) {
   container = root;
-  [events, characters, locations] = await Promise.all([
+  [events, characters, locations, calendar] = await Promise.all([
     apiGet("/api/timeline"),
     apiGet("/api/characters"),
     apiGet("/api/locations"),
+    loadCalendar(),
   ]);
   if (focusId && events.some((e) => e.id === focusId)) activeId = focusId;
   draw();
@@ -223,17 +226,9 @@ function reorder(draggedId, targetId, orderedList) {
   draw();
 }
 
-function buildDrawer(ev) {
-  const drawer = document.createElement("div");
-  drawer.className = "drawer";
-
-  const titleInput = document.createElement("input");
-  titleInput.value = ev.title;
-  titleInput.style.cssText =
-    "background:none;border:none;color:var(--text);font-family:Fraunces,serif;font-size:1.3rem;font-weight:600;width:100%;";
-  titleInput.addEventListener("input", () => { ev.title = titleInput.value; persist(); });
-  drawer.appendChild(titleInput);
-
+// Свободный текст — поведение как было всегда: число внутри строки
+// двигает событие по шкале (см. orderFromDate выше).
+function buildFreeTextDateField(ev) {
   const dateField = document.createElement("div");
   dateField.className = "field";
   dateField.style.marginTop = "14px";
@@ -250,7 +245,79 @@ function buildDrawer(ev) {
     persist();
   });
   dateField.appendChild(dateInput);
-  drawer.appendChild(dateField);
+  return dateField;
+}
+
+// Свой календарь (Настройки → Календарь) включён — три поля вместо
+// текста, и порядок на шкале точный (absoluteDay), а не по эвристике.
+// dateYear/dateMonth/dateDay хранятся отдельно от готовой строки ev.date,
+// чтобы при повторном открытии карточки не разбирать её обратно.
+function buildCalendarDateField(ev) {
+  const dateField = document.createElement("div");
+  dateField.className = "field";
+  dateField.style.marginTop = "14px";
+  const dateLabel = document.createElement("label");
+  dateLabel.textContent = "Дата";
+  dateField.appendChild(dateLabel);
+
+  const row = document.createElement("div");
+  row.className = "timeline-date-fields";
+
+  const yearInput = document.createElement("input");
+  yearInput.type = "number";
+  yearInput.value = ev.dateYear ?? 0;
+
+  const monthSelect = document.createElement("select");
+  calendar.months.forEach((m, i) => {
+    const opt = document.createElement("option");
+    opt.value = i;
+    opt.textContent = m.name;
+    if ((ev.dateMonth ?? 0) === i) opt.selected = true;
+    monthSelect.appendChild(opt);
+  });
+
+  const dayInput = document.createElement("input");
+  dayInput.type = "number";
+  dayInput.min = "1";
+  dayInput.value = ev.dateDay ?? 1;
+
+  function apply() {
+    const monthIndex = Number(monthSelect.value);
+    const maxDay = calendar.months[monthIndex]?.days || 30;
+    const year = Number(yearInput.value) || 0;
+    const day = Math.max(1, Math.min(maxDay, Number(dayInput.value) || 1));
+    dayInput.max = String(maxDay);
+    dayInput.value = day;
+
+    ev.dateYear = year;
+    ev.dateMonth = monthIndex;
+    ev.dateDay = day;
+    ev.date = formatDate(calendar, { year, month: monthIndex, day });
+    ev.order = absoluteDay(calendar, year, monthIndex, day);
+    persist();
+  }
+
+  yearInput.addEventListener("input", apply);
+  monthSelect.addEventListener("change", apply);
+  dayInput.addEventListener("input", apply);
+
+  row.append(yearInput, monthSelect, dayInput);
+  dateField.appendChild(row);
+  return dateField;
+}
+
+function buildDrawer(ev) {
+  const drawer = document.createElement("div");
+  drawer.className = "drawer";
+
+  const titleInput = document.createElement("input");
+  titleInput.value = ev.title;
+  titleInput.style.cssText =
+    "background:none;border:none;color:var(--text);font-family:Fraunces,serif;font-size:1.3rem;font-weight:600;width:100%;";
+  titleInput.addEventListener("input", () => { ev.title = titleInput.value; persist(); });
+  drawer.appendChild(titleInput);
+
+  drawer.appendChild(calendar ? buildCalendarDateField(ev) : buildFreeTextDateField(ev));
 
   const descField = document.createElement("div");
   descField.className = "field";

@@ -1,6 +1,6 @@
 import { apiGet, apiPost, uid } from "./api.js";
 import { debounceSave } from "./save-badge.js";
-import { escapeHtml } from "./chips.js";
+import { escapeHtml, buildToggleGroup } from "./chips.js";
 import { pushTrash } from "./trash.js";
 import { buildReverseLinks } from "./reverse-links.js";
 import { loadTagsMap, buildTagsField } from "./tags.js";
@@ -46,6 +46,7 @@ function blank() {
     color: PALETTE[characters.length % PALETTE.length],
     role: "", age: "", appearance: "", personality: "",
     motivation: "", goal: "", flaws: "", backstory: "", tags: "",
+    parentIds: [],
   };
 }
 
@@ -197,6 +198,18 @@ function buildDrawer(c) {
     colorRow.appendChild(sw);
   }
   drawer.appendChild(colorRow);
+
+  drawer.appendChild(
+    buildToggleGroup(
+      "Родители",
+      characters.filter((x) => x.id !== c.id),
+      c.parentIds || [],
+      (ids) => {
+        c.parentIds = ids;
+        persist();
+      }
+    )
+  );
 
   for (const [key, label, kind] of FIELDS) {
     const field = document.createElement("div");

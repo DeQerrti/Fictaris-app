@@ -655,6 +655,19 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
   color: var(--text-faint);
 }
 
+/* ── Календарь ─────────────────────────────── */
+
+.calendar-editor { margin-top: 14px; max-width: 420px; }
+.calendar-months { display: flex; flex-direction: column; gap: 6px; margin: 12px 0; }
+.calendar-month-row { display: flex; align-items: center; gap: 8px; }
+.calendar-month-row input[type="text"] { flex: 1; }
+.calendar-month-row input[type="number"] { width: 56px; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--panel-alt); color: var(--text); font-family: inherit; font-size: 0.85rem; }
+.calendar-days-label { color: var(--text-faint); font-size: 0.78rem; flex-shrink: 0; }
+
+.timeline-date-fields { display: flex; gap: 8px; align-items: center; }
+.timeline-date-fields input[type="number"] { width: 70px; }
+.timeline-date-fields select { flex: 1; }
+
 /* ── Синхронизация ─────────────────────────── */
 
 .sync-steps { padding-left: 1.2em; display: flex; flex-direction: column; gap: 6px; color: var(--text-dim); font-size: 0.85rem; }
