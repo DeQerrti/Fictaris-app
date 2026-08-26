@@ -2,6 +2,7 @@ import { apiGet, apiPost, uid } from "./api.js";
 import { debounceSave } from "./save-badge.js";
 import { escapeHtml, characterSelect } from "./chips.js";
 import { pushTrash } from "./trash.js";
+import { i18n } from "./i18n.js";
 
 let characters = [];
 let relationships = [];
@@ -45,7 +46,7 @@ function draw() {
   if (characters.length < 2) {
     const empty = document.createElement("div");
     empty.className = "empty-state";
-    empty.textContent = "Нужно как минимум два персонажа, чтобы связать их между собой.";
+    empty.textContent = i18n("Нужно как минимум два персонажа, чтобы связать их между собой.");
     wrap.appendChild(empty);
     container.appendChild(wrap);
     return;
@@ -103,7 +104,7 @@ function buildList() {
 
   const addBtn = document.createElement("button");
   addBtn.className = "btn";
-  addBtn.textContent = "+ Добавить связь";
+  addBtn.textContent = i18n("+ Добавить связь");
   addBtn.style.alignSelf = "flex-start";
   addBtn.addEventListener("click", () => {
     relationships.push({
@@ -138,7 +139,7 @@ function buildRelRow(rel) {
   selB.addEventListener("change", () => { rel.charB = selB.value; persist(); draw(); });
 
   const label = document.createElement("input");
-  label.placeholder = "Метка (наставник, вражда…)";
+  label.placeholder = i18n("Метка (наставник, вражда…)");
   label.value = rel.label || "";
   label.style.flex = "1";
   label.style.cssText += "background:var(--panel-alt);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:6px 8px;font-family:inherit;font-size:0.85rem;";
@@ -177,7 +178,7 @@ function buildRelRow(rel) {
   row.appendChild(sliderRow);
 
   const note = document.createElement("textarea");
-  note.placeholder = "Заметка о связи…";
+  note.placeholder = i18n("Заметка о связи…");
   note.value = rel.note || "";
   note.style.cssText = "width:100%;margin-top:8px;background:var(--panel-alt);border:1px solid var(--border);border-radius:6px;color:var(--text-dim);padding:6px 8px;font-family:inherit;font-size:0.85rem;resize:vertical;min-height:36px;";
   note.addEventListener("input", () => { rel.note = note.value; persist(); });

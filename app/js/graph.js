@@ -1,6 +1,7 @@
 import { apiGet } from "./api.js";
 import { escapeHtml } from "./chips.js";
 import { locationTypeInfo, factionTypeInfo, iconSvg } from "./icons.js";
+import { i18n } from "./i18n.js";
 
 let nodes = [];
 let edges = [];
@@ -70,7 +71,7 @@ function draw() {
   if (nodes.length < 2) {
     const empty = document.createElement("div");
     empty.className = "empty-state";
-    empty.textContent = "Добавь персонажей, локаций или фракций, чтобы увидеть граф проекта.";
+    empty.textContent = i18n("Добавь персонажей, локаций или фракций, чтобы увидеть граф проекта.");
     container.appendChild(empty);
     return;
   }
@@ -191,8 +192,8 @@ function buildLegend() {
   const legend = document.createElement("div");
   legend.className = "graph-legend";
   legend.innerHTML = `
-    <span><span class="legend-dot" style="background:#c9944a"></span>Персонажи</span>
-    <span><span class="legend-dot" style="background:#6a8fae"></span>Локации/фракции — цвет по типу</span>
+    <span><span class="legend-dot" style="background:#c9944a"></span>${i18n("Персонажи")}</span>
+    <span><span class="legend-dot" style="background:#6a8fae"></span>${i18n("Локации/фракции — цвет по типу")}</span>
   `;
   return legend;
 }

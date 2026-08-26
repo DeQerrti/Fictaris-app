@@ -30,6 +30,8 @@
 //  отклоняется сервером, а не тихо затирает чужую правку.
 // ══════════════════════════════════════════════
 
+import { i18n } from "./i18n.js";
+
 const SYNC_CONFIG_KEY = "fictaris_sync_config"; // { token, owner, repo }
 const SYNC_STATE_KEY = "fictaris_sync_state"; // { files: {путь:{hash,sha}}, images: {путь:{hash,sha}}, lastSyncAt }
 export const AUTOSYNC_CONFLICTS_KEY = "fictaris_sync_has_conflicts";
@@ -94,32 +96,32 @@ async function githubApi(config, path, { method = "GET", body } = {}) {
       body: body ? JSON.stringify(body) : undefined,
     });
   } catch {
-    throw new SyncError("Не получилось достучаться до GitHub — проверь соединение с интернетом.");
+    throw new SyncError(i18n("Не получилось достучаться до GitHub — проверь соединение с интернетом."));
   }
 
   if (res.status === 401) {
-    throw new SyncError("GitHub не принял токен — проверь, что он не истёк и не отозван.");
+    throw new SyncError(i18n("GitHub не принял токен — проверь, что он не истёк и не отозван."));
   }
   if (res.status === 403) {
     const data = await res.json().catch(() => ({}));
     if (/rate limit/i.test(data.message || "")) {
-      throw new SyncError("GitHub временно ограничил число запросов — попробуй через несколько минут.");
+      throw new SyncError(i18n("GitHub временно ограничил число запросов — попробуй через несколько минут."));
     }
-    throw new SyncError("У токена не хватает прав на этот репозиторий.");
+    throw new SyncError(i18n("У токена не хватает прав на этот репозиторий."));
   }
   return res;
 }
 
 export async function checkGithubUser(token) {
   const res = await githubApi({ token }, "/user");
-  if (!res.ok) throw new SyncError("Не получилось проверить токен.");
+  if (!res.ok) throw new SyncError(i18n("Не получилось проверить токен."));
   return res.json(); // { login, ... }
 }
 
 export async function repoExists(config) {
   const res = await githubApi(config, `/repos/${config.owner}/${config.repo}`);
   if (res.status === 404) return false;
-  if (!res.ok) throw new SyncError("Не получилось проверить репозиторий.");
+  if (!res.ok) throw new SyncError(i18n("Не получилось проверить репозиторий."));
   return true;
 }
 
@@ -139,7 +141,7 @@ export async function createRepo(config) {
   );
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
-    throw new SyncError(data.message || "Не получилось создать репозиторий.");
+    throw new SyncError(data.message || i18n("Не получилось создать репозиторий."));
   }
 }
 
@@ -154,7 +156,7 @@ function encodePath(path) {
 async function getRemoteFile(config, path) {
   const res = await githubApi(config, `/repos/${config.owner}/${config.repo}/contents/${encodePath(path)}`);
   if (res.status === 404) return null;
-  if (!res.ok) throw new SyncError(`Не получилось прочитать файл из репозитория: ${path}`);
+  if (!res.ok) throw new SyncError(i18n("Не получилось прочитать файл из репозитория: {path}", { path }));
   const data = await res.json();
   return { base64: data.content.replace(/\n/g, ""), sha: data.sha };
 }
@@ -166,7 +168,7 @@ async function putRemoteFile(config, path, base64, sha) {
   });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
-    throw new SyncError(data.message || `Не получилось отправить файл: ${path}`);
+    throw new SyncError(data.message || i18n("Не получилось отправить файл: {path}", { path }));
   }
   return (await res.json()).content.sha;
 }

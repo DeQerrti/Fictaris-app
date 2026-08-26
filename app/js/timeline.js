@@ -6,6 +6,7 @@ import { attachMentionAutocomplete } from "./mentions.js";
 import { pushTrash } from "./trash.js";
 import { buildExportPngButton } from "./png-export.js";
 import { loadCalendar, absoluteDay, formatDate } from "./calendar.js";
+import { i18n } from "./i18n.js";
 
 let events = [];
 let characters = [];
@@ -31,7 +32,7 @@ function blank() {
     id: uid(),
     order: maxOrder + 1,
     date: "",
-    title: "Новое событие",
+    title: i18n("Новое событие"),
     description: "",
     characterIds: [],
     locationIds: [],
@@ -75,7 +76,7 @@ function draw() {
   listPane.className = "timeline-list-pane";
   const toolbar = document.createElement("div");
   toolbar.className = "timeline-toolbar";
-  toolbar.appendChild(buildExportPngButton(() => container.querySelector(".timeline-list"), "таймлайн"));
+  toolbar.appendChild(buildExportPngButton(() => container.querySelector(".timeline-list"), i18n("таймлайн")));
   listPane.appendChild(toolbar);
   listPane.appendChild(buildFilterBar());
   listPane.appendChild(buildList());
@@ -129,7 +130,7 @@ function buildFilterBar() {
   if (filterCharIds.size || filterLocIds.size) {
     const count = document.createElement("div");
     count.className = "filter-count";
-    count.textContent = `${visibleEvents().length} из ${events.length} событий`;
+    count.textContent = i18n("{shown} из {total} событий", { shown: visibleEvents().length, total: events.length });
     wrap.appendChild(count);
   }
 
@@ -157,7 +158,7 @@ function buildList() {
   if (!items.length) {
     const empty = document.createElement("div");
     empty.className = "empty-state";
-    empty.textContent = events.length ? "Нет событий с таким фильтром." : "Событий пока нет — добавь первое.";
+    empty.textContent = events.length ? i18n("Нет событий с таким фильтром.") : i18n("Событий пока нет — добавь первое.");
     list.appendChild(empty);
   }
 
@@ -179,7 +180,7 @@ function buildList() {
 
     item.innerHTML = `
       <div class="timeline-date">${escapeHtml(ev.date || "—")}</div>
-      <div class="timeline-title">${escapeHtml(ev.title || "Без названия")}</div>
+      <div class="timeline-title">${escapeHtml(ev.title || i18n("Без названия"))}</div>
       <div class="timeline-chips">${chips}</div>
     `;
 
@@ -198,7 +199,7 @@ function buildList() {
 
   const addBtn = document.createElement("button");
   addBtn.className = "add-chapter";
-  addBtn.textContent = "+ Событие";
+  addBtn.textContent = i18n("+ Событие");
   addBtn.addEventListener("click", () => {
     const ev = blank();
     events.push(ev);
@@ -233,11 +234,11 @@ function buildFreeTextDateField(ev) {
   dateField.className = "field";
   dateField.style.marginTop = "14px";
   const dateLabel = document.createElement("label");
-  dateLabel.textContent = "Дата";
+  dateLabel.textContent = i18n("Дата");
   dateField.appendChild(dateLabel);
   const dateInput = document.createElement("input");
   dateInput.value = ev.date || "";
-  dateInput.placeholder = "например: год 214, день третий";
+  dateInput.placeholder = i18n("например: год 214, день третий");
   dateInput.addEventListener("input", () => {
     ev.date = dateInput.value;
     const n = orderFromDate(ev.date);
@@ -257,7 +258,7 @@ function buildCalendarDateField(ev) {
   dateField.className = "field";
   dateField.style.marginTop = "14px";
   const dateLabel = document.createElement("label");
-  dateLabel.textContent = "Дата";
+  dateLabel.textContent = i18n("Дата");
   dateField.appendChild(dateLabel);
 
   const row = document.createElement("div");
@@ -322,7 +323,7 @@ function buildDrawer(ev) {
   const descField = document.createElement("div");
   descField.className = "field";
   const descLabel = document.createElement("label");
-  descLabel.textContent = "Описание";
+  descLabel.textContent = i18n("Описание");
   descField.appendChild(descLabel);
   const descArea = document.createElement("textarea");
   descArea.value = ev.description || "";
@@ -331,14 +332,14 @@ function buildDrawer(ev) {
   attachMentionAutocomplete(descArea, () => characters);
   drawer.appendChild(descField);
 
-  drawer.appendChild(buildToggleGroup("Персонажи", characters, ev.characterIds || [], (ids) => {
+  drawer.appendChild(buildToggleGroup(i18n("Персонажи"), characters, ev.characterIds || [], (ids) => {
     ev.characterIds = ids;
     persist();
     draw();
   }));
 
   drawer.appendChild(buildToggleGroup(
-    "Локации",
+    i18n("Локации"),
     locations,
     ev.locationIds || [],
     (ids) => { ev.locationIds = ids; persist(); draw(); },
@@ -349,11 +350,11 @@ function buildDrawer(ev) {
   actions.className = "drawer-actions";
   const closeBtn = document.createElement("button");
   closeBtn.className = "btn";
-  closeBtn.textContent = "Закрыть";
+  closeBtn.textContent = i18n("Закрыть");
   closeBtn.addEventListener("click", () => { activeId = null; draw(); });
   const delBtn = document.createElement("button");
   delBtn.className = "btn danger";
-  delBtn.textContent = "Удалить";
+  delBtn.textContent = i18n("Удалить");
   delBtn.addEventListener("click", async () => {
     await pushTrash("timeline", ev);
     events = events.filter((x) => x.id !== ev.id);

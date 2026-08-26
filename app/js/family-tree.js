@@ -1,4 +1,5 @@
 import { apiGet } from "./api.js";
+import { i18n } from "./i18n.js";
 
 // ══════════════════════════════════════════════
 //  ДЕРЕВО РОДСТВА
@@ -46,7 +47,7 @@ export async function renderFamilyTree(root) {
   if (!inTree.length) {
     const empty = document.createElement("div");
     empty.className = "empty-state";
-    empty.textContent = "Пока пусто — укажи родителей в карточке персонажа, чтобы здесь появилось дерево.";
+    empty.textContent = i18n("Пока пусто — укажи родителей в карточке персонажа, чтобы здесь появилось дерево.");
     root.appendChild(empty);
     return;
   }

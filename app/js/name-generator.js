@@ -9,6 +9,8 @@
 //  наброска персонажа за секунду).
 // ══════════════════════════════════════════════
 
+import { i18n } from "./i18n.js";
+
 const STYLES = {
   human: {
     label: "Человеческое",
@@ -60,7 +62,7 @@ export function buildNameGeneratorButton(onGenerated, styleId) {
   btn.type = "button";
   btn.className = "btn name-gen-btn";
   btn.textContent = "🎲";
-  btn.title = "Сгенерировать имя";
+  btn.title = i18n("Сгенерировать имя");
   btn.addEventListener("click", () => {
     const style = styleId || pick(Object.keys(STYLES));
     onGenerated(generateName(style));

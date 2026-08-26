@@ -5,6 +5,7 @@ import { pushTrash } from "./trash.js";
 import { buildReverseLinks } from "./reverse-links.js";
 import { loadTagsMap, buildTagsField } from "./tags.js";
 import { buildNameGeneratorButton } from "./name-generator.js";
+import { i18n } from "./i18n.js";
 
 const PALETTE = [
   "#c9944a", "#4f7d74", "#a4483c", "#7d6a9e",
@@ -12,17 +13,21 @@ const PALETTE = [
 ];
 
 // Тег — не отсюда: у него свой виджет с чипами (см. buildTagsField),
-// эти поля рисуются общим циклом как есть.
-const FIELDS = [
-  ["role", "Роль", "input"],
-  ["age", "Возраст", "input"],
-  ["appearance", "Внешность", "textarea"],
-  ["personality", "Характер", "textarea"],
-  ["motivation", "Мотивация", "textarea"],
-  ["goal", "Цель", "textarea"],
-  ["flaws", "Слабости", "textarea"],
-  ["backstory", "Предыстория", "textarea"],
-];
+// эти поля рисуются общим циклом как есть. Функция, а не константа —
+// i18n() должен звать её после loadLang() (main.js, boot()), а не в
+// момент импорта модуля.
+function fields() {
+  return [
+    ["role", i18n("Роль"), "input"],
+    ["age", i18n("Возраст"), "input"],
+    ["appearance", i18n("Внешность"), "textarea"],
+    ["personality", i18n("Характер"), "textarea"],
+    ["motivation", i18n("Мотивация"), "textarea"],
+    ["goal", i18n("Цель"), "textarea"],
+    ["flaws", i18n("Слабости"), "textarea"],
+    ["backstory", i18n("Предыстория"), "textarea"],
+  ];
+}
 
 let characters = [];
 let relationships = [];
@@ -42,7 +47,7 @@ function persist() {
 function blank() {
   return {
     id: uid(),
-    name: "Новый персонаж",
+    name: i18n("Новый персонаж"),
     color: PALETTE[characters.length % PALETTE.length],
     role: "", age: "", appearance: "", personality: "",
     motivation: "", goal: "", flaws: "", backstory: "", tags: "",
@@ -84,7 +89,7 @@ function reverseLinksFor(c) {
 
   const factionRows = factions
     .filter((f) => f.leaderId === c.id || (f.memberIds || []).includes(c.id))
-    .map((f) => `${f.name}${f.leaderId === c.id ? " (глава)" : ""}`);
+    .map((f) => `${f.name}${f.leaderId === c.id ? ` (${i18n("глава")})` : ""}`);
 
   const cardRows = Object.values(board.cards || {})
     .filter((card) => card.characterId === c.id)
@@ -93,16 +98,16 @@ function reverseLinksFor(c) {
   const pinRows = [];
   for (const m of Object.values(mapData.maps || {})) {
     for (const pin of m.pins || []) {
-      if (pin.characterId === c.id) pinRows.push(`${pin.label} (карта «${m.name}»)`);
+      if (pin.characterId === c.id) pinRows.push(i18n("{label} (карта «{name}»)", { label: pin.label, name: m.name }));
     }
   }
 
   return buildReverseLinks([
-    ["Связи", relRows],
-    ["Таймлайн", eventRows],
-    ["Фракции", factionRows],
-    ["Карточки доски", cardRows],
-    ["Метки на карте", pinRows],
+    [i18n("Связи"), relRows],
+    [i18n("Таймлайн"), eventRows],
+    [i18n("Фракции"), factionRows],
+    [i18n("Карточки доски"), cardRows],
+    [i18n("Метки на карте"), pinRows],
   ]);
 }
 
@@ -118,7 +123,7 @@ function draw() {
     const empty = document.createElement("div");
     empty.className = "empty-state";
     empty.style.gridColumn = "1 / -1";
-    empty.textContent = "Персонажей пока нет — добавь первого.";
+    empty.textContent = i18n("Персонажей пока нет — добавь первого.");
     grid.appendChild(empty);
   }
 
@@ -127,7 +132,7 @@ function draw() {
     card.className = "char-card";
     card.innerHTML = `
       <div class="char-avatar" style="background:${c.color}">${initials(c.name)}</div>
-      <div class="char-name">${escapeHtml(c.name || "Без имени")}</div>
+      <div class="char-name">${escapeHtml(c.name || i18n("Без имени"))}</div>
       <div class="char-role">${escapeHtml(c.role || "")}</div>
     `;
     card.addEventListener("click", () => {
@@ -139,7 +144,7 @@ function draw() {
 
   const addCard = document.createElement("button");
   addCard.className = "char-card add-card";
-  addCard.textContent = "+ Добавить персонажа";
+  addCard.textContent = i18n("+ Добавить персонажа");
   addCard.addEventListener("click", () => {
     const c = blank();
     characters.push(c);
@@ -201,7 +206,7 @@ function buildDrawer(c) {
 
   drawer.appendChild(
     buildToggleGroup(
-      "Родители",
+      i18n("Родители"),
       characters.filter((x) => x.id !== c.id),
       c.parentIds || [],
       (ids) => {
@@ -211,7 +216,7 @@ function buildDrawer(c) {
     )
   );
 
-  for (const [key, label, kind] of FIELDS) {
+  for (const [key, label, kind] of fields()) {
     const field = document.createElement("div");
     field.className = "field";
     const lab = document.createElement("label");
@@ -241,14 +246,14 @@ function buildDrawer(c) {
   actions.className = "drawer-actions";
   const closeBtn = document.createElement("button");
   closeBtn.className = "btn";
-  closeBtn.textContent = "Закрыть";
+  closeBtn.textContent = i18n("Закрыть");
   closeBtn.addEventListener("click", () => {
     activeId = null;
     draw();
   });
   const delBtn = document.createElement("button");
   delBtn.className = "btn danger";
-  delBtn.textContent = "Удалить";
+  delBtn.textContent = i18n("Удалить");
   delBtn.addEventListener("click", async () => {
     await pushTrash("character", c);
     characters = characters.filter((x) => x.id !== c.id);

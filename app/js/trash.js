@@ -1,5 +1,6 @@
 import { apiGet, apiPost, uid } from "./api.js";
 import { escapeHtml } from "./chips.js";
+import { i18n } from "./i18n.js";
 
 const TRASH_LIMIT = 200;
 
@@ -17,14 +18,16 @@ export async function pushTrash(type, item) {
   document.dispatchEvent(new CustomEvent("fictaris:trash-changed"));
 }
 
-const TYPE_INFO = {
-  character: { label: "Персонаж", listPath: "/api/characters", displayName: (i) => i.name },
-  location: { label: "Локация", listPath: "/api/locations", displayName: (i) => i.name },
-  relationship: { label: "Связь", listPath: "/api/relationships", displayName: (i) => i.label || "Связь" },
-  faction: { label: "Фракция", listPath: "/api/factions", displayName: (i) => i.name },
-  timeline: { label: "Событие таймлайна", listPath: "/api/timeline", displayName: (i) => i.title },
-  "board-card": { label: "Карточка доски", listPath: null, displayName: (i) => i.title },
-};
+function typeInfo() {
+  return {
+    character: { label: i18n("Персонаж"), listPath: "/api/characters", displayName: (i) => i.name },
+    location: { label: i18n("Локация"), listPath: "/api/locations", displayName: (i) => i.name },
+    relationship: { label: i18n("Связь"), listPath: "/api/relationships", displayName: (i) => i.label || i18n("Связь") },
+    faction: { label: i18n("Фракция"), listPath: "/api/factions", displayName: (i) => i.name },
+    timeline: { label: i18n("Событие таймлайна"), listPath: "/api/timeline", displayName: (i) => i.title },
+    "board-card": { label: i18n("Карточка доски"), listPath: null, displayName: (i) => i.title },
+  };
+}
 
 async function restoreArrayItem(listPath, item) {
   const list = await apiGet(listPath);
@@ -39,9 +42,9 @@ async function restoreArrayItem(listPath, item) {
 async function restoreBoardCard(card) {
   const board = await apiGet("/api/board");
   if (board.cards[card.id]) return;
-  let col = board.columns.find((c) => c.title === "Восстановлено");
+  let col = board.columns.find((c) => c.title === i18n("Восстановлено"));
   if (!col) {
-    col = { id: uid(), title: "Восстановлено" };
+    col = { id: uid(), title: i18n("Восстановлено") };
     board.columns.push(col);
     board.cardOrder[col.id] = [];
   }
@@ -52,7 +55,7 @@ async function restoreBoardCard(card) {
 
 async function restoreEntry(entry) {
   if (entry.type === "board-card") await restoreBoardCard(entry.item);
-  else await restoreArrayItem(TYPE_INFO[entry.type].listPath, entry.item);
+  else await restoreArrayItem(typeInfo()[entry.type].listPath, entry.item);
 }
 
 export async function trashCount() {
@@ -68,7 +71,7 @@ export async function renderTrash(root) {
   if (!trash.length) {
     const empty = document.createElement("div");
     empty.className = "empty-state";
-    empty.textContent = "Корзина пуста.";
+    empty.textContent = i18n("Корзина пуста.");
     wrap.appendChild(empty);
     root.appendChild(wrap);
     return;
@@ -82,7 +85,7 @@ export async function renderTrash(root) {
 }
 
 function buildRow(entry, trash) {
-  const info = TYPE_INFO[entry.type];
+  const info = typeInfo()[entry.type];
   const row = document.createElement("div");
   row.className = "trash-row";
 
@@ -97,7 +100,7 @@ function buildRow(entry, trash) {
 
   const restoreBtn = document.createElement("button");
   restoreBtn.className = "btn";
-  restoreBtn.textContent = "Восстановить";
+  restoreBtn.textContent = i18n("Восстановить");
   restoreBtn.addEventListener("click", async () => {
     await restoreEntry(entry);
     const next = trash.filter((e) => e.id !== entry.id);
@@ -109,7 +112,7 @@ function buildRow(entry, trash) {
 
   const forgetBtn = document.createElement("button");
   forgetBtn.className = "btn danger";
-  forgetBtn.textContent = "Удалить навсегда";
+  forgetBtn.textContent = i18n("Удалить навсегда");
   forgetBtn.addEventListener("click", async () => {
     if (forgetBtn.dataset.confirm === "1") {
       const next = trash.filter((e) => e.id !== entry.id);
@@ -119,10 +122,10 @@ function buildRow(entry, trash) {
       return;
     }
     forgetBtn.dataset.confirm = "1";
-    forgetBtn.textContent = "Точно?";
+    forgetBtn.textContent = i18n("Точно?");
     setTimeout(() => {
       forgetBtn.dataset.confirm = "";
-      forgetBtn.textContent = "Удалить навсегда";
+      forgetBtn.textContent = i18n("Удалить навсегда");
     }, 3000);
   });
   actions.appendChild(forgetBtn);

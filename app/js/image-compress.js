@@ -3,13 +3,15 @@
 // исходного браузерного прототипа, только результат уезжает файлом на
 // диск, а не base64-строкой в JSON (см. комментарий в vault.js).
 
+import { i18n } from "./i18n.js";
+
 export function compressImage(file, maxWidth = 1600, quality = 0.82) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onerror = () => reject(new Error("Не удалось прочитать файл"));
+    reader.onerror = () => reject(new Error(i18n("Не удалось прочитать файл")));
     reader.onload = () => {
       const img = new Image();
-      img.onerror = () => reject(new Error("Не удалось прочитать изображение"));
+      img.onerror = () => reject(new Error(i18n("Не удалось прочитать изображение")));
       img.onload = () => {
         const scale = Math.min(1, maxWidth / img.width);
         const canvas = document.createElement("canvas");

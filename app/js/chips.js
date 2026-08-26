@@ -3,6 +3,8 @@
 // та же форма объекта пригодится для локаций/фракций в будущем без
 // переписывания компонента.
 
+import { i18n } from "./i18n.js";
+
 export function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
@@ -20,7 +22,7 @@ export function characterSelect(list, selectedId, placeholder) {
   for (const c of list) {
     const opt = document.createElement("option");
     opt.value = c.id;
-    opt.textContent = c.name || "Без имени";
+    opt.textContent = c.name || i18n("Без имени");
     if (c.id === selectedId) opt.selected = true;
     select.appendChild(opt);
   }
@@ -55,7 +57,7 @@ export function buildToggleGroup(label, items, selectedIds, onChange, colorOf = 
   if (!items.length) {
     const none = document.createElement("span");
     none.className = "filter-count";
-    none.textContent = "пока нет";
+    none.textContent = i18n("пока нет");
     row.appendChild(none);
   }
   field.appendChild(row);

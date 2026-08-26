@@ -1,6 +1,7 @@
 import { apiGet } from "./api.js";
 import { escapeHtml } from "./chips.js";
 import { factionTypeInfo } from "./icons.js";
+import { i18n, currentLang } from "./i18n.js";
 
 // ══════════════════════════════════════════════
 //  СТАТИСТИКА ПО МИРУ
@@ -33,7 +34,7 @@ function buildBarList(rows, max) {
   const list = document.createElement("div");
   list.className = "stat-bar-list";
   if (!rows.length) {
-    list.innerHTML = '<div class="empty-state">Пока нечего показать.</div>';
+    list.innerHTML = `<div class="empty-state">${i18n("Пока нечего показать.")}</div>`;
     return list;
   }
   for (const { label, value, color } of rows) {
@@ -74,17 +75,17 @@ export async function renderStats(root) {
   const totalWords = manuscript.chapters.reduce((sum, c) => sum + wordCount(c.content), 0);
   const cardCount = Object.keys(board.cards || {}).length;
 
-  const overview = buildSection("Обзор");
+  const overview = buildSection(i18n("Обзор"));
   const tiles = document.createElement("div");
   tiles.className = "stat-tiles";
   tiles.append(
-    buildTile(characters.length, "персонажей"),
-    buildTile(locations.length, "локаций"),
-    buildTile(factions.length, "фракций"),
-    buildTile(timeline.length, "событий"),
-    buildTile(cardCount, "карточек на доске"),
-    buildTile(manuscript.chapters.length, "глав"),
-    buildTile(totalWords.toLocaleString("ru-RU"), "слов написано")
+    buildTile(characters.length, i18n("персонажей")),
+    buildTile(locations.length, i18n("локаций")),
+    buildTile(factions.length, i18n("фракций")),
+    buildTile(timeline.length, i18n("событий")),
+    buildTile(cardCount, i18n("карточек на доске")),
+    buildTile(manuscript.chapters.length, i18n("глав")),
+    buildTile(totalWords.toLocaleString(currentLang() === "en" ? "en-US" : "ru-RU"), i18n("слов написано"))
   );
   overview.appendChild(tiles);
   wrap.appendChild(overview);
@@ -97,21 +98,21 @@ export async function renderStats(root) {
     return { label: f.name, value: (f.memberIds || []).length, color };
   });
   const unaffiliated = characters.filter((c) => !inFaction.has(c.id)).length;
-  if (unaffiliated) factionRows.push({ label: "Без фракции", value: unaffiliated, color: "#7c7157" });
+  if (unaffiliated) factionRows.push({ label: i18n("Без фракции"), value: unaffiliated, color: "#7c7157" });
   const factionMax = Math.max(1, ...factionRows.map((r) => r.value));
 
-  const factionSection = buildSection("Персонажи по фракциям");
+  const factionSection = buildSection(i18n("Персонажи по фракциям"));
   factionSection.appendChild(buildBarList(factionRows, factionMax));
   wrap.appendChild(factionSection);
 
   // ── Слова по главам ─────────────────────────────
   const chapterRows = manuscript.chapters.map((c) => ({
-    label: c.title || "Без названия",
+    label: c.title || i18n("Без названия"),
     value: wordCount(c.content),
   }));
   const chapterMax = Math.max(1, ...chapterRows.map((r) => r.value));
 
-  const chapterSection = buildSection("Слова по главам");
+  const chapterSection = buildSection(i18n("Слова по главам"));
   chapterSection.appendChild(buildBarList(chapterRows, chapterMax));
   wrap.appendChild(chapterSection);
 
@@ -130,7 +131,7 @@ export async function renderStats(root) {
     .slice(0, 8);
   const castMax = Math.max(1, ...castRows.map((r) => r.value));
 
-  const castSection = buildSection("Чаще всего в таймлайне", "Сколько раз персонаж указан участником события — топ-8.");
+  const castSection = buildSection(i18n("Чаще всего в таймлайне"), i18n("Сколько раз персонаж указан участником события — топ-8."));
   castSection.appendChild(buildBarList(castRows, castMax));
   wrap.appendChild(castSection);
 

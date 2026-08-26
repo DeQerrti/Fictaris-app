@@ -1,4 +1,5 @@
 import { apiGet, apiPost } from "./api.js";
+import { i18n } from "./i18n.js";
 
 const btn = document.getElementById("projectBtn");
 const menu = document.getElementById("projectMenu");
@@ -26,11 +27,11 @@ function promptForNameRow(onCreate) {
   row.className = "project-row";
   const input = document.createElement("input");
   input.className = "project-row-input";
-  input.placeholder = "Название проекта";
+  input.placeholder = i18n("Название проекта");
   const create = document.createElement("button");
   create.className = "project-row-del";
   create.textContent = "✓";
-  create.title = "Создать";
+  create.title = i18n("Создать");
   create.addEventListener("click", (e) => {
     e.stopPropagation();
     if (input.value.trim()) onCreate(input.value.trim());
@@ -80,7 +81,7 @@ async function openMenu() {
     const renameBtn = document.createElement("button");
     renameBtn.className = "project-row-del";
     renameBtn.textContent = "✎";
-    renameBtn.title = "Переименовать";
+    renameBtn.title = i18n("Переименовать");
     renameBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       const input = renameRow(v, openMenu);
@@ -95,8 +96,8 @@ async function openMenu() {
       delBtn.className = "project-row-del";
       delBtn.textContent = "✕";
       delBtn.title = info.mobile
-        ? "Удалить проект вместе с файлами — это необратимо"
-        : "Убрать из списка (файлы на диске не трогает)";
+        ? i18n("Удалить проект вместе с файлами — это необратимо")
+        : i18n("Убрать из списка (файлы на диске не трогает)");
       delBtn.addEventListener("click", async (e) => {
         e.stopPropagation();
         if (delBtn.dataset.confirm === "1") {
@@ -128,7 +129,7 @@ async function openMenu() {
   if (info.mobile) {
     const addBtn = document.createElement("button");
     addBtn.className = "project-row-name";
-    addBtn.textContent = "+ Новый проект…";
+    addBtn.textContent = i18n("+ Новый проект…");
     addBtn.addEventListener("click", () => {
       const { row, input } = promptForNameRow(async (name) => {
         const res = await apiPost("/api/app/add-vault", { name });
@@ -145,7 +146,7 @@ async function openMenu() {
   } else {
     const addBtn = document.createElement("button");
     addBtn.className = "project-row-name";
-    addBtn.textContent = "+ Другой проект…";
+    addBtn.textContent = i18n("+ Другой проект…");
     addBtn.addEventListener("click", pickAndUse);
     menu.appendChild(addBtn);
   }
@@ -156,7 +157,7 @@ async function openMenu() {
 export async function initProjectSwitcher() {
   const info = await apiGet("/api/app/info").catch(() => ({ vaults: [], currentVaultId: null }));
   const current = (info.vaults || []).find((v) => v.id === info.currentVaultId);
-  btn.textContent = current ? current.name : "Проект";
+  btn.textContent = current ? current.name : i18n("Проект");
 
   btn.addEventListener("click", (e) => {
     e.stopPropagation();

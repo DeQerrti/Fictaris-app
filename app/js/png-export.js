@@ -10,6 +10,8 @@
 //  кнопки, которую нажмут не на каждом открытии, незачем.
 // ══════════════════════════════════════════════
 
+import { i18n } from "./i18n.js";
+
 let html2canvasPromise = null;
 function loadHtml2Canvas() {
   if (typeof html2canvas !== "undefined") return Promise.resolve();
@@ -20,7 +22,7 @@ function loadHtml2Canvas() {
     script.onload = () => resolve();
     script.onerror = () => {
       html2canvasPromise = null; // даём шанс повторить попытку при следующем клике
-      reject(new Error("Не удалось загрузить html2canvas"));
+      reject(new Error(i18n("Не удалось загрузить html2canvas")));
     };
     document.head.appendChild(script);
   });
@@ -51,14 +53,14 @@ async function exportElementAsPng(element, filename, backgroundColor) {
 export function buildExportPngButton(getElement, filenameBase) {
   const btn = document.createElement("button");
   btn.className = "btn export-png-btn";
-  btn.textContent = "Экспорт в PNG";
+  btn.textContent = i18n("Экспорт в PNG");
   btn.addEventListener("click", async () => {
     const original = btn.textContent;
     btn.disabled = true;
-    btn.textContent = "Готовим…";
+    btn.textContent = i18n("Готовим…");
     try {
       const el = getElement();
-      if (!el) throw new Error("Нечего экспортировать");
+      if (!el) throw new Error(i18n("Нечего экспортировать"));
       const safeName = filenameBase.replace(/[^a-zA-Zа-яА-Я0-9_\- ]/g, "").trim() || "fictaris";
       await exportElementAsPng(el, `${safeName}.png`);
     } catch (e) {

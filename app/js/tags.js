@@ -1,4 +1,5 @@
 import { apiGet } from "./api.js";
+import { i18n } from "./i18n.js";
 
 // ══════════════════════════════════════════════
 //  ТЕГИ
@@ -83,7 +84,7 @@ export function buildTagsField(tagsMap, value, onChange) {
   const field = document.createElement("div");
   field.className = "field tags-field";
   const label = document.createElement("label");
-  label.textContent = "Теги";
+  label.textContent = i18n("Теги");
   field.appendChild(label);
 
   let current = new Set(parseTags(value));
@@ -106,8 +107,8 @@ export function buildTagsField(tagsMap, value, onChange) {
       const chip = document.createElement("button");
       chip.type = "button";
       chip.className = "tag-chip" + (current.has(name) ? " active" : "");
-      chip.textContent = name;
-      if (tagsMap[name]?.tip) chip.title = tagsMap[name].tip;
+      chip.textContent = i18n(name);
+      if (tagsMap[name]?.tip) chip.title = i18n(tagsMap[name].tip);
       chip.addEventListener("click", () => {
         if (current.has(name)) current.delete(name);
         else current.add(name);
@@ -122,11 +123,11 @@ export function buildTagsField(tagsMap, value, onChange) {
   function render() {
     chips.innerHTML = "";
     for (const [cat, names] of Object.entries(byCategory)) {
-      chips.appendChild(buildGroup(CATEGORY_LABELS[cat] || cat, names));
+      chips.appendChild(buildGroup(i18n(CATEGORY_LABELS[cat] || cat), names));
     }
     // Свои теги — те, что выбраны, но не входят в известный словарь.
     const customNow = [...current].filter((t) => !tagsMap[t]);
-    if (customNow.length) chips.appendChild(buildGroup("Свои", customNow));
+    if (customNow.length) chips.appendChild(buildGroup(i18n("Свои"), customNow));
   }
   render();
 
@@ -134,7 +135,7 @@ export function buildTagsField(tagsMap, value, onChange) {
   addRow.className = "tags-add-row";
   const input = document.createElement("input");
   input.type = "text";
-  input.placeholder = "Свой тег — Enter, чтобы добавить";
+  input.placeholder = i18n("Свой тег — Enter, чтобы добавить");
   input.addEventListener("keydown", (e) => {
     if (e.key !== "Enter") return;
     e.preventDefault();

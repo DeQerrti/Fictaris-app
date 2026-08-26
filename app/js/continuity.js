@@ -1,5 +1,6 @@
 import { apiGet } from "./api.js";
 import { escapeHtml } from "./chips.js";
+import { i18n } from "./i18n.js";
 
 // Список проверок из брифа: битые ссылки, «забытые» сущности, дубли на
 // таймлайне, главы со статусом «Готово» с пустым текстом. Каждая
@@ -17,38 +18,38 @@ export function brokenRefs({ characters, locations, factions, relationships, tim
   const issues = [];
 
   for (const r of relationships) {
-    if (r.charA && !chars.has(r.charA)) issues.push(`Связь «${r.label || "?"}» ссылается на несуществующего персонажа`);
-    if (r.charB && !chars.has(r.charB)) issues.push(`Связь «${r.label || "?"}» ссылается на несуществующего персонажа`);
+    if (r.charA && !chars.has(r.charA)) issues.push(i18n("Связь «{label}» ссылается на несуществующего персонажа", { label: r.label || "?" }));
+    if (r.charB && !chars.has(r.charB)) issues.push(i18n("Связь «{label}» ссылается на несуществующего персонажа", { label: r.label || "?" }));
   }
 
   for (const f of factions) {
-    if (f.leaderId && !chars.has(f.leaderId)) issues.push(`Фракция «${f.name}» — глава не найден`);
-    if (f.headquartersId && !locs.has(f.headquartersId)) issues.push(`Фракция «${f.name}» — штаб-квартира не найдена`);
+    if (f.leaderId && !chars.has(f.leaderId)) issues.push(i18n("Фракция «{name}» — глава не найден", { name: f.name }));
+    if (f.headquartersId && !locs.has(f.headquartersId)) issues.push(i18n("Фракция «{name}» — штаб-квартира не найдена", { name: f.name }));
     for (const m of f.memberIds || []) {
-      if (!chars.has(m)) issues.push(`Фракция «${f.name}» — в составе несуществующий персонаж`);
+      if (!chars.has(m)) issues.push(i18n("Фракция «{name}» — в составе несуществующий персонаж", { name: f.name }));
     }
   }
 
   for (const ev of timeline) {
     for (const c of ev.characterIds || []) {
-      if (!chars.has(c)) issues.push(`Событие «${ev.title}» ссылается на несуществующего персонажа`);
+      if (!chars.has(c)) issues.push(i18n("Событие «{title}» ссылается на несуществующего персонажа", { title: ev.title }));
     }
     for (const l of ev.locationIds || []) {
-      if (!locs.has(l)) issues.push(`Событие «${ev.title}» ссылается на несуществующую локацию`);
+      if (!locs.has(l)) issues.push(i18n("Событие «{title}» ссылается на несуществующую локацию", { title: ev.title }));
     }
   }
 
   for (const card of Object.values(board.cards || {})) {
     if (card.characterId && !chars.has(card.characterId)) {
-      issues.push(`Карточка доски «${card.title}» ссылается на несуществующего персонажа`);
+      issues.push(i18n("Карточка доски «{title}» ссылается на несуществующего персонажа", { title: card.title }));
     }
   }
 
   for (const m of Object.values(map.maps || {})) {
     for (const pin of m.pins || []) {
-      if (pin.characterId && !chars.has(pin.characterId)) issues.push(`Метка «${pin.label}» на карте «${m.name}» ссылается на несуществующего персонажа`);
-      if (pin.locationId && !locs.has(pin.locationId)) issues.push(`Метка «${pin.label}» на карте «${m.name}» ссылается на несуществующую локацию`);
-      if (pin.linkedMapId && !map.maps[pin.linkedMapId]) issues.push(`Метка «${pin.label}» на карте «${m.name}» ссылается на несуществующую под-карту`);
+      if (pin.characterId && !chars.has(pin.characterId)) issues.push(i18n("Метка «{label}» на карте «{name}» ссылается на несуществующего персонажа", { label: pin.label, name: m.name }));
+      if (pin.locationId && !locs.has(pin.locationId)) issues.push(i18n("Метка «{label}» на карте «{name}» ссылается на несуществующую локацию", { label: pin.label, name: m.name }));
+      if (pin.linkedMapId && !map.maps[pin.linkedMapId]) issues.push(i18n("Метка «{label}» на карте «{name}» ссылается на несуществующую под-карту", { label: pin.label, name: m.name }));
     }
   }
 
@@ -79,10 +80,10 @@ export function orphans({ characters, locations, relationships, factions, timeli
 
   const issues = [];
   for (const c of characters) {
-    if (!referenced.has(c.id)) issues.push(`Персонаж «${c.name}» нигде не упомянут — ни в связях, ни в таймлайне, ни во фракциях`);
+    if (!referenced.has(c.id)) issues.push(i18n("Персонаж «{name}» нигде не упомянут — ни в связях, ни в таймлайне, ни во фракциях", { name: c.name }));
   }
   for (const l of locations) {
-    if (!referenced.has(l.id)) issues.push(`Локация «${l.name}» нигде не упомянута`);
+    if (!referenced.has(l.id)) issues.push(i18n("Локация «{name}» нигде не упомянута", { name: l.name }));
   }
   return issues;
 }
@@ -93,7 +94,7 @@ export function duplicateTimelineEntries({ timeline }) {
   for (const ev of timeline) {
     const key = `${(ev.title || "").trim().toLowerCase()}|${(ev.date || "").trim().toLowerCase()}`;
     if (!key.trim().replace("|", "")) continue;
-    if (seen.has(key)) issues.push(`Возможный дубль на таймлайне: «${ev.title}» (${ev.date || "без даты"})`);
+    if (seen.has(key)) issues.push(i18n("Возможный дубль на таймлайне: «{title}» ({date})", { title: ev.title, date: ev.date || i18n("без даты") }));
     seen.set(key, ev);
   }
   return issues;
@@ -102,14 +103,14 @@ export function duplicateTimelineEntries({ timeline }) {
 export function emptyDoneChapters({ manuscript }) {
   return manuscript.chapters
     .filter((c) => c.status === "done" && !(c.content || "").trim())
-    .map((c) => `Глава «${c.title}» помечена «Готово», но текст пуст`);
+    .map((c) => i18n("Глава «{title}» помечена «Готово», но текст пуст", { title: c.title }));
 }
 
 export async function renderContinuity(root) {
   root.innerHTML = "";
   const wrap = document.createElement("div");
   wrap.className = "continuity-panel";
-  wrap.innerHTML = '<div class="empty-state">Проверяю…</div>';
+  wrap.innerHTML = `<div class="empty-state">${i18n("Проверяю…")}</div>`;
   root.appendChild(wrap);
 
   const [characters, locations, relationships, factions, timeline, board, map, manuscript] = await Promise.all([
@@ -125,10 +126,10 @@ export async function renderContinuity(root) {
   const data = { characters, locations, relationships, factions, timeline, board, map, manuscript };
 
   const sections = [
-    ["Битые ссылки", brokenRefs(data)],
-    ["Забытые сущности", orphans(data)],
-    ["Возможные дубли на таймлайне", duplicateTimelineEntries(data)],
-    ["Главы «Готово» с пустым текстом", emptyDoneChapters(data)],
+    [i18n("Битые ссылки"), brokenRefs(data)],
+    [i18n("Забытые сущности"), orphans(data)],
+    [i18n("Возможные дубли на таймлайне"), duplicateTimelineEntries(data)],
+    [i18n("Главы «Готово» с пустым текстом"), emptyDoneChapters(data)],
   ];
 
   wrap.innerHTML = "";
@@ -137,7 +138,7 @@ export async function renderContinuity(root) {
   if (!total) {
     const ok = document.createElement("div");
     ok.className = "empty-state";
-    ok.textContent = "Всё чисто — проверка не нашла проблем.";
+    ok.textContent = i18n("Всё чисто — проверка не нашла проблем.");
     wrap.appendChild(ok);
     return;
   }

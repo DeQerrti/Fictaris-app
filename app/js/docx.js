@@ -1,4 +1,5 @@
 import { buildZip } from "./zip-writer.js";
+import { i18n } from "./i18n.js";
 
 function escapeXml(s) {
   return String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
@@ -16,7 +17,7 @@ function paragraph(text, { heading = false } = {}) {
 export function buildManuscriptDocx(chapters) {
   const body = chapters
     .map((ch) => {
-      const heading = paragraph(ch.title || "Без названия", { heading: true });
+      const heading = paragraph(ch.title || i18n("Без названия"), { heading: true });
       const lines = (ch.content || "").split("\n").map((line) => paragraph(line));
       return heading + lines.join("");
     })

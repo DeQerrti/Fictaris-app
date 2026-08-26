@@ -4,6 +4,7 @@ import { characterSelect, escapeHtml } from "./chips.js";
 import { locationTypeInfo, iconSvg } from "./icons.js";
 import { compressImage } from "./image-compress.js";
 import { buildExportPngButton } from "./png-export.js";
+import { i18n } from "./i18n.js";
 
 let map = { rootIds: [], maps: {} };
 let characters = [];
@@ -93,7 +94,7 @@ function buildMapsHome() {
     const empty = document.createElement("div");
     empty.className = "empty-state";
     empty.style.gridColumn = "1 / -1";
-    empty.textContent = "Карт пока нет — загрузи изображение, чтобы создать первую.";
+    empty.textContent = i18n("Карт пока нет — загрузи изображение, чтобы создать первую.");
     grid.appendChild(empty);
   }
 
@@ -107,8 +108,8 @@ function buildMapsHome() {
     open.className = "map-home-open";
     open.innerHTML = `
       <div class="char-avatar" style="background:#6a8fae">${iconSvg("pin", 20)}</div>
-      <div class="char-name">${escapeHtml(m.name || "Без названия")}</div>
-      <div class="char-role">${(m.pins || []).length} меток</div>
+      <div class="char-name">${escapeHtml(m.name || i18n("Без названия"))}</div>
+      <div class="char-role">${i18n("{n} меток", { n: (m.pins || []).length })}</div>
     `;
     open.addEventListener("click", () => {
       stack = [id];
@@ -120,7 +121,7 @@ function buildMapsHome() {
     const delBtn = document.createElement("button");
     delBtn.className = "board-column-del";
     delBtn.textContent = "✕";
-    delBtn.title = "Удалить карту со всеми вложенными под-картами";
+    delBtn.title = i18n("Удалить карту со всеми вложенными под-картами");
     delBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       if (delBtn.dataset.confirm === "1") {
@@ -132,7 +133,7 @@ function buildMapsHome() {
       }
       delBtn.dataset.confirm = "1";
       delBtn.textContent = "?";
-      delBtn.title = "Удалит карту со всем вложенным. Точно?";
+      delBtn.title = i18n("Удалит карту со всем вложенным. Точно?");
       setTimeout(() => {
         delBtn.dataset.confirm = "";
         delBtn.textContent = "✕";
@@ -145,7 +146,7 @@ function buildMapsHome() {
 
   const addCard = document.createElement("button");
   addCard.className = "char-card add-card";
-  addCard.textContent = "+ Новая карта";
+  addCard.textContent = i18n("+ Новая карта");
   addCard.addEventListener("click", createRootMap);
   grid.appendChild(addCard);
 
@@ -162,7 +163,7 @@ function createRootMap() {
     if (!file) return;
     const path = await uploadCompressed(file);
     const id = uid();
-    map.maps[id] = { id, name: "Новая карта", imageRelPath: path, pins: [] };
+    map.maps[id] = { id, name: i18n("Новая карта"), imageRelPath: path, pins: [] };
     map.rootIds.push(id);
     persist();
     stack = [id];
@@ -182,7 +183,7 @@ async function uploadCompressed(file) {
 function buildUploadPrompt() {
   const wrap = document.createElement("div");
   wrap.className = "empty-state map-upload";
-  wrap.innerHTML = "<p>У этой под-карты пока нет изображения.</p>";
+  wrap.innerHTML = `<p>${i18n("У этой под-карты пока нет изображения.")}</p>`;
   const input = document.createElement("input");
   input.type = "file";
   input.accept = "image/*";
@@ -203,7 +204,7 @@ function buildBreadcrumbs() {
 
   const home = document.createElement("button");
   home.className = "map-breadcrumb";
-  home.textContent = "← Все карты";
+  home.textContent = i18n("← Все карты");
   home.addEventListener("click", () => { stack = []; activePinId = null; draw(); });
   bar.appendChild(home);
 
@@ -229,7 +230,7 @@ function buildBreadcrumbs() {
     });
     bar.appendChild(btn);
   });
-  bar.appendChild(buildExportPngButton(() => container.querySelector(".map-canvas-wrap"), currentMap()?.name || "карта"));
+  bar.appendChild(buildExportPngButton(() => container.querySelector(".map-canvas-wrap"), currentMap()?.name || i18n("карта")));
   return bar;
 }
 
@@ -272,7 +273,7 @@ function buildCanvas() {
     const rect = img.getBoundingClientRect();
     const x = ((e.clientX - rect.left) / rect.width) * 100;
     const y = ((e.clientY - rect.top) / rect.height) * 100;
-    const pin = { id: uid(), x, y, label: "Новая метка", note: "", characterId: null, locationId: null, linkedMapId: null };
+    const pin = { id: uid(), x, y, label: i18n("Новая метка"), note: "", characterId: null, locationId: null, linkedMapId: null };
     cm.pins.push(pin);
     activePinId = pin.id;
     persist();
@@ -328,7 +329,7 @@ function buildDrawer(pin) {
   noteField.className = "field";
   noteField.style.marginTop = "14px";
   const noteLabel = document.createElement("label");
-  noteLabel.textContent = "Заметка";
+  noteLabel.textContent = i18n("Заметка");
   noteField.appendChild(noteLabel);
   const noteArea = document.createElement("textarea");
   noteArea.value = pin.note || "";
@@ -339,9 +340,9 @@ function buildDrawer(pin) {
   const charField = document.createElement("div");
   charField.className = "field";
   const charLabel = document.createElement("label");
-  charLabel.textContent = "Персонаж";
+  charLabel.textContent = i18n("Персонаж");
   charField.appendChild(charLabel);
-  const charSelect = characterSelect(characters, pin.characterId, "Не привязан");
+  const charSelect = characterSelect(characters, pin.characterId, i18n("Не привязан"));
   charSelect.addEventListener("change", () => { pin.characterId = charSelect.value || null; persist(); draw(); });
   charField.appendChild(charSelect);
   drawer.appendChild(charField);
@@ -349,17 +350,17 @@ function buildDrawer(pin) {
   const locField = document.createElement("div");
   locField.className = "field";
   const locLabel = document.createElement("label");
-  locLabel.textContent = "Локация";
+  locLabel.textContent = i18n("Локация");
   locField.appendChild(locLabel);
   const locSelect = document.createElement("select");
   const noneOpt = document.createElement("option");
   noneOpt.value = "";
-  noneOpt.textContent = "Не привязана";
+  noneOpt.textContent = i18n("Не привязана");
   locSelect.appendChild(noneOpt);
   for (const l of locations) {
     const opt = document.createElement("option");
     opt.value = l.id;
-    opt.textContent = l.name || "Без имени";
+    opt.textContent = l.name || i18n("Без имени");
     if (pin.locationId === l.id) opt.selected = true;
     locSelect.appendChild(opt);
   }
@@ -370,12 +371,12 @@ function buildDrawer(pin) {
   const subField = document.createElement("div");
   subField.className = "field";
   const subLabel = document.createElement("label");
-  subLabel.textContent = "Под-карта";
+  subLabel.textContent = i18n("Под-карта");
   subField.appendChild(subLabel);
   if (pin.linkedMapId && map.maps[pin.linkedMapId]) {
     const openBtn = document.createElement("button");
     openBtn.className = "btn";
-    openBtn.textContent = "Открыть под-карту →";
+    openBtn.textContent = i18n("Открыть под-карту →");
     openBtn.addEventListener("click", () => {
       stack.push(pin.linkedMapId);
       activePinId = null;
@@ -385,7 +386,7 @@ function buildDrawer(pin) {
 
     const unlinkBtn = document.createElement("button");
     unlinkBtn.className = "btn danger";
-    unlinkBtn.textContent = "Удалить под-карту";
+    unlinkBtn.textContent = i18n("Удалить под-карту");
     unlinkBtn.style.marginLeft = "8px";
     unlinkBtn.addEventListener("click", () => {
       if (unlinkBtn.dataset.confirm === "1") {
@@ -396,17 +397,17 @@ function buildDrawer(pin) {
         return;
       }
       unlinkBtn.dataset.confirm = "1";
-      unlinkBtn.textContent = "Точно? Со всем вложенным";
-      setTimeout(() => { unlinkBtn.dataset.confirm = ""; unlinkBtn.textContent = "Удалить под-карту"; }, 3000);
+      unlinkBtn.textContent = i18n("Точно? Со всем вложенным");
+      setTimeout(() => { unlinkBtn.dataset.confirm = ""; unlinkBtn.textContent = i18n("Удалить под-карту"); }, 3000);
     });
     subField.appendChild(unlinkBtn);
   } else {
     const createBtn = document.createElement("button");
     createBtn.className = "btn";
-    createBtn.textContent = "+ Создать под-карту";
+    createBtn.textContent = i18n("+ Создать под-карту");
     createBtn.addEventListener("click", () => {
       const id = uid();
-      map.maps[id] = { id, name: "Новая карта", imageRelPath: null, pins: [] };
+      map.maps[id] = { id, name: i18n("Новая карта"), imageRelPath: null, pins: [] };
       pin.linkedMapId = id;
       persist();
       stack.push(id);
@@ -421,11 +422,11 @@ function buildDrawer(pin) {
   actions.className = "drawer-actions";
   const closeBtn = document.createElement("button");
   closeBtn.className = "btn";
-  closeBtn.textContent = "Закрыть";
+  closeBtn.textContent = i18n("Закрыть");
   closeBtn.addEventListener("click", () => { activePinId = null; draw(); });
   const delBtn = document.createElement("button");
   delBtn.className = "btn danger";
-  delBtn.textContent = "Удалить метку";
+  delBtn.textContent = i18n("Удалить метку");
   delBtn.addEventListener("click", () => {
     if (pin.linkedMapId) {
       for (const id of collectMapIds(pin.linkedMapId)) delete map.maps[id];

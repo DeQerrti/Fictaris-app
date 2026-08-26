@@ -4,7 +4,7 @@ import { THEME_PRESETS, saveTheme } from "./theme.js";
 import { defaultLabels, saveLabels, resetLabels } from "./labels.js";
 import { captureKey, saveShortcut, clearShortcut } from "./shortcuts.js";
 import { DEFAULT_TAGS_MAP, CATEGORY_LABELS } from "./tags.js";
-import { DEFAULT_MONTHS, loadCalendar, saveCalendar } from "./calendar.js";
+import { defaultMonths, loadCalendar, saveCalendar } from "./calendar.js";
 import {
   getSyncConfig,
   saveSyncConfig,
@@ -339,7 +339,7 @@ function renderTagsManageList(list, merged, hidden, custom) {
       const row = document.createElement("div");
       row.className = "tags-manage-row" + (hidden.has(name) ? " hidden-tag" : "");
       const label = document.createElement("span");
-      label.textContent = name + (custom[name] ? i18n(" (своя)") : "");
+      label.textContent = i18n(name) + (custom[name] ? i18n(" (своя)") : "");
       const toggle = document.createElement("button");
       toggle.className = "btn shortcut-clear";
       toggle.textContent = hidden.has(name) ? "↺" : "×";
@@ -388,7 +388,7 @@ async function buildCalendarSection() {
     eraRow.innerHTML = `<label>${i18n("Название года")}</label>`;
     const eraInput = document.createElement("input");
     eraInput.type = "text";
-    eraInput.value = cal.eraLabel || "год";
+    eraInput.value = cal.eraLabel || i18n("год");
     let eraTimer;
     eraInput.addEventListener("input", () => {
       clearTimeout(eraTimer);
@@ -469,7 +469,7 @@ async function buildCalendarSection() {
       await saveCalendar(null);
       toggleBtn.textContent = i18n("Включить свой календарь");
     } else {
-      current = { months: DEFAULT_MONTHS.map((m) => ({ ...m })), eraLabel: "год" };
+      current = { months: defaultMonths().map((m) => ({ ...m })), eraLabel: i18n("год") };
       await saveCalendar(current);
       toggleBtn.textContent = i18n("Отключить свой календарь");
     }

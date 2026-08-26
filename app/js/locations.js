@@ -6,11 +6,14 @@ import { LOCATION_TYPES, locationTypeInfo, iconSvg } from "./icons.js";
 import { buildReverseLinks } from "./reverse-links.js";
 import { loadTagsMap, buildTagsField } from "./tags.js";
 import { buildNameGeneratorButton } from "./name-generator.js";
+import { i18n } from "./i18n.js";
 
-const FIELDS = [
-  ["description", "Описание", "textarea"],
-  ["notes", "Заметки", "textarea"],
-];
+function fields() {
+  return [
+    ["description", i18n("Описание"), "textarea"],
+    ["notes", i18n("Заметки"), "textarea"],
+  ];
+}
 
 let locations = [];
 let timeline = [];
@@ -28,7 +31,7 @@ function persist() {
 function blank() {
   return {
     id: uid(),
-    name: "Новая локация",
+    name: i18n("Новая локация"),
     type: "settlement",
     description: "", notes: "", tags: "",
   };
@@ -54,19 +57,19 @@ function reverseLinksFor(loc) {
 
   const factionRows = factions
     .filter((f) => f.headquartersId === loc.id)
-    .map((f) => `${f.name} (штаб-квартира)`);
+    .map((f) => i18n("{name} (штаб-квартира)", f));
 
   const pinRows = [];
   for (const m of Object.values(mapData.maps || {})) {
     for (const pin of m.pins || []) {
-      if (pin.locationId === loc.id) pinRows.push(`${pin.label} (карта «${m.name}»)`);
+      if (pin.locationId === loc.id) pinRows.push(i18n("{label} (карта «{name}»)", { label: pin.label, name: m.name }));
     }
   }
 
   return buildReverseLinks([
-    ["Таймлайн", eventRows],
-    ["Фракции", factionRows],
-    ["Метки на карте", pinRows],
+    [i18n("Таймлайн"), eventRows],
+    [i18n("Фракции"), factionRows],
+    [i18n("Метки на карте"), pinRows],
   ]);
 }
 
@@ -82,7 +85,7 @@ function draw() {
     const empty = document.createElement("div");
     empty.className = "empty-state";
     empty.style.gridColumn = "1 / -1";
-    empty.textContent = "Локаций пока нет — добавь первую.";
+    empty.textContent = i18n("Локаций пока нет — добавь первую.");
     grid.appendChild(empty);
   }
 
@@ -92,8 +95,8 @@ function draw() {
     card.className = "char-card";
     card.innerHTML = `
       <div class="char-avatar" style="background:${color}">${iconSvg(iconName, 20)}</div>
-      <div class="char-name">${escapeHtml(loc.name || "Без имени")}</div>
-      <div class="char-role">${escapeHtml(locationTypeInfo(loc.type)[1])}</div>
+      <div class="char-name">${escapeHtml(loc.name || i18n("Без имени"))}</div>
+      <div class="char-role">${escapeHtml(i18n(locationTypeInfo(loc.type)[1]))}</div>
     `;
     card.addEventListener("click", () => {
       activeId = loc.id;
@@ -104,7 +107,7 @@ function draw() {
 
   const addCard = document.createElement("button");
   addCard.className = "char-card add-card";
-  addCard.textContent = "+ Добавить локацию";
+  addCard.textContent = i18n("+ Добавить локацию");
   addCard.addEventListener("click", () => {
     const loc = blank();
     locations.push(loc);
@@ -150,13 +153,13 @@ function buildDrawer(loc) {
   typeField.className = "field";
   typeField.style.marginTop = "14px";
   const typeLabel = document.createElement("label");
-  typeLabel.textContent = "Тип";
+  typeLabel.textContent = i18n("Тип");
   typeField.appendChild(typeLabel);
   const typeSelect = document.createElement("select");
   for (const [value, label] of LOCATION_TYPES) {
     const opt = document.createElement("option");
     opt.value = value;
-    opt.textContent = label;
+    opt.textContent = i18n(label);
     if (loc.type === value) opt.selected = true;
     typeSelect.appendChild(opt);
   }
@@ -168,7 +171,7 @@ function buildDrawer(loc) {
   typeField.appendChild(typeSelect);
   drawer.appendChild(typeField);
 
-  for (const [key, label, kind] of FIELDS) {
+  for (const [key, label, kind] of fields()) {
     const field = document.createElement("div");
     field.className = "field";
     const lab = document.createElement("label");
@@ -198,14 +201,14 @@ function buildDrawer(loc) {
   actions.className = "drawer-actions";
   const closeBtn = document.createElement("button");
   closeBtn.className = "btn";
-  closeBtn.textContent = "Закрыть";
+  closeBtn.textContent = i18n("Закрыть");
   closeBtn.addEventListener("click", () => {
     activeId = null;
     draw();
   });
   const delBtn = document.createElement("button");
   delBtn.className = "btn danger";
-  delBtn.textContent = "Удалить";
+  delBtn.textContent = i18n("Удалить");
   delBtn.addEventListener("click", async () => {
     await pushTrash("location", loc);
     locations = locations.filter((x) => x.id !== loc.id);

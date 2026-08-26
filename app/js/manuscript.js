@@ -4,6 +4,7 @@ import { escapeHtml } from "./chips.js";
 import { mentionsToHtml, attachMentionAutocomplete, attachMentionHoverPreview } from "./mentions.js";
 import { stickersToHtml, attachStickyPopover } from "./stickies.js";
 import { buildManuscriptDocx } from "./docx.js";
+import { i18n } from "./i18n.js";
 
 const STATUSES = [
   ["draft", "Черновик"],
@@ -25,7 +26,7 @@ function persist() {
 const SNAPSHOT_LIMIT = 20;
 
 function blankChapter() {
-  return { id: uid(), title: "Новая глава", content: "", status: "draft", authorNotes: "", stickies: [], snapshots: [] };
+  return { id: uid(), title: i18n("Новая глава"), content: "", status: "draft", authorNotes: "", stickies: [], snapshots: [] };
 }
 
 function wordCount(text) {
@@ -37,7 +38,7 @@ function wordCount(text) {
 // самого пишущего, а не для читателя итогового текста.
 function exportMarkdown() {
   const body = manuscript.chapters
-    .map((ch) => `# ${ch.title || "Без названия"}\n\n${ch.content || ""}`)
+    .map((ch) => `# ${ch.title || i18n("Без названия")}\n\n${ch.content || ""}`)
     .join("\n\n---\n\n");
   const blob = new Blob([body], { type: "text/markdown" });
   const url = URL.createObjectURL(blob);
@@ -110,7 +111,7 @@ function buildChapterList() {
     item.draggable = true;
     item.innerHTML = `
       <span class="status-dot status-${ch.status}"></span>
-      <span>${escapeHtml(ch.title || "Без названия")}</span>
+      <span>${escapeHtml(ch.title || i18n("Без названия"))}</span>
     `;
     item.addEventListener("click", () => {
       manuscript.activeChapterId = ch.id;
@@ -133,7 +134,7 @@ function buildChapterList() {
 
   const addBtn = document.createElement("button");
   addBtn.className = "add-chapter";
-  addBtn.textContent = "+ Глава";
+  addBtn.textContent = i18n("+ Глава");
   addBtn.addEventListener("click", () => {
     const c = blankChapter();
     manuscript.chapters.push(c);
@@ -145,13 +146,13 @@ function buildChapterList() {
 
   const exportBtn = document.createElement("button");
   exportBtn.className = "add-chapter";
-  exportBtn.textContent = "Экспорт в .md";
+  exportBtn.textContent = i18n("Экспорт в .md");
   exportBtn.addEventListener("click", exportMarkdown);
   list.appendChild(exportBtn);
 
   const exportDocxBtn = document.createElement("button");
   exportDocxBtn.className = "add-chapter";
-  exportDocxBtn.textContent = "Экспорт в .docx";
+  exportDocxBtn.textContent = i18n("Экспорт в .docx");
   exportDocxBtn.addEventListener("click", exportDocx);
   list.appendChild(exportDocxBtn);
 
@@ -166,7 +167,7 @@ function buildEditor() {
   if (!chapter) {
     const empty = document.createElement("div");
     empty.className = "empty-state";
-    empty.textContent = "Выбери или создай главу.";
+    empty.textContent = i18n("Выбери или создай главу.");
     pane.appendChild(empty);
     return pane;
   }
@@ -188,7 +189,7 @@ function buildEditor() {
   for (const [value, label] of STATUSES) {
     const opt = document.createElement("option");
     opt.value = value;
-    opt.textContent = label;
+    opt.textContent = i18n(label);
     if (chapter.status === value) opt.selected = true;
     statusSelect.appendChild(opt);
   }
@@ -203,7 +204,7 @@ function buildEditor() {
 
   const modeBtn = document.createElement("button");
   modeBtn.className = "btn";
-  modeBtn.textContent = viewMode ? "Правка" : "Просмотр";
+  modeBtn.textContent = viewMode ? i18n("Правка") : i18n("Просмотр");
   modeBtn.addEventListener("click", () => {
     viewMode = !viewMode;
     draw();
@@ -212,7 +213,7 @@ function buildEditor() {
 
   const focusBtn = document.createElement("button");
   focusBtn.className = "btn";
-  focusBtn.title = focusMode ? "Выйти из фокус-режима (Esc)" : "Фокус-режим — скрыть сайдбар и список глав";
+  focusBtn.title = focusMode ? i18n("Выйти из фокус-режима (Esc)") : i18n("Фокус-режим — скрыть сайдбар и список глав");
   focusBtn.textContent = focusMode ? "⤢" : "⛶";
   focusBtn.addEventListener("click", () => {
     focusMode = !focusMode;
@@ -222,8 +223,8 @@ function buildEditor() {
 
   const snapshotBtn = document.createElement("button");
   snapshotBtn.className = "btn";
-  snapshotBtn.textContent = "Снимок";
-  snapshotBtn.title = "Сохранить текущий текст как снимок версии (до 20 на главу)";
+  snapshotBtn.textContent = i18n("Снимок");
+  snapshotBtn.title = i18n("Сохранить текущий текст как снимок версии (до 20 на главу)");
   snapshotBtn.addEventListener("click", () => {
     const snapshot = { id: uid(), content: chapter.content, savedAt: new Date().toISOString() };
     chapter.snapshots = [snapshot, ...(chapter.snapshots || [])].slice(0, SNAPSHOT_LIMIT);
@@ -235,7 +236,7 @@ function buildEditor() {
   const wc = document.createElement("div");
   wc.className = "word-count";
   const total = manuscript.chapters.reduce((sum, c) => sum + wordCount(c.content), 0);
-  wc.textContent = `${wordCount(chapter.content)} слов · всего ${total}`;
+  wc.textContent = i18n("{count} слов · всего {total}", { count: wordCount(chapter.content), total });
   header.appendChild(wc);
 
   pane.appendChild(header);
@@ -244,7 +245,7 @@ function buildEditor() {
     const view = document.createElement("div");
     view.className = "chapter-content chapter-content-view";
     const mentioned = mentionsToHtml(chapter.content, characters);
-    view.innerHTML = stickersToHtml(mentioned, chapter.stickies || []) || '<span class="empty-state">Глава пуста.</span>';
+    view.innerHTML = stickersToHtml(mentioned, chapter.stickies || []) || `<span class="empty-state">${i18n("Глава пуста.")}</span>`;
     view.addEventListener("click", (e) => {
       const charId = e.target.dataset?.charId;
       if (charId) document.dispatchEvent(new CustomEvent("fictaris:open-character", { detail: { id: charId } }));
@@ -258,10 +259,10 @@ function buildEditor() {
     const textarea = document.createElement("textarea");
     textarea.className = "chapter-content";
     textarea.value = chapter.content;
-    textarea.placeholder = "Пиши здесь… @имя вставит упоминание персонажа";
+    textarea.placeholder = i18n("Пиши здесь… @имя вставит упоминание персонажа");
     textarea.addEventListener("input", () => {
       chapter.content = textarea.value;
-      wc.textContent = `${wordCount(chapter.content)} слов · всего ${manuscript.chapters.reduce((s, c) => s + wordCount(c.content), 0)}`;
+      wc.textContent = i18n("{count} слов · всего {total}", { count: wordCount(chapter.content), total: manuscript.chapters.reduce((s, c) => s + wordCount(c.content), 0) });
       persist();
     });
     wrap.appendChild(textarea);
@@ -269,8 +270,8 @@ function buildEditor() {
 
     const stickyBtn = document.createElement("button");
     stickyBtn.className = "btn sticky-insert-btn";
-    stickyBtn.textContent = "📌 Стикер";
-    stickyBtn.title = "Вставить инлайн-заметку в текст";
+    stickyBtn.textContent = i18n("📌 Стикер");
+    stickyBtn.title = i18n("Вставить инлайн-заметку в текст");
     stickyBtn.addEventListener("click", () => {
       const sticky = { id: uid(), text: "" };
       chapter.stickies = [...(chapter.stickies || []), sticky];
@@ -288,11 +289,11 @@ function buildEditor() {
   const notes = document.createElement("details");
   notes.className = "author-notes";
   const summary = document.createElement("summary");
-  summary.textContent = "Заметки автора";
+  summary.textContent = i18n("Заметки автора");
   notes.appendChild(summary);
   const notesArea = document.createElement("textarea");
   notesArea.value = chapter.authorNotes || "";
-  notesArea.placeholder = "Не входит в текст главы и в экспорт.";
+  notesArea.placeholder = i18n("Не входит в текст главы и в экспорт.");
   notesArea.addEventListener("input", () => {
     chapter.authorNotes = notesArea.value;
     persist();
@@ -314,7 +315,7 @@ function buildStickyEditor(chapter) {
   details.className = "author-notes";
   details.open = true;
   const summary = document.createElement("summary");
-  summary.textContent = `Стикеры (${chapter.stickies.length})`;
+  summary.textContent = i18n("Стикеры ({n})", { n: chapter.stickies.length });
   details.appendChild(summary);
 
   for (const sticky of chapter.stickies) {
@@ -322,7 +323,7 @@ function buildStickyEditor(chapter) {
     row.style.cssText = "display:flex;gap:6px;align-items:flex-start;margin-top:8px;";
     const area = document.createElement("textarea");
     area.value = sticky.text || "";
-    area.placeholder = "Текст заметки…";
+    area.placeholder = i18n("Текст заметки…");
     area.style.cssText =
       "flex:1;background:none;border:1px solid var(--border);border-radius:6px;color:var(--text-dim);font-family:inherit;font-size:0.85rem;padding:6px 8px;resize:vertical;min-height:34px;";
     area.addEventListener("input", () => { sticky.text = area.value; persist(); });
@@ -331,7 +332,7 @@ function buildStickyEditor(chapter) {
     const delBtn = document.createElement("button");
     delBtn.className = "btn danger";
     delBtn.textContent = "✕";
-    delBtn.title = "Удалить стикер (маркер [[note:…]] в тексте останется как обычный текст)";
+    delBtn.title = i18n("Удалить стикер (маркер [[note:…]] в тексте останется как обычный текст)");
     delBtn.addEventListener("click", () => {
       chapter.stickies = chapter.stickies.filter((s) => s.id !== sticky.id);
       persist();
@@ -349,13 +350,13 @@ function buildSnapshots(chapter) {
   const details = document.createElement("details");
   details.className = "author-notes";
   const summary = document.createElement("summary");
-  summary.textContent = `Снимки версий (${(chapter.snapshots || []).length})`;
+  summary.textContent = i18n("Снимки версий ({n})", { n: (chapter.snapshots || []).length });
   details.appendChild(summary);
 
   if (!(chapter.snapshots || []).length) {
     const empty = document.createElement("div");
     empty.style.cssText = "color:var(--text-faint);font-size:0.82rem;margin-top:8px;";
-    empty.textContent = "Пока нет снимков — кнопка «Снимок» в шапке главы сохранит текущий текст.";
+    empty.textContent = i18n("Пока нет снимков — кнопка «Снимок» в шапке главы сохранит текущий текст.");
     details.appendChild(empty);
     return details;
   }
@@ -374,7 +375,7 @@ function buildSnapshots(chapter) {
 
     const restoreBtn = document.createElement("button");
     restoreBtn.className = "btn";
-    restoreBtn.textContent = "Восстановить";
+    restoreBtn.textContent = i18n("Восстановить");
     restoreBtn.addEventListener("click", () => {
       if (restoreBtn.dataset.confirm === "1") {
         chapter.content = snap.content;
@@ -383,8 +384,8 @@ function buildSnapshots(chapter) {
         return;
       }
       restoreBtn.dataset.confirm = "1";
-      restoreBtn.textContent = "Заменит текущий текст. Точно?";
-      setTimeout(() => { restoreBtn.dataset.confirm = ""; restoreBtn.textContent = "Восстановить"; }, 4000);
+      restoreBtn.textContent = i18n("Заменит текущий текст. Точно?");
+      setTimeout(() => { restoreBtn.dataset.confirm = ""; restoreBtn.textContent = i18n("Восстановить"); }, 4000);
     });
     actions.appendChild(restoreBtn);
 
@@ -408,6 +409,6 @@ function buildSnapshots(chapter) {
 function refreshChapterListTitles() {
   const items = container.querySelectorAll(".chapter-item span:last-child");
   manuscript.chapters.forEach((ch, i) => {
-    if (items[i]) items[i].textContent = ch.title || "Без названия";
+    if (items[i]) items[i].textContent = ch.title || i18n("Без названия");
   });
 }

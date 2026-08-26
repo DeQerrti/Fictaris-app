@@ -1,4 +1,5 @@
 import { escapeHtml } from "./chips.js";
+import { i18n } from "./i18n.js";
 
 // Общий рендер блока «Где ещё упоминается» — карточки персонажа и
 // локации показывают его в самом низу, под редактируемыми полями.
@@ -13,7 +14,7 @@ export function buildReverseLinks(groups) {
 
   const title = document.createElement("div");
   title.className = "reverse-links-title";
-  title.textContent = "Где ещё упоминается";
+  title.textContent = i18n("Где ещё упоминается");
   wrap.appendChild(title);
 
   for (const [label, list] of nonEmpty) {

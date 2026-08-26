@@ -4,6 +4,7 @@ import { escapeHtml, characterSelect, buildToggleGroup } from "./chips.js";
 import { FACTION_TYPES, factionTypeInfo, iconSvg } from "./icons.js";
 import { pushTrash } from "./trash.js";
 import { loadTagsMap, buildTagsField } from "./tags.js";
+import { i18n } from "./i18n.js";
 
 let factions = [];
 let characters = [];
@@ -20,7 +21,7 @@ function persist() {
 function blank() {
   return {
     id: uid(),
-    name: "Новая фракция",
+    name: i18n("Новая фракция"),
     type: "order",
     description: "", notes: "", tags: "",
     leaderId: null,
@@ -53,7 +54,7 @@ function draw() {
     const empty = document.createElement("div");
     empty.className = "empty-state";
     empty.style.gridColumn = "1 / -1";
-    empty.textContent = "Фракций пока нет — добавь первую.";
+    empty.textContent = i18n("Фракций пока нет — добавь первую.");
     grid.appendChild(empty);
   }
 
@@ -63,8 +64,8 @@ function draw() {
     card.className = "char-card";
     card.innerHTML = `
       <div class="char-avatar" style="background:${color}">${iconSvg(iconName, 20)}</div>
-      <div class="char-name">${escapeHtml(f.name || "Без имени")}</div>
-      <div class="char-role">${escapeHtml(typeLabel)}</div>
+      <div class="char-name">${escapeHtml(f.name || i18n("Без имени"))}</div>
+      <div class="char-role">${escapeHtml(i18n(typeLabel))}</div>
     `;
     card.addEventListener("click", () => {
       activeId = f.id;
@@ -75,7 +76,7 @@ function draw() {
 
   const addCard = document.createElement("button");
   addCard.className = "char-card add-card";
-  addCard.textContent = "+ Добавить фракцию";
+  addCard.textContent = i18n("+ Добавить фракцию");
   addCard.addEventListener("click", () => {
     const f = blank();
     factions.push(f);
@@ -108,13 +109,13 @@ function buildDrawer(f) {
   typeField.className = "field";
   typeField.style.marginTop = "14px";
   const typeLabel = document.createElement("label");
-  typeLabel.textContent = "Тип";
+  typeLabel.textContent = i18n("Тип");
   typeField.appendChild(typeLabel);
   const typeSelect = document.createElement("select");
   for (const [value, label] of FACTION_TYPES) {
     const opt = document.createElement("option");
     opt.value = value;
-    opt.textContent = label;
+    opt.textContent = i18n(label);
     if (f.type === value) opt.selected = true;
     typeSelect.appendChild(opt);
   }
@@ -125,9 +126,9 @@ function buildDrawer(f) {
   const leaderField = document.createElement("div");
   leaderField.className = "field";
   const leaderLabel = document.createElement("label");
-  leaderLabel.textContent = "Глава";
+  leaderLabel.textContent = i18n("Глава фракции");
   leaderField.appendChild(leaderLabel);
-  const leaderSelect = characterSelect(characters, f.leaderId, "Не назначен");
+  const leaderSelect = characterSelect(characters, f.leaderId, i18n("Не назначен"));
   leaderSelect.addEventListener("change", () => { f.leaderId = leaderSelect.value || null; persist(); });
   leaderField.appendChild(leaderSelect);
   drawer.appendChild(leaderField);
@@ -135,17 +136,17 @@ function buildDrawer(f) {
   const hqField = document.createElement("div");
   hqField.className = "field";
   const hqLabel = document.createElement("label");
-  hqLabel.textContent = "Штаб-квартира";
+  hqLabel.textContent = i18n("Штаб-квартира");
   hqField.appendChild(hqLabel);
   const hqSelect = document.createElement("select");
   const noneOpt = document.createElement("option");
   noneOpt.value = "";
-  noneOpt.textContent = "Не указана";
+  noneOpt.textContent = i18n("Не указана");
   hqSelect.appendChild(noneOpt);
   for (const l of locations) {
     const opt = document.createElement("option");
     opt.value = l.id;
-    opt.textContent = l.name || "Без имени";
+    opt.textContent = l.name || i18n("Без имени");
     if (f.headquartersId === l.id) opt.selected = true;
     hqSelect.appendChild(opt);
   }
@@ -153,13 +154,13 @@ function buildDrawer(f) {
   hqField.appendChild(hqSelect);
   drawer.appendChild(hqField);
 
-  drawer.appendChild(buildToggleGroup("Состав", characters, f.memberIds || [], (ids) => {
+  drawer.appendChild(buildToggleGroup(i18n("Состав"), characters, f.memberIds || [], (ids) => {
     f.memberIds = ids;
     persist();
     draw();
   }));
 
-  for (const [key, label] of [["description", "Описание / идеология"], ["notes", "Заметки"]]) {
+  for (const [key, label] of [["description", i18n("Описание / идеология")], ["notes", i18n("Заметки")]]) {
     const field = document.createElement("div");
     field.className = "field";
     const lab = document.createElement("label");
@@ -183,11 +184,11 @@ function buildDrawer(f) {
   actions.className = "drawer-actions";
   const closeBtn = document.createElement("button");
   closeBtn.className = "btn";
-  closeBtn.textContent = "Закрыть";
+  closeBtn.textContent = i18n("Закрыть");
   closeBtn.addEventListener("click", () => { activeId = null; draw(); });
   const delBtn = document.createElement("button");
   delBtn.className = "btn danger";
-  delBtn.textContent = "Удалить";
+  delBtn.textContent = i18n("Удалить");
   delBtn.addEventListener("click", async () => {
     await pushTrash("faction", f);
     factions = factions.filter((x) => x.id !== f.id);

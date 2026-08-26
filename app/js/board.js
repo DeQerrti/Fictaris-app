@@ -3,6 +3,7 @@ import { debounceSave } from "./save-badge.js";
 import { characterSelect } from "./chips.js";
 import { pushTrash } from "./trash.js";
 import { buildExportPngButton } from "./png-export.js";
+import { i18n } from "./i18n.js";
 
 const LABEL_COLORS = [
   "#c9944a", "#4f7d74", "#a4483c", "#7d6a9e",
@@ -33,7 +34,7 @@ function columnsFromTitles(titles) {
 }
 
 function defaultBoard() {
-  return columnsFromTitles(["Задумано", "В работе", "Готово"]);
+  return columnsFromTitles([i18n("Задумано"), i18n("В работе"), i18n("Готово")]);
 }
 
 function charById(id) {
@@ -64,9 +65,9 @@ function draw() {
 
   const addCol = document.createElement("button");
   addCol.className = "add-column";
-  addCol.textContent = "+ Колонка";
+  addCol.textContent = i18n("+ Колонка");
   addCol.addEventListener("click", () => {
-    const col = { id: uid(), title: "Новая колонка" };
+    const col = { id: uid(), title: i18n("Новая колонка") };
     board.columns.push(col);
     board.cardOrder[col.id] = [];
     persist();
@@ -86,40 +87,40 @@ function buildTemplateBar() {
   const select = document.createElement("select");
   const placeholder = document.createElement("option");
   placeholder.value = "";
-  placeholder.textContent = "Шаблон структуры…";
+  placeholder.textContent = i18n("Шаблон структуры…");
   select.appendChild(placeholder);
   for (const [value, label] of TEMPLATES) {
     const opt = document.createElement("option");
     opt.value = value;
-    opt.textContent = label;
+    opt.textContent = i18n(label);
     select.appendChild(opt);
   }
   bar.appendChild(select);
 
   const applyBtn = document.createElement("button");
   applyBtn.className = "btn";
-  applyBtn.textContent = "Применить";
+  applyBtn.textContent = i18n("Применить");
   applyBtn.disabled = true;
   select.addEventListener("change", () => { applyBtn.disabled = !select.value; });
   applyBtn.addEventListener("click", () => {
     if (!select.value) return;
     if (applyBtn.dataset.confirm === "1") {
       const template = TEMPLATES.find((t) => t[0] === select.value);
-      board = columnsFromTitles(template[2]);
+      board = columnsFromTitles(template[2].map((t) => i18n(t)));
       persist();
       draw();
       return;
     }
     applyBtn.dataset.confirm = "1";
-    applyBtn.textContent = "Заменит все колонки. Точно?";
+    applyBtn.textContent = i18n("Заменит все колонки. Точно?");
     setTimeout(() => {
       applyBtn.dataset.confirm = "";
-      applyBtn.textContent = "Применить";
+      applyBtn.textContent = i18n("Применить");
     }, 4000);
   });
   bar.appendChild(applyBtn);
 
-  bar.appendChild(buildExportPngButton(() => container.querySelector(".board-view"), "доска"));
+  bar.appendChild(buildExportPngButton(() => container.querySelector(".board-view"), i18n("доска")));
 
   return bar;
 }
@@ -145,7 +146,7 @@ function buildColumn(col) {
   const delBtn = document.createElement("button");
   delBtn.className = "board-column-del";
   delBtn.textContent = "✕";
-  delBtn.title = "Удалить колонку";
+  delBtn.title = i18n("Удалить колонку");
   delBtn.addEventListener("click", () => {
     if (delBtn.dataset.confirm === "1") {
       const cardIds = board.cardOrder[col.id] || [];
@@ -157,7 +158,7 @@ function buildColumn(col) {
       return;
     }
     delBtn.dataset.confirm = "1";
-    delBtn.textContent = "Точно?";
+    delBtn.textContent = i18n("Точно?");
     setTimeout(() => {
       delBtn.dataset.confirm = "";
       delBtn.textContent = "✕";
@@ -185,9 +186,9 @@ function buildColumn(col) {
 
   const addCard = document.createElement("button");
   addCard.className = "add-chapter";
-  addCard.textContent = "+ Карточка";
+  addCard.textContent = i18n("+ Карточка");
   addCard.addEventListener("click", () => {
-    const card = { id: uid(), title: "Новая карточка", characterId: null, labelColor: null };
+    const card = { id: uid(), title: i18n("Новая карточка"), characterId: null, labelColor: null };
     board.cards[card.id] = card;
     board.cardOrder[col.id].push(card.id);
     persist();
@@ -239,7 +240,7 @@ function buildCard(card, colId) {
   const noneSwatch = document.createElement("div");
   noneSwatch.className = "swatch label-swatch" + (!card.labelColor ? " selected" : "");
   noneSwatch.style.background = "var(--panel-alt)";
-  noneSwatch.title = "Без метки";
+  noneSwatch.title = i18n("Без метки");
   noneSwatch.addEventListener("click", () => { card.labelColor = null; persist(); draw(); });
   labelRow.appendChild(noneSwatch);
   for (const color of LABEL_COLORS) {
@@ -252,7 +253,7 @@ function buildCard(card, colId) {
   el.appendChild(labelRow);
 
   if (characters.length) {
-    const select = characterSelect(characters, card.characterId, "Без персонажа");
+    const select = characterSelect(characters, card.characterId, i18n("Без персонажа"));
     select.className = "board-card-select";
     select.addEventListener("change", () => {
       card.characterId = select.value || null;

@@ -1,4 +1,5 @@
 import { apiGet, apiPost } from "./api.js";
+import { i18n } from "./i18n.js";
 
 // ══════════════════════════════════════════════
 //  КАЛЕНДАРЬ
@@ -16,7 +17,9 @@ import { apiGet, apiPost } from "./api.js";
 //  прочее) — общие на проект, а не на устройство.
 // ══════════════════════════════════════════════
 
-export const DEFAULT_MONTHS = Array.from({ length: 12 }, (_, i) => ({ name: `Месяц ${i + 1}`, days: 30 }));
+export function defaultMonths() {
+  return Array.from({ length: 12 }, (_, i) => ({ name: i18n("Месяц {n}", { n: i + 1 }), days: 30 }));
+}
 
 export async function loadCalendar() {
   const settings = await apiGet("/api/site-settings").catch(() => ({}));
@@ -45,6 +48,6 @@ export function absoluteDay(calendar, year, monthIndex, day) {
 
 export function formatDate(calendar, { year, month, day }) {
   const m = calendar.months[month];
-  const era = calendar.eraLabel || "год";
+  const era = calendar.eraLabel || i18n("год");
   return `${day} ${m ? m.name : "?"}, ${year} ${era}`;
 }
