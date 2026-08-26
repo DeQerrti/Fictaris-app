@@ -527,6 +527,53 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
   font-size: 0.85rem;
 }
 
+/* ── Теги ──────────────────────────────────── */
+
+.tags-chip-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
+.tags-group { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.tags-group-label { width: 100%; color: var(--text-faint); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.03em; margin-top: 4px; }
+
+.tag-chip {
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--panel-alt);
+  color: var(--text-dim);
+  font-family: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.tag-chip:hover { border-color: var(--accent); }
+.tag-chip.active { background: var(--accent); border-color: var(--accent); color: var(--panel); font-weight: 600; }
+
+.tags-manage-list { display: flex; flex-direction: column; gap: 12px; margin-bottom: 14px; max-width: 480px; }
+.tags-manage-group-title { color: var(--text-faint); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 4px; }
+.tags-manage-row { display: flex; align-items: center; gap: 8px; padding: 3px 0; }
+.tags-manage-row span { flex: 1; color: var(--text-dim); font-size: 0.85rem; }
+.tags-manage-row.hidden-tag span { text-decoration: line-through; color: var(--text-faint); }
+.tags-manage-add { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.tags-manage-add select {
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--panel-alt);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.85rem;
+}
+
+.tags-add-row input {
+  width: 100%;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px dashed var(--border);
+  background: transparent;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.82rem;
+}
+
 /* ── Экспорт в PNG ─────────────────────────── */
 
 .export-png-btn { margin-left: auto; }

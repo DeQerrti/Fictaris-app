@@ -3,12 +3,15 @@ import { debounceSave } from "./save-badge.js";
 import { escapeHtml } from "./chips.js";
 import { pushTrash } from "./trash.js";
 import { buildReverseLinks } from "./reverse-links.js";
+import { loadTagsMap, buildTagsField } from "./tags.js";
 
 const PALETTE = [
   "#c9944a", "#4f7d74", "#a4483c", "#7d6a9e",
   "#6a8fae", "#9a9250", "#b5636b", "#5a8a5f",
 ];
 
+// Тег — не отсюда: у него свой виджет с чипами (см. buildTagsField),
+// эти поля рисуются общим циклом как есть.
 const FIELDS = [
   ["role", "Роль", "input"],
   ["age", "Возраст", "input"],
@@ -18,11 +21,11 @@ const FIELDS = [
   ["goal", "Цель", "textarea"],
   ["flaws", "Слабости", "textarea"],
   ["backstory", "Предыстория", "textarea"],
-  ["tags", "Теги (через запятую)", "input"],
 ];
 
 let characters = [];
 let relationships = [];
+let tagsMap = {};
 let timeline = [];
 let factions = [];
 let board = { cards: {} };
@@ -51,13 +54,14 @@ function initials(name) {
 
 export async function renderCharacters(root, focusId) {
   container = root;
-  [characters, relationships, timeline, factions, board, mapData] = await Promise.all([
+  [characters, relationships, timeline, factions, board, mapData, tagsMap] = await Promise.all([
     apiGet("/api/characters"),
     apiGet("/api/relationships"),
     apiGet("/api/timeline"),
     apiGet("/api/factions"),
     apiGet("/api/board"),
     apiGet("/api/map"),
+    loadTagsMap(),
   ]);
   if (focusId && characters.some((c) => c.id === focusId)) activeId = focusId;
   draw();
@@ -198,6 +202,13 @@ function buildDrawer(c) {
     field.appendChild(input);
     drawer.appendChild(field);
   }
+
+  drawer.appendChild(
+    buildTagsField(tagsMap, c.tags, (value) => {
+      c.tags = value;
+      persist();
+    })
+  );
 
   const reverse = reverseLinksFor(c);
   if (reverse) drawer.appendChild(reverse);

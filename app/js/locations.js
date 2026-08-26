@@ -4,17 +4,18 @@ import { escapeHtml } from "./chips.js";
 import { pushTrash } from "./trash.js";
 import { LOCATION_TYPES, locationTypeInfo, iconSvg } from "./icons.js";
 import { buildReverseLinks } from "./reverse-links.js";
+import { loadTagsMap, buildTagsField } from "./tags.js";
 
 const FIELDS = [
   ["description", "Описание", "textarea"],
   ["notes", "Заметки", "textarea"],
-  ["tags", "Теги (через запятую)", "input"],
 ];
 
 let locations = [];
 let timeline = [];
 let factions = [];
 let mapData = { maps: {} };
+let tagsMap = {};
 let activeId = null;
 let container = null;
 const save = debounceSave((list) => apiPost("/api/locations", list));
@@ -34,11 +35,12 @@ function blank() {
 
 export async function renderLocations(root, focusId) {
   container = root;
-  [locations, timeline, factions, mapData] = await Promise.all([
+  [locations, timeline, factions, mapData, tagsMap] = await Promise.all([
     apiGet("/api/locations"),
     apiGet("/api/timeline"),
     apiGet("/api/factions"),
     apiGet("/api/map"),
+    loadTagsMap(),
   ]);
   if (focusId && locations.some((l) => l.id === focusId)) activeId = focusId;
   draw();
@@ -170,6 +172,13 @@ function buildDrawer(loc) {
     field.appendChild(input);
     drawer.appendChild(field);
   }
+
+  drawer.appendChild(
+    buildTagsField(tagsMap, loc.tags, (value) => {
+      loc.tags = value;
+      persist();
+    })
+  );
 
   const reverse = reverseLinksFor(loc);
   if (reverse) drawer.appendChild(reverse);

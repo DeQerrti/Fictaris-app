@@ -3,10 +3,12 @@ import { debounceSave } from "./save-badge.js";
 import { escapeHtml, characterSelect, buildToggleGroup } from "./chips.js";
 import { FACTION_TYPES, factionTypeInfo, iconSvg } from "./icons.js";
 import { pushTrash } from "./trash.js";
+import { loadTagsMap, buildTagsField } from "./tags.js";
 
 let factions = [];
 let characters = [];
 let locations = [];
+let tagsMap = {};
 let activeId = null;
 let container = null;
 const save = debounceSave((list) => apiPost("/api/factions", list));
@@ -29,10 +31,11 @@ function blank() {
 
 export async function renderFactions(root, focusId) {
   container = root;
-  [factions, characters, locations] = await Promise.all([
+  [factions, characters, locations, tagsMap] = await Promise.all([
     apiGet("/api/factions"),
     apiGet("/api/characters"),
     apiGet("/api/locations"),
+    loadTagsMap(),
   ]);
   if (focusId && factions.some((f) => f.id === focusId)) activeId = focusId;
   draw();
@@ -156,19 +159,25 @@ function buildDrawer(f) {
     draw();
   }));
 
-  for (const [key, label] of [["description", "Описание / идеология"], ["notes", "Заметки"], ["tags", "Теги (через запятую)"]]) {
+  for (const [key, label] of [["description", "Описание / идеология"], ["notes", "Заметки"]]) {
     const field = document.createElement("div");
     field.className = "field";
     const lab = document.createElement("label");
     lab.textContent = label;
     field.appendChild(lab);
-    const kind = key === "tags" ? "input" : "textarea";
-    const input = document.createElement(kind);
+    const input = document.createElement("textarea");
     input.value = f[key] || "";
     input.addEventListener("input", () => { f[key] = input.value; persist(); });
     field.appendChild(input);
     drawer.appendChild(field);
   }
+
+  drawer.appendChild(
+    buildTagsField(tagsMap, f.tags, (value) => {
+      f.tags = value;
+      persist();
+    })
+  );
 
   const actions = document.createElement("div");
   actions.className = "drawer-actions";

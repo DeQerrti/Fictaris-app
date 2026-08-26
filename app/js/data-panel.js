@@ -3,6 +3,7 @@ import { buildDemoBundle } from "./demo-data.js";
 import { THEME_PRESETS, saveTheme } from "./theme.js";
 import { DEFAULT_LABELS, saveLabels, resetLabels } from "./labels.js";
 import { captureKey, saveShortcut, clearShortcut } from "./shortcuts.js";
+import { DEFAULT_TAGS_MAP, CATEGORY_LABELS } from "./tags.js";
 import {
   getSyncConfig,
   saveSyncConfig,
@@ -85,6 +86,7 @@ export async function renderData(root) {
   wrap.appendChild(await buildAppearanceSection());
   wrap.appendChild(await buildLabelsSection());
   wrap.appendChild(await buildShortcutsSection());
+  wrap.appendChild(await buildTagsSection());
   wrap.appendChild(buildUpdateSection(info));
   wrap.appendChild(buildSyncSection());
   wrap.appendChild(buildExportSection());
@@ -246,6 +248,96 @@ async function buildShortcutsSection() {
 
 function bindingLabel(binding) {
   return (binding.shift ? "Shift+" : "") + binding.label;
+}
+
+// ── Теги ──────────────────────────────────────
+// Словарь по умолчанию (DEFAULT_TAGS_MAP) правится только кодом — здесь
+// можно спрятать любой встроенный тег (hiddenTags) и добавить свой
+// (customTags), тем же принципом, что и TasteID. Сама витрина чипов —
+// в tags.js, buildTagsField; это только экран управления словарём.
+
+async function buildTagsSection() {
+  const section = document.createElement("div");
+  section.className = "data-section";
+  section.innerHTML =
+    "<h3>Теги</h3><p>Спрячь ненужный встроенный тег или добавь свой — оба применяются сразу во всех модулях.</p>";
+
+  const settings = await apiGet("/api/site-settings").catch(() => ({}));
+  const hidden = new Set(settings.hiddenTags || []);
+  const custom = settings.customTags || {};
+  const merged = { ...DEFAULT_TAGS_MAP, ...custom };
+
+  const list = document.createElement("div");
+  list.className = "tags-manage-list";
+  renderTagsManageList(list, merged, hidden, custom);
+  section.appendChild(list);
+
+  const addRow = document.createElement("div");
+  addRow.className = "tags-manage-add";
+  const nameInput = document.createElement("input");
+  nameInput.type = "text";
+  nameInput.placeholder = "Название тега";
+  const catSelect = document.createElement("select");
+  for (const [cat, label] of Object.entries(CATEGORY_LABELS)) {
+    const opt = document.createElement("option");
+    opt.value = cat;
+    opt.textContent = label;
+    catSelect.appendChild(opt);
+  }
+  const addBtn = document.createElement("button");
+  addBtn.className = "btn";
+  addBtn.textContent = "Добавить тег";
+  addBtn.addEventListener("click", async () => {
+    const name = nameInput.value.trim();
+    if (!name) return;
+    const s = (await apiGet("/api/site-settings").catch(() => ({}))) || {};
+    const nextCustom = { ...s.customTags, [name]: { cat: catSelect.value, tip: "" } };
+    await apiPost("/api/site-settings", { ...s, customTags: nextCustom });
+    nameInput.value = "";
+    const nextHidden = new Set(s.hiddenTags || []);
+    renderTagsManageList(list, { ...DEFAULT_TAGS_MAP, ...nextCustom }, nextHidden, nextCustom);
+  });
+  addRow.append(nameInput, catSelect, addBtn);
+  section.appendChild(addRow);
+
+  return section;
+}
+
+function renderTagsManageList(list, merged, hidden, custom) {
+  list.innerHTML = "";
+  const byCategory = {};
+  for (const [name, info] of Object.entries(merged)) {
+    (byCategory[info.cat] ||= []).push(name);
+  }
+  for (const [cat, names] of Object.entries(byCategory)) {
+    const group = document.createElement("div");
+    group.className = "tags-manage-group";
+    const title = document.createElement("div");
+    title.className = "tags-manage-group-title";
+    title.textContent = CATEGORY_LABELS[cat] || cat;
+    group.appendChild(title);
+    for (const name of names) {
+      const row = document.createElement("div");
+      row.className = "tags-manage-row" + (hidden.has(name) ? " hidden-tag" : "");
+      const label = document.createElement("span");
+      label.textContent = name + (custom[name] ? " (своя)" : "");
+      const toggle = document.createElement("button");
+      toggle.className = "btn shortcut-clear";
+      toggle.textContent = hidden.has(name) ? "↺" : "×";
+      toggle.title = hidden.has(name) ? "Вернуть" : "Спрятать";
+      toggle.addEventListener("click", async () => {
+        const s = (await apiGet("/api/site-settings").catch(() => ({}))) || {};
+        const nextHidden = new Set(s.hiddenTags || []);
+        if (nextHidden.has(name)) nextHidden.delete(name);
+        else nextHidden.add(name);
+        await apiPost("/api/site-settings", { ...s, hiddenTags: [...nextHidden] });
+        renderTagsManageList(list, merged, nextHidden, custom);
+      });
+      row.append(label, toggle);
+      group.appendChild(row);
+    }
+    list.appendChild(group);
+  }
 }
 
 // ── Синхронизация ────────────────────────────
