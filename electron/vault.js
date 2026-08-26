@@ -123,11 +123,11 @@ export class Vault {
   // лимита нет, но привычка хранить бинарные данные файлами, а не
   // строками в JSON, всё равно правильная — сам map.json остаётся
   // маленьким и читаемым.
-  async saveImage(filename, buffer) {
+  async saveImage(filename, base64) {
     const dir = path.join(this.root, "maps");
     await fs.mkdir(dir, { recursive: true });
     const safeName = filename.replace(/[/\\:*?"<>|\x00-\x1f]/g, "_").slice(-80);
-    await fs.writeFile(path.join(dir, safeName), buffer);
+    await fs.writeFile(path.join(dir, safeName), Buffer.from(base64, "base64"));
     return `maps/${safeName}`;
   }
 }

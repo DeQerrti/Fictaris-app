@@ -19,6 +19,45 @@ async function pickAndUse() {
   location.reload();
 }
 
+// На телефоне нечего выбирать, кроме названия — своего проводника нет
+// (см. mobile/src/main.js, appRoutes/"add-vault").
+function promptForNameRow(onCreate) {
+  const row = document.createElement("div");
+  row.className = "project-row";
+  const input = document.createElement("input");
+  input.className = "project-row-input";
+  input.placeholder = "Название проекта";
+  const create = document.createElement("button");
+  create.className = "project-row-del";
+  create.textContent = "✓";
+  create.title = "Создать";
+  create.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (input.value.trim()) onCreate(input.value.trim());
+  });
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && input.value.trim()) onCreate(input.value.trim());
+  });
+  row.append(input, create);
+  return { row, input };
+}
+
+function renameRow(v, onDone) {
+  const input = document.createElement("input");
+  input.className = "project-row-input";
+  input.value = v.name;
+  const finish = async () => {
+    const name = input.value.trim();
+    if (name && name !== v.name) await apiPost("/api/app/rename-vault", { id: v.id, name });
+    onDone();
+  };
+  input.addEventListener("blur", finish);
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") input.blur();
+  });
+  return input;
+}
+
 async function openMenu() {
   const info = await apiGet("/api/app/info");
   menu.innerHTML = "";
@@ -30,7 +69,7 @@ async function openMenu() {
     const nameBtn = document.createElement("button");
     nameBtn.className = "project-row-name";
     nameBtn.textContent = v.name;
-    nameBtn.title = v.path;
+    if (v.path) nameBtn.title = v.path;
     nameBtn.addEventListener("click", async () => {
       if (v.id === info.currentVaultId) return;
       await apiPost("/api/app/switch-vault", { id: v.id });
@@ -38,19 +77,43 @@ async function openMenu() {
     });
     row.appendChild(nameBtn);
 
+    const renameBtn = document.createElement("button");
+    renameBtn.className = "project-row-del";
+    renameBtn.textContent = "✎";
+    renameBtn.title = "Переименовать";
+    renameBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const input = renameRow(v, openMenu);
+      nameBtn.replaceWith(input);
+      input.focus();
+      input.select();
+    });
+    row.appendChild(renameBtn);
+
     if ((info.vaults || []).length > 1) {
       const delBtn = document.createElement("button");
       delBtn.className = "project-row-del";
       delBtn.textContent = "✕";
-      delBtn.title = "Убрать из списка (файлы на диске не трогает)";
+      delBtn.title = info.mobile
+        ? "Удалить проект вместе с файлами — это необратимо"
+        : "Убрать из списка (файлы на диске не трогает)";
       delBtn.addEventListener("click", async (e) => {
         e.stopPropagation();
-        const res = await apiPost("/api/app/remove-vault", { id: v.id });
-        if (res.error) {
-          alert(res.error);
+        if (delBtn.dataset.confirm === "1") {
+          const res = await apiPost("/api/app/remove-vault", { id: v.id });
+          if (res.error) {
+            alert(res.error);
+            return;
+          }
+          openMenu();
           return;
         }
-        openMenu();
+        delBtn.dataset.confirm = "1";
+        delBtn.textContent = "?";
+        setTimeout(() => {
+          delBtn.dataset.confirm = "";
+          delBtn.textContent = "✕";
+        }, 3000);
       });
       row.appendChild(delBtn);
     }
@@ -62,11 +125,30 @@ async function openMenu() {
   divider.className = "project-menu-divider";
   menu.appendChild(divider);
 
-  const addBtn = document.createElement("button");
-  addBtn.className = "project-row-name";
-  addBtn.textContent = "+ Другой проект…";
-  addBtn.addEventListener("click", pickAndUse);
-  menu.appendChild(addBtn);
+  if (info.mobile) {
+    const addBtn = document.createElement("button");
+    addBtn.className = "project-row-name";
+    addBtn.textContent = "+ Новый проект…";
+    addBtn.addEventListener("click", () => {
+      const { row, input } = promptForNameRow(async (name) => {
+        const res = await apiPost("/api/app/add-vault", { name });
+        if (res.error) {
+          alert(res.error);
+          return;
+        }
+        location.reload();
+      });
+      addBtn.replaceWith(row);
+      input.focus();
+    });
+    menu.appendChild(addBtn);
+  } else {
+    const addBtn = document.createElement("button");
+    addBtn.className = "project-row-name";
+    addBtn.textContent = "+ Другой проект…";
+    addBtn.addEventListener("click", pickAndUse);
+    menu.appendChild(addBtn);
+  }
 
   menu.style.display = "block";
 }

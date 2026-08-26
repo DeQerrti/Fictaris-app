@@ -72,14 +72,20 @@ export const ROUTES = {
 
   // Картинка приходит как base64 (сжата на клиенте через <canvas> перед
   // отправкой — см. брифе про compressImage) и уезжает на диск отдельным
-  // файлом; map.json хранит только относительный путь к нему.
+  // файлом; map.json хранит только относительный путь к нему. Base64
+  // остаётся строкой до самого Vault — декодирует его каждая
+  // реализация по-своему (node:fs хочет Buffer, Capacitor Filesystem
+  // пишет base64 как есть), а Buffer в WebView на телефоне не существует.
   "POST /api/map/image": async ({ vault, body }) => {
     if (!body.data) throw new ApiError("Нет данных изображения");
     const ext = IMAGE_EXT.test(body.ext) ? body.ext.toLowerCase() : "jpg";
     const name = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}.${ext}`;
-    const buffer = Buffer.from(body.data, "base64");
-    if (buffer.length > 20 * 1024 * 1024) throw new ApiError("Изображение слишком большое", 413);
-    const relPath = await vault.saveImage(name, buffer);
+    // Оценка размера по длине base64 (реальные байты ~0.75×) — точная
+    // проверка после декодирования была бы надёжнее, но decode здесь
+    // не делаем нарочно (см. выше), а грубой оценки достаточно, чтобы
+    // не пустить на диск что-то откровенно огромное.
+    if (body.data.length > 28 * 1024 * 1024) throw new ApiError("Изображение слишком большое", 413);
+    const relPath = await vault.saveImage(name, body.data);
     return { path: relPath };
   },
 

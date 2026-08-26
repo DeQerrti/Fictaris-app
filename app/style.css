@@ -117,6 +117,17 @@ body.focus-mode .sidebar { display: none; }
 .project-row-name:hover { background: var(--panel-alt); color: var(--text); }
 .project-row.active .project-row-name { color: var(--accent-hover); font-weight: 600; }
 
+.project-row-input {
+  flex: 1;
+  background: var(--panel-alt);
+  border: 1px solid var(--accent);
+  border-radius: 5px;
+  color: var(--text);
+  font-size: 0.8rem;
+  padding: 5px 8px;
+  font-family: inherit;
+}
+
 .project-row-del {
   background: none;
   border: none;
@@ -1086,4 +1097,72 @@ button.btn.danger:hover { border-color: var(--color-3); color: var(--color-3); }
 .reverse-links-group strong {
   color: var(--text);
   font-weight: 600;
+}
+
+/* ── Телефон ───────────────────────────────── */
+/* Sidebar и .drawer — два места, общих для всего приложения (drawer
+   переиспользуют персонажи/локации/фракции/таймлайн/карта), поэтому
+   починка именно их снимает большую часть проблемы «всё сжато в
+   три колонки» на узком экране. */
+
+.sidebar-toggle {
+  display: none;
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  z-index: 60;
+  width: 36px;
+  height: 36px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+
+.sidebar-backdrop {
+  display: none;
+}
+
+@media (max-width: 860px) {
+  .sidebar-toggle { display: block; }
+
+  .sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 55;
+    transform: translateX(-100%);
+    transition: transform 0.2s ease;
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.5);
+  }
+
+  #app.sidebar-open .sidebar { transform: translateX(0); }
+
+  #app.sidebar-open .sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 50;
+  }
+
+  /* Место под кнопку-гамбургер сверху, чтобы она не перекрывала шапку
+     активного модуля (заголовок главы, хлебные крошки карты и т.п.). */
+  #content { padding-top: 44px; }
+
+  /* .drawer используют персонажи, локации, фракции, таймлайн, карта —
+     на компьютере это узкая боковая панель редактирования, на
+     телефоне под форму с десятком полей нужен весь экран. */
+  .drawer {
+    position: fixed;
+    inset: 0;
+    z-index: 45;
+    width: 100%;
+    padding-top: 54px;
+  }
+
+  .chapter-list { width: 130px; }
+  .timeline-list-pane { min-width: 0; }
+  .board-column { width: 200px; }
 }

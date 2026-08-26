@@ -10,19 +10,52 @@
     "build": "electron-builder --publish never",
     "build:win": "electron-builder --win --publish never",
     "build:mac": "electron-builder --mac --publish never",
-    "build:linux": "electron-builder --linux --publish never"
+    "build:linux": "electron-builder --linux --publish never",
+    "build:mobile": "esbuild mobile/src/main.js --bundle --format=iife --outfile=app/js/mobile.bundle.js --minify --legal-comments=none",
+    "mobile:sync": "npm run build:mobile && npx cap sync android"
   },
   "devDependencies": {
+    "@capacitor/android": "^8.5.0",
+    "@capacitor/app": "^8.1.1",
+    "@capacitor/cli": "^8.5.0",
+    "@capacitor/core": "^8.5.0",
+    "@capacitor/filesystem": "^8.1.3",
     "electron": "^43.0.0",
-    "electron-builder": "^26.0.0"
+    "electron-builder": "^26.0.0",
+    "esbuild": "^0.28.2"
   },
   "build": {
     "appId": "ru.fictaris.app",
     "productName": "Fictaris",
-    "directories": { "output": "dist" },
-    "files": ["app/**/*", "core/**/*", "electron/**/*", "package.json"],
-    "win": { "target": ["nsis"] },
-    "mac": { "target": [{ "target": "dmg", "arch": ["arm64", "x64"] }] },
-    "linux": { "target": ["AppImage"] }
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "app/**/*",
+      "core/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ]
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ]
+    }
   }
 }

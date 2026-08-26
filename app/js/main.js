@@ -30,6 +30,9 @@ const MODULES = {
 
 const content = document.getElementById("content");
 const navItems = document.querySelectorAll(".nav-item");
+const appEl = document.getElementById("app");
+const sidebarToggle = document.getElementById("sidebarToggle");
+const sidebarBackdrop = document.getElementById("sidebarBackdrop");
 
 async function openModule(name, arg) {
   // Фокус-режим рукописи прячет сайдбар классом на body (manuscript.js) —
@@ -39,11 +42,15 @@ async function openModule(name, arg) {
   navItems.forEach((btn) => btn.classList.toggle("active", btn.dataset.module === name));
   content.innerHTML = "";
   await MODULES[name](content, arg);
+  appEl.classList.remove("sidebar-open"); // на телефоне — сайдбар выезжающий, после выбора закрываем
 }
 
 navItems.forEach((btn) => {
   btn.addEventListener("click", () => openModule(btn.dataset.module));
 });
+
+sidebarToggle.addEventListener("click", () => appEl.classList.toggle("sidebar-open"));
+sidebarBackdrop.addEventListener("click", () => appEl.classList.remove("sidebar-open"));
 
 // Клик по @упоминанию в тексте главы (mentions.js) — открывает карточку
 // персонажа в модуле «Персонажи», а не только подсвечивает имя.
