@@ -185,6 +185,17 @@ function appRoutes() {
     // прошлый отказ («Позже»), если человек попросил проверить сам.
     "POST /api/app/check-update": async () => checkForUpdatesManual(),
 
+    // Масштаб окна — настройка самого приложения (Electron config), не
+    // мира в хранилище: значение общее на устройство, а не на проект,
+    // поэтому не в site-settings.json, а тут же, где остальной /api/app/*.
+    "GET /api/app/zoom": async () => ({ percent: config.zoom ?? 100, min: ZOOM_MIN, max: ZOOM_MAX, step: ZOOM_STEP }),
+    "POST /api/app/zoom": async ({ body }) => {
+      const percent = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Number(body.percent) || 100));
+      applyZoom(percent);
+      await saveConfig({ zoom: percent });
+      return { percent };
+    },
+
     "POST /api/app/pick-vault": async () => ({ path: await askForVault() }),
 
     "POST /api/app/use-vault": async ({ body }) => {
@@ -338,6 +349,15 @@ async function bumpZoom(deltaPercent) {
   await saveConfig({ zoom: percent });
 }
 
+// Сама полоса меню (Файл/Вид) в интерфейс не вписывалась — не под тему
+// приложения, и дублировала то, что удобнее держать в Настройках
+// (масштаб — рядом с размером шрифта). Но горячие клавиши из неё нужны
+// по-прежнему, а без зарегистрированного Menu акселераторы Electron не
+// работают вовсе — поэтому меню остаётся зарегистрированным (в фоне,
+// accelerator'ы это не требует видимой полосы), а сама полоса прячется
+// через win.removeMenu() отдельно для каждого окна (Windows/Linux; на
+// macOS полоса меню — часть системного меню наверху экрана, а не окна,
+// и её принято оставлять).
 function buildMenu() {
   Menu.setApplicationMenu(
     Menu.buildFromTemplate([
@@ -381,6 +401,7 @@ function createWindow() {
     webPreferences: { nodeIntegration: false, contextIsolation: true, sandbox: true },
   });
   win.once("ready-to-show", () => win.show());
+  if (process.platform !== "darwin") win.removeMenu();
   win.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
     return { action: "deny" };

@@ -194,6 +194,9 @@ export const EN_DICT = {
   "Пока нет снимков — кнопка «Снимок» в шапке главы сохранит текущий текст.":
     "No snapshots yet — the “Snapshot” button in the chapter header will save the current text.",
   "Заменит текущий текст. Точно?": "This will replace the current text. Sure?",
+  "Просмотреть": "Preview",
+  "Скрыть": "Hide",
+  "(пусто)": "(empty)",
 
   // ── Переключатель проектов (project-switcher.js) ──
   "Название проекта": "Project name",
@@ -349,8 +352,8 @@ export const EN_DICT = {
     "<b>Search</b> — the <kbd>/</kbd> key or the sidebar button searches across every module at once.",
   "<b>⚙ Настройки</b> — тема, акцент, подписи меню, горячие клавиши, синхронизация между устройствами.":
     "<b>⚙ Settings</b> — theme, accent color, menu labels, keyboard shortcuts, sync between devices.",
-  "<b>«Данные» → «Заполнить примером»</b> — связный тестовый сюжет, чтобы сразу увидеть, как модули работают вместе.":
-    "<b>“Data” → “Fill with example”</b> — a connected sample story so you can see right away how the modules work together.",
+  "<b>«⚙ Настройки» → «Данные» → «Заполнить примером»</b> — связный тестовый сюжет, чтобы сразу увидеть, как модули работают вместе.":
+    "<b>“⚙ Settings” → “Data” → “Fill with example”</b> — a connected sample story so you can see right away how the modules work together.",
   "Заполнить примером": "Fill with example",
   "Понятно, дальше сам": "Got it, I'll explore",
 
@@ -398,6 +401,8 @@ export const EN_DICT = {
 
   "Редактор": "Editor",
   "Размер шрифта в тексте главы.": "Font size for chapter text.",
+  "Масштаб окна: ": "Window zoom: ",
+  "100%": "100%",
 
   "Подписи интерфейса": "Interface labels",
   "Переименуй пункты меню под свою терминологию — применяется сразу, без перезагрузки.":

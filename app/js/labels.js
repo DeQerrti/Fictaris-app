@@ -34,7 +34,6 @@ export function defaultLabels() {
       continuity: i18n("Проверка"),
       trash: i18n("Корзина"),
       settings: i18n("⚙ Настройки"),
-      data: i18n("Данные"),
     },
   };
 }

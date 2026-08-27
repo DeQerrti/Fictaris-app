@@ -69,17 +69,12 @@ function showConfirmBar(bar, message, onConfirm) {
   bar.append(text, yes, no);
 }
 
-export async function renderData(root) {
-  root.innerHTML = "";
-  const wrap = document.createElement("div");
-  wrap.className = "data-panel";
-
-  wrap.appendChild(buildExportSection());
-  wrap.appendChild(buildImportSection());
-  wrap.appendChild(buildDemoSection());
-  wrap.appendChild(buildHistorySection());
-
-  root.appendChild(wrap);
+// Экспортируются как набор секций, а не готовый экран (как раньше
+// renderData(root)) — «Данные» теперь одна из вкладок Настроек
+// (settings-panel.js), а не отдельный пункт сайдбара, и вкладке нужны
+// именно секции, чтобы вписать их в общий контейнер вкладки самой.
+export function buildDataSections() {
+  return [buildExportSection(), buildImportSection(), buildDemoSection(), buildHistorySection()];
 }
 
 function historyFiles() {

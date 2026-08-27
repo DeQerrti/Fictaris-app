@@ -1,4 +1,5 @@
 import { apiGet, apiPost } from "./api.js";
+import { buildDataSections } from "./data-panel.js";
 import { i18n, currentLang, setLang } from "./i18n.js";
 import { THEME_PRESETS, saveTheme } from "./theme.js";
 import { defaultLabels, saveLabels, resetLabels } from "./labels.js";
@@ -29,25 +30,64 @@ import {
 //  оказались попросту не видны — по этой самой причине раздел и завели.
 // ══════════════════════════════════════════════
 
+// Раньше все разделы шли одной длинной лентой на скролл — по образцу
+// Obsidian (категории слева, справа — только выбранная) читать и найти
+// нужное проще, а «Данные» (data-panel.js) естественно встают ещё одной
+// вкладкой вместо отдельного пункта в сайдбаре, которым они и были
+// концептуально всё это время — операциями над содержимым проекта,
+// такими же настройками, только над данными, а не над видом приложения.
+let activeSettingsTab = "appearance";
+
 export async function renderSettings(root) {
   root.innerHTML = "";
-  const wrap = document.createElement("div");
-  wrap.className = "data-panel";
-
   const info = await apiGet("/api/app/info").catch(() => ({}));
 
-  wrap.appendChild(await buildAppearanceSection());
-  wrap.appendChild(buildLanguageSection());
-  wrap.appendChild(await buildEditorSection());
-  wrap.appendChild(await buildLabelsSection());
-  wrap.appendChild(await buildShortcutsSection());
-  wrap.appendChild(await buildTagsSection());
-  wrap.appendChild(await buildCalendarSection());
-  wrap.appendChild(buildSyncSection());
-  wrap.appendChild(buildUpdateSection(info));
-  wrap.appendChild(buildAboutSection(info));
+  const TABS = [
+    ["appearance", () => i18n("Оформление"), () => buildAppearanceSection()],
+    ["language", () => i18n("Язык"), () => buildLanguageSection()],
+    ["editor", () => i18n("Редактор"), () => buildEditorSection()],
+    ["labels", () => i18n("Подписи интерфейса"), () => buildLabelsSection()],
+    ["shortcuts", () => i18n("Горячие клавиши"), () => buildShortcutsSection()],
+    ["tags", () => i18n("Теги"), () => buildTagsSection()],
+    ["calendar", () => i18n("Календарь"), () => buildCalendarSection()],
+    ["sync", () => i18n("Синхронизация"), () => buildSyncSection()],
+    ["data", () => i18n("Данные"), () => buildDataSections()],
+    ["updates", () => i18n("Обновления"), () => buildUpdateSection(info)],
+    ["about", () => i18n("О приложении"), () => buildAboutSection(info)],
+  ];
+  if (!TABS.some(([key]) => key === activeSettingsTab)) activeSettingsTab = "appearance";
 
-  root.appendChild(wrap);
+  const shell = document.createElement("div");
+  shell.className = "settings-shell";
+
+  const tabsNav = document.createElement("nav");
+  tabsNav.className = "settings-tabs";
+
+  const content = document.createElement("div");
+  content.className = "settings-content data-panel";
+
+  async function selectTab(key, build) {
+    activeSettingsTab = key;
+    for (const btn of tabsNav.children) btn.classList.toggle("active", btn.dataset.tab === key);
+    content.innerHTML = "";
+    const result = await build();
+    for (const el of Array.isArray(result) ? result : [result]) content.appendChild(el);
+  }
+
+  for (const [key, label, build] of TABS) {
+    const btn = document.createElement("button");
+    btn.className = "nav-item" + (key === activeSettingsTab ? " active" : "");
+    btn.dataset.tab = key;
+    btn.textContent = label();
+    btn.addEventListener("click", () => selectTab(key, build));
+    tabsNav.appendChild(btn);
+  }
+
+  shell.append(tabsNav, content);
+  root.appendChild(shell);
+
+  const initial = TABS.find(([key]) => key === activeSettingsTab);
+  await selectTab(initial[0], initial[2]);
 }
 
 async function buildAppearanceSection() {
@@ -163,6 +203,48 @@ async function buildEditorSection() {
   }
 
   section.appendChild(row);
+
+  // Масштаб окна — раньше жил в отдельной полосе меню (Файл/Вид), которая
+  // не вписывалась в тему приложения; теперь тут, рядом с размером
+  // шрифта — обе настройки об одном и том же ("крупнее/мельче видно").
+  const zoom = await apiGet("/api/app/zoom").catch(() => null);
+  if (zoom) {
+    const zoomRow = document.createElement("div");
+    zoomRow.className = "sync-actions";
+    zoomRow.style.marginTop = "12px";
+
+    const label = document.createElement("span");
+    label.textContent = i18n("Масштаб окна: ");
+    label.style.color = "var(--text-dim)";
+
+    const percentLabel = document.createElement("span");
+    percentLabel.className = "zoom-percent";
+    percentLabel.textContent = `${zoom.percent}%`;
+
+    async function setZoom(percent) {
+      const res = await apiPost("/api/app/zoom", { percent });
+      percentLabel.textContent = `${res.percent}%`;
+    }
+
+    const minusBtn = document.createElement("button");
+    minusBtn.className = "btn";
+    minusBtn.textContent = "−";
+    minusBtn.addEventListener("click", () => setZoom(Number(percentLabel.textContent) - zoom.step));
+
+    const resetBtn = document.createElement("button");
+    resetBtn.className = "btn";
+    resetBtn.textContent = i18n("100%");
+    resetBtn.addEventListener("click", () => setZoom(100));
+
+    const plusBtn = document.createElement("button");
+    plusBtn.className = "btn";
+    plusBtn.textContent = "+";
+    plusBtn.addEventListener("click", () => setZoom(Number(percentLabel.textContent) + zoom.step));
+
+    zoomRow.append(label, minusBtn, percentLabel, plusBtn, resetBtn);
+    section.appendChild(zoomRow);
+  }
+
   return section;
 }
 

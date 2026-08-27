@@ -289,7 +289,7 @@ function buildEditor() {
   const notes = document.createElement("details");
   notes.className = "author-notes";
   const summary = document.createElement("summary");
-  summary.textContent = i18n("Заметки автора");
+  summary.textContent = i18n("Заметки");
   notes.appendChild(summary);
   const notesArea = document.createElement("textarea");
   notesArea.value = chapter.authorNotes || "";
@@ -362,8 +362,11 @@ function buildSnapshots(chapter) {
   }
 
   for (const snap of chapter.snapshots) {
+    const wrap = document.createElement("div");
+    wrap.style.marginTop = "8px";
+
     const row = document.createElement("div");
-    row.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:8px;";
+    row.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:10px;";
 
     const date = document.createElement("span");
     date.style.cssText = "font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:var(--text-faint);";
@@ -372,6 +375,24 @@ function buildSnapshots(chapter) {
 
     const actions = document.createElement("div");
     actions.style.cssText = "display:flex;gap:6px;";
+
+    // Раньше приходилось восстанавливать вслепую, чтобы вспомнить, что
+    // именно в снимке — теперь можно развернуть текст прямо тут,
+    // read-only, и решить уже по факту.
+    const preview = document.createElement("div");
+    preview.className = "snapshot-preview";
+    preview.style.display = "none";
+    preview.textContent = snap.content || i18n("(пусто)");
+
+    const previewBtn = document.createElement("button");
+    previewBtn.className = "btn";
+    previewBtn.textContent = i18n("Просмотреть");
+    previewBtn.addEventListener("click", () => {
+      const open = preview.style.display !== "none";
+      preview.style.display = open ? "none" : "block";
+      previewBtn.textContent = open ? i18n("Просмотреть") : i18n("Скрыть");
+    });
+    actions.appendChild(previewBtn);
 
     const restoreBtn = document.createElement("button");
     restoreBtn.className = "btn";
@@ -400,7 +421,8 @@ function buildSnapshots(chapter) {
     actions.appendChild(delBtn);
 
     row.appendChild(actions);
-    details.appendChild(row);
+    wrap.append(row, preview);
+    details.appendChild(wrap);
   }
 
   return details;

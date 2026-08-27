@@ -853,6 +853,19 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
   min-height: 50px;
 }
 
+.snapshot-preview {
+  margin-top: 6px;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-dim);
+  font-size: 0.88rem;
+  padding: 8px 10px;
+  max-height: 240px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+}
+
 /* ── Общее: цветной чип ────────────────────── */
 
 .chip {
@@ -1343,6 +1356,30 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
   flex-direction: column;
   gap: 16px;
   max-width: 560px;
+}
+
+/* ── Настройки: вкладки-категории (по образцу Obsidian) ────── */
+
+.settings-shell {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.settings-tabs {
+  flex: 0 0 200px;
+  border-right: 1px solid var(--border);
+  padding: 16px 8px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.settings-content {
+  flex: 1;
+  min-width: 0;
 }
 
 .data-section {

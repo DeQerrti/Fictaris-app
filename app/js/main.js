@@ -12,7 +12,7 @@ import { renderGraph } from "./graph.js";
 import { renderStats } from "./stats.js";
 import { renderFamilyTree } from "./family-tree.js";
 import { renderContinuity } from "./continuity.js";
-import { renderData, fillWithDemoData } from "./data-panel.js";
+import { fillWithDemoData } from "./data-panel.js";
 import { renderSettings } from "./settings-panel.js";
 import { renderTrash, trashCount } from "./trash.js";
 import { initProjectSwitcher } from "./project-switcher.js";
@@ -39,7 +39,6 @@ const MODULES = {
   continuity: renderContinuity,
   trash: renderTrash,
   settings: renderSettings,
-  data: renderData,
 };
 
 const content = document.getElementById("content");
