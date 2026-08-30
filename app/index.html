@@ -33,11 +33,15 @@
     <button class="sidebar-toggle" id="sidebarToggle" aria-label="Меню">☰</button>
     <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
     <nav class="sidebar">
+      <div class="sidebar-resize-handle" id="sidebarResizeHandle"></div>
       <div class="brand-row">
         <div class="brand">Fictaris</div>
-        <button class="settings-btn" id="settingsBtn" data-module="settings" title="Настройки" aria-label="Настройки">⚙</button>
+        <div class="brand-row-actions">
+          <button class="sidebar-pin" id="sidebarPin" aria-label="Закрепить меню"></button>
+          <button class="settings-btn" id="settingsBtn" data-module="settings" title="Настройки" aria-label="Настройки">⚙</button>
+        </div>
       </div>
-      <button class="search-trigger" id="searchTrigger">🔍 Поиск <span class="search-trigger-hint">/</span></button>
+      <button class="search-trigger" id="searchTrigger">Поиск <span class="search-trigger-hint">/</span></button>
       <button class="nav-item active" data-module="manuscript">Рукопись</button>
       <button class="nav-item" data-module="characters">Персонажи</button>
       <button class="nav-item" data-module="locations">Локации</button>
