@@ -409,14 +409,11 @@ export const EN_DICT = {
   "Масштаб окна: ": "Window zoom: ",
   "100%": "100%",
 
-  "Разделы": "Sections",
-  "Скрой из сайдбара те разделы, которые не нужны в этом проекте — их всегда можно включить обратно здесь же.":
-    "Hide sidebar sections you don't need for this project — you can always turn them back on here.",
-
   "Подписи интерфейса": "Interface labels",
-  "Переименуй пункты меню под свою терминологию — применяется сразу, без перезагрузки.":
-    "Rename menu items to match your own terminology — applied instantly, no reload.",
-  "Название приложения": "App name",
+  "Переименуй пункты меню под свою терминологию — применяется сразу. Глазик слева прячет раздел из сайдбара, если он не нужен в этом проекте.":
+    "Rename menu items to match your own terminology — applied instantly. The eye icon on the left hides a section from the sidebar if you don't need it in this project.",
+  "Показать раздел": "Show section",
+  "Скрыть раздел": "Hide section",
   "Сбросить все подписи": "Reset all labels",
 
   "Горячие клавиши": "Keyboard shortcuts",
@@ -437,6 +434,7 @@ export const EN_DICT = {
   " (своя)": " (custom)",
   "Вернуть": "Restore",
   "Спрятать": "Hide",
+  "Удалить тег навсегда": "Delete tag permanently",
 
   "Календарь": "Calendar",
   "Своё летоисчисление для таймлайна — свои месяцы вместо реальных, произвольная длина года.":
