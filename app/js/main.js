@@ -22,6 +22,7 @@ import { applyLabels } from "./labels.js";
 import { applyTabVisibility, getHiddenTabs } from "./visibility.js";
 import { initSearch, openSearch } from "./search.js";
 import { initShortcuts, loadShortcuts } from "./shortcuts.js";
+import { initSidebar } from "./sidebar.js";
 import { maybeShowOnboarding } from "./onboarding.js";
 import { loadLang, i18n } from "./i18n.js";
 
@@ -53,15 +54,35 @@ const sidebarBackdrop = document.getElementById("sidebarBackdrop");
 // считают именно по .nav-item.
 const settingsBtn = document.getElementById("settingsBtn");
 
+// Счётчик запросов на переключение модуля — если кликнуть вкладку мышкой
+// (её MODULES[name] может уйти в сеть за данными), а потом, не дожидаясь
+// отрисовки, переключиться на другую через горячую клавишу, второй запрос
+// обязан выиграть: без счётчика первый (более медленный) запрос дорисует
+// свой модуль поверх уже выбранного новой вкладки — подсветка в сайдбаре
+// будет показывать одно, а содержимое — другое.
+let openRequestId = 0;
+
 async function openModule(name, arg) {
+  const requestId = ++openRequestId;
   // Фокус-режим рукописи прячет сайдбар классом на body (manuscript.js) —
   // сбрасываем его при любом переключении модуля, иначе уйти со
   // страницы, скрывшей навигацию, можно было бы только через Esc.
   document.body.classList.remove("focus-mode");
   navItems.forEach((btn) => btn.classList.toggle("active", btn.dataset.module === name));
   settingsBtn.classList.toggle("active", name === "settings");
+  // Клик мышью оставляет активный фокус на нажатой кнопке — саму подсветку
+  // выбора это не портит (она через .active, не :focus), но при живом
+  // переключении по горячим клавишам старая кнопка иначе продолжает
+  // выделяться браузерным контуром фокуса поверх новой активной. Явный
+  // blur — самый надёжный способ снять этот контур независимо от того,
+  // какая кнопка успела получить фокус до этого.
+  const focused = document.activeElement;
+  if (focused instanceof HTMLElement && (focused.classList.contains("nav-item") || focused === settingsBtn)) {
+    focused.blur();
+  }
   content.innerHTML = "";
   await MODULES[name](content, arg);
+  if (requestId !== openRequestId) return; // за это время выбрали другой модуль — не перетираем его
   appEl.classList.remove("sidebar-open"); // на телефоне — сайдбар выезжающий, после выбора закрываем
 }
 
@@ -107,8 +128,9 @@ async function boot() {
   applyLabels();
   applyTabVisibility();
   loadShortcuts();
+  initSidebar();
   const searchTriggerText = document.getElementById("searchTrigger").childNodes[0];
-  if (searchTriggerText) searchTriggerText.textContent = `${i18n("🔍 Поиск")} `;
+  if (searchTriggerText) searchTriggerText.textContent = `${i18n("Поиск")} `;
   const info = await apiGet("/api/app/info").catch(() => ({ vaultPath: null }));
   if (!info.vaultPath) {
     location.href = "/welcome";
