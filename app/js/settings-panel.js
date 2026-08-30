@@ -3,6 +3,7 @@ import { buildDataSections } from "./data-panel.js";
 import { i18n, currentLang, setLang } from "./i18n.js";
 import { THEME_PRESETS, saveTheme } from "./theme.js";
 import { defaultLabels, saveLabels, resetLabels } from "./labels.js";
+import { HIDEABLE_TABS, getHiddenTabs, setTabHidden } from "./visibility.js";
 import { captureKey, saveShortcut, clearShortcut } from "./shortcuts.js";
 import { DEFAULT_TAGS_MAP, CATEGORY_LABELS } from "./tags.js";
 import { defaultMonths, loadCalendar, saveCalendar } from "./calendar.js";
@@ -44,6 +45,7 @@ export async function renderSettings(root) {
 
   const TABS = [
     ["appearance", () => i18n("Оформление"), () => buildAppearanceSection()],
+    ["sections", () => i18n("Разделы"), () => buildSectionsSection()],
     ["language", () => i18n("Язык"), () => buildLanguageSection()],
     ["editor", () => i18n("Редактор"), () => buildEditorSection()],
     ["labels", () => i18n("Подписи интерфейса"), () => buildLabelsSection()],
@@ -169,44 +171,16 @@ function buildLanguageSection() {
 }
 
 // ── Редактор ──────────────────────────────────
-// Единственная сквозная настройка рукописи, которую спрашивают почти
-// все текстовые редакторы (Scrivener, World Anvil) — размер шрифта.
-// Применяется через CSS-переменную --editor-font-size на :root, читает
-// её .chapter-content в style.css.
-const FONT_SIZES = [15, 16, 17, 18, 20, 22];
-const DEFAULT_FONT_SIZE = 17;
-
+// Размер шрифта переехал в саму главу (manuscript.js, шапка редактора) —
+// это настройка того, что читаешь прямо сейчас, а не приложения в
+// целом, и логичнее видеть/менять её рядом с текстом, а не в отдельном
+// экране. Тут остаётся масштаб всего окна — он не про главу, а про
+// приложение целиком, так что при переезде правильно бы было тут.
 async function buildEditorSection() {
   const section = document.createElement("div");
   section.className = "data-section";
-  section.innerHTML = `<h3>${i18n("Редактор")}</h3><p>${i18n("Размер шрифта в тексте главы.")}</p>`;
+  section.innerHTML = `<h3>${i18n("Редактор")}</h3><p>${i18n("Масштаб окна приложения. Размер шрифта в тексте главы — в шапке самой рукописи.")}</p>`;
 
-  const settings = await apiGet("/api/site-settings").catch(() => ({}));
-  const current = FONT_SIZES.includes(settings.editorFontSize) ? settings.editorFontSize : DEFAULT_FONT_SIZE;
-
-  const row = document.createElement("div");
-  row.className = "font-size-row";
-  const buttons = new Map();
-  for (const size of FONT_SIZES) {
-    const btn = document.createElement("button");
-    btn.className = "btn font-size-btn" + (size === current ? " active" : "");
-    btn.textContent = String(size);
-    btn.addEventListener("click", async () => {
-      buttons.forEach((b) => b.classList.remove("active"));
-      btn.classList.add("active");
-      const s = (await apiGet("/api/site-settings").catch(() => ({}))) || {};
-      await apiPost("/api/site-settings", { ...s, editorFontSize: size });
-      document.documentElement.style.setProperty("--editor-font-size", `${size}px`);
-    });
-    buttons.set(size, btn);
-    row.appendChild(btn);
-  }
-
-  section.appendChild(row);
-
-  // Масштаб окна — раньше жил в отдельной полосе меню (Файл/Вид), которая
-  // не вписывалась в тему приложения; теперь тут, рядом с размером
-  // шрифта — обе настройки об одном и том же ("крупнее/мельче видно").
   const zoom = await apiGet("/api/app/zoom").catch(() => null);
   if (zoom) {
     const zoomRow = document.createElement("div");
@@ -221,15 +195,23 @@ async function buildEditorSection() {
     percentLabel.className = "zoom-percent";
     percentLabel.textContent = `${zoom.percent}%`;
 
+    // Баг: раньше текущий процент читали из percentLabel.textContent
+    // ("100%") и парсили через Number() — но Number("100%") === NaN,
+    // так что +/- всегда слали NaN на сервер, там NaN || 100 тихо
+    // откатывало обратно на 100%, и кнопки казались нерабочими.
+    // Держим текущее значение отдельной переменной вместо чтения из DOM.
+    let currentPercent = zoom.percent;
+
     async function setZoom(percent) {
       const res = await apiPost("/api/app/zoom", { percent });
+      currentPercent = res.percent;
       percentLabel.textContent = `${res.percent}%`;
     }
 
     const minusBtn = document.createElement("button");
     minusBtn.className = "btn";
     minusBtn.textContent = "−";
-    minusBtn.addEventListener("click", () => setZoom(Number(percentLabel.textContent) - zoom.step));
+    minusBtn.addEventListener("click", () => setZoom(currentPercent - zoom.step));
 
     const resetBtn = document.createElement("button");
     resetBtn.className = "btn";
@@ -239,12 +221,50 @@ async function buildEditorSection() {
     const plusBtn = document.createElement("button");
     plusBtn.className = "btn";
     plusBtn.textContent = "+";
-    plusBtn.addEventListener("click", () => setZoom(Number(percentLabel.textContent) + zoom.step));
+    plusBtn.addEventListener("click", () => setZoom(currentPercent + zoom.step));
 
     zoomRow.append(label, minusBtn, percentLabel, plusBtn, resetBtn);
     section.appendChild(zoomRow);
   }
 
+  return section;
+}
+
+// ── Разделы ───────────────────────────────────
+// «В настройках должна быть возможность скрыть любую вкладку» — список
+// тех же пунктов, что и в сайдбаре (HIDEABLE_TABS, visibility.js), без
+// «Настроек» самих себя — иначе можно случайно спрятать единственный
+// путь всё вернуть обратно. Переключение применяется сразу же, без
+// отдельной кнопки «Сохранить».
+async function buildSectionsSection() {
+  const section = document.createElement("div");
+  section.className = "data-section";
+  section.innerHTML = `<h3>${i18n("Разделы")}</h3><p>${i18n("Скрой из сайдбара те разделы, которые не нужны в этом проекте — их всегда можно включить обратно здесь же.")}</p>`;
+
+  const defaults = defaultLabels();
+  const hidden = new Set(await getHiddenTabs());
+
+  const grid = document.createElement("div");
+  grid.className = "labels-grid";
+
+  for (const key of HIDEABLE_TABS) {
+    const row = document.createElement("label");
+    row.style.cssText = "display:flex;align-items:center;gap:10px;padding:6px 0;cursor:pointer;";
+
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.checked = !hidden.has(key);
+    checkbox.addEventListener("change", () => setTabHidden(key, !checkbox.checked));
+    row.appendChild(checkbox);
+
+    const caption = document.createElement("span");
+    caption.textContent = defaults.nav[key] || key;
+    row.appendChild(caption);
+
+    grid.appendChild(row);
+  }
+
+  section.appendChild(grid);
   return section;
 }
 
