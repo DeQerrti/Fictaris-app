@@ -1,9 +1,50 @@
 // Связный тестовый сюжет для кнопки «Заполнить примером» — по духу
-// демо из брифа ("Хроники Раскола Троп"), но без карты (модуля карты
-// пока нет): персонажи, локации, связи, фракции, таймлайн, доска и
-// пара глав рукописи, всё ссылается друг на друга.
+// демо из брифа ("Хроники Раскола Троп"): персонажи, локации, связи,
+// фракции, таймлайн, доска, карта и пара глав рукописи, всё ссылается
+// друг на друга. Раньше карта сюда не входила (заполняла все вкладки,
+// кроме неё) — теперь функция асинхронная: рисует холст-заглушку и
+// заливает его через /api/map/image, как обычная загрузка картинки
+// пользователем, а map.json ссылается на полученный путь.
+import { apiPost } from "./api.js";
 
-export function buildDemoBundle() {
+// Простая карта-заглушка, нарисованная на <canvas> — тот же приём, что
+// в image-compress.js: рисуем, берём dataURL, отрезаем префикс до base64.
+// Реального изображения-подложки не нужно: смысл демо-карты в метках,
+// а не в художественной ценности фона.
+function buildDemoMapImage() {
+  const canvas = document.createElement("canvas");
+  canvas.width = 1200;
+  canvas.height = 800;
+  const ctx = canvas.getContext("2d");
+
+  const grad = ctx.createLinearGradient(0, 0, 1200, 800);
+  grad.addColorStop(0, "#e8d9b5");
+  grad.addColorStop(1, "#cdb583");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 1200, 800);
+
+  ctx.strokeStyle = "#6b5636";
+  ctx.lineWidth = 10;
+  ctx.strokeRect(16, 16, 1168, 768);
+
+  ctx.fillStyle = "#4a3b22";
+  ctx.font = "bold 42px serif";
+  ctx.textAlign = "center";
+  ctx.fillText("Побережье Раскола", 600, 90);
+
+  ctx.strokeStyle = "#8a744f";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(120, 620);
+  ctx.bezierCurveTo(300, 700, 500, 560, 700, 610);
+  ctx.bezierCurveTo(900, 660, 1000, 560, 1120, 600);
+  ctx.stroke();
+
+  const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+  return dataUrl.slice(dataUrl.indexOf(",") + 1);
+}
+
+export async function buildDemoBundle() {
   const aster = { id: "demo-c-aster", name: "Астра Вирен", color: "#c9944a",
     role: "Изгнанная наследница", age: "24", appearance: "Шрам через бровь, серебряная прядь в чёрных волосах",
     personality: "Упряма, скрытна, верна немногим", motivation: "Вернуть себе Дом Вирен",
@@ -110,5 +151,22 @@ export function buildDemoBundle() {
     activeChapterId: "demo-ch-1",
   };
 
-  return { characters, locations, relationships, factions, timeline, board, manuscript };
+  const { path: mapImagePath } = await apiPost("/api/map/image", { data: buildDemoMapImage(), ext: "jpg" });
+  const map = {
+    rootIds: ["demo-map-coast"],
+    maps: {
+      "demo-map-coast": {
+        id: "demo-map-coast",
+        name: "Побережье Раскола",
+        imageRelPath: mapImagePath,
+        pins: [
+          { id: "demo-pin-fortress", x: 74, y: 22, label: fortress.name, note: "", characterId: null, locationId: fortress.id, linkedMapId: null },
+          { id: "demo-pin-capital", x: 28, y: 38, label: capital.name, note: "", characterId: null, locationId: capital.id, linkedMapId: null },
+          { id: "demo-pin-harbor", x: 46, y: 72, label: harbor.name, note: "", characterId: null, locationId: harbor.id, linkedMapId: null },
+        ],
+      },
+    },
+  };
+
+  return { characters, locations, relationships, factions, timeline, board, map, manuscript };
 }
