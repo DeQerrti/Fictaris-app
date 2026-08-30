@@ -9,7 +9,7 @@
 //    хранилища нет, оно пропало, или это первый запуск → экран приветствия
 // ══════════════════════════════════════════════
 
-import { app, BrowserWindow, dialog, shell, Menu } from "electron";
+import { app, BrowserWindow, dialog, shell, Menu, MenuItem } from "electron";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -358,6 +358,54 @@ async function bumpZoom(deltaPercent) {
 // через win.removeMenu() отдельно для каждого окна (Windows/Linux; на
 // macOS полоса меню — часть системного меню наверху экрана, а не окна,
 // и её принято оставлять).
+// ── Контекстное меню по правой кнопке ────────────
+// В отличие от обычного окна Chrome, Electron НЕ показывает системное
+// меню Вырезать/Копировать/Вставить сам по себе — это нужно собрать
+// вручную через событие "context-menu" на webContents. Раньше его не
+// было вовсе, поэтому правая кнопка в рукописи (и вообще где угодно —
+// поле названия главы, заметки автора и т.д.) ничего не делала.
+// Собираем то же самое, что у любого текстового редактора (Word,
+// Obsidian — тоже Electron-приложение — браузеры): подсказки
+// орфографии сверху (Electron проверяет её сам, если включён spellcheck
+// в сессии — включён по умолчанию), затем Отменить/Повторить,
+// Вырезать/Копировать/Вставить/Выделить всё для полей ввода, и просто
+// «Копировать», если это не поле ввода, но есть выделенный текст.
+function buildContextMenu(webContents, params) {
+  const menu = new Menu();
+
+  if (params.misspelledWord) {
+    for (const suggestion of params.dictionarySuggestions.slice(0, 6)) {
+      menu.append(new MenuItem({ label: suggestion, click: () => webContents.replaceMisspelling(suggestion) }));
+    }
+    if (params.dictionarySuggestions.length) menu.append(new MenuItem({ type: "separator" }));
+    menu.append(
+      new MenuItem({
+        label: "Добавить в словарь",
+        click: () => webContents.session.addWordToSpellCheckerDictionary(params.misspelledWord),
+      })
+    );
+    menu.append(new MenuItem({ type: "separator" }));
+  }
+
+  if (params.isEditable) {
+    menu.append(new MenuItem({ label: "Отменить", role: "undo", enabled: params.editFlags.canUndo }));
+    menu.append(new MenuItem({ label: "Повторить", role: "redo", enabled: params.editFlags.canRedo }));
+    menu.append(new MenuItem({ type: "separator" }));
+    menu.append(new MenuItem({ label: "Вырезать", role: "cut", enabled: params.editFlags.canCut }));
+    menu.append(new MenuItem({ label: "Копировать", role: "copy", enabled: params.editFlags.canCopy }));
+    menu.append(new MenuItem({ label: "Вставить", role: "paste", enabled: params.editFlags.canPaste }));
+    menu.append(
+      new MenuItem({ label: "Вставить без форматирования", role: "pasteAndMatchStyle", enabled: params.editFlags.canPaste })
+    );
+    menu.append(new MenuItem({ type: "separator" }));
+    menu.append(new MenuItem({ label: "Выделить всё", role: "selectAll", enabled: params.editFlags.canSelectAll }));
+  } else if (params.selectionText) {
+    menu.append(new MenuItem({ label: "Копировать", role: "copy" }));
+  }
+
+  if (menu.items.length) menu.popup({ window: win });
+}
+
 function buildMenu() {
   Menu.setApplicationMenu(
     Menu.buildFromTemplate([
@@ -407,6 +455,7 @@ function createWindow() {
     return { action: "deny" };
   });
   win.webContents.on("did-finish-load", () => applyZoom(config.zoom ?? 100));
+  win.webContents.on("context-menu", (_event, params) => buildContextMenu(win.webContents, params));
 
   // Дать автосинхронизации (app/js/sync.js) недолго доработать перед
   // закрытием окна — закрыв Fictaris, человек с большой вероятностью не
