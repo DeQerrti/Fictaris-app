@@ -98,6 +98,17 @@ function applyOverrides(skin, accent) {
   style.textContent = `:root { --accent: ${accent}; --accent-hover: ${hover}; }`;
 }
 
+// Сообщает окну Electron, в какие цвета красить кнопки
+// свернуть/развернуть/закрыть (electron/chrome.js) — рамка рисуется
+// системой, а не CSS, поэтому её не перекрасить обычными стилями. На
+// вебе/телефоне такого адреса нет — тихий catch, это не ошибка.
+function syncTitleBarColors(skin) {
+  const cs = getComputedStyle(document.documentElement);
+  const bg = cs.getPropertyValue("--bg").trim();
+  const symbol = cs.getPropertyValue("--text-dim").trim();
+  apiPost("/api/app/set-titlebar-colors", { bg, symbol, skin }).catch(() => {});
+}
+
 export async function applyTheme() {
   let settings = {};
   try {
@@ -119,6 +130,7 @@ export async function applyTheme() {
   } catch {
     // приватный режим/квота — не страшно, это только кэш для FOUC
   }
+  syncTitleBarColors(skin);
   return { theme: skin, accent: settings.accent || null };
 }
 
