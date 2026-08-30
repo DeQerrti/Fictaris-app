@@ -19,6 +19,7 @@ import { initProjectSwitcher } from "./project-switcher.js";
 import { initUpdateBanner } from "./update-banner.js";
 import { applyTheme } from "./theme.js";
 import { applyLabels } from "./labels.js";
+import { applyTabVisibility, getHiddenTabs } from "./visibility.js";
 import { initSearch, openSearch } from "./search.js";
 import { initShortcuts, loadShortcuts } from "./shortcuts.js";
 import { maybeShowOnboarding } from "./onboarding.js";
@@ -75,6 +76,17 @@ document.addEventListener("fictaris:open-character", (e) => {
   openModule("characters", e.detail.id);
 });
 
+// Граф проекта (graph.js) держит персонажей, локаций и фракций в одном
+// SVG — при клике на узел нужно открыть три разных модуля одним и тем
+// же обработчиком, поэтому отдельное общее событие с типом сущности,
+// а не переиспользование fictaris:open-character (та завязана именно
+// на модуль «Персонажи» и используется @упоминаниями в тексте главы).
+const ENTITY_MODULES = { character: "characters", location: "locations", faction: "factions" };
+document.addEventListener("fictaris:open-entity", (e) => {
+  const module = ENTITY_MODULES[e.detail.type];
+  if (module) openModule(module, e.detail.id);
+});
+
 const trashBadge = document.getElementById("trashBadge");
 async function refreshTrashBadge() {
   const n = await trashCount().catch(() => 0);
@@ -86,6 +98,7 @@ async function boot() {
   await loadLang(); // до всего остального — applyLabels и любой другой i18n() ниже должны видеть уже загруженный язык
   applyTheme(); // независимо от info — кэш уже применён инлайн-скриптом, здесь только свежие данные
   applyLabels();
+  applyTabVisibility();
   loadShortcuts();
   const searchTriggerText = document.getElementById("searchTrigger").childNodes[0];
   if (searchTriggerText) searchTriggerText.textContent = `${i18n("🔍 Поиск")} `;
@@ -94,7 +107,11 @@ async function boot() {
     location.href = "/welcome";
     return;
   }
-  openModule("manuscript");
+  const hidden = await getHiddenTabs();
+  const defaultModule = hidden.includes("manuscript")
+    ? Object.keys(MODULES).find((key) => key !== "settings" && !hidden.includes(key)) || "settings"
+    : "manuscript";
+  openModule(defaultModule);
   refreshTrashBadge();
   initProjectSwitcher();
   maybeShowOnboarding({ onFillDemo: fillWithDemoData });
