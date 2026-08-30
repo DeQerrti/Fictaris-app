@@ -45,16 +45,13 @@ export async function renderSettings(root) {
 
   const TABS = [
     ["appearance", () => i18n("Оформление"), () => buildAppearanceSection()],
-    ["language", () => i18n("Язык"), () => buildLanguageSection()],
-    ["editor", () => i18n("Редактор"), () => buildEditorSection()],
+    ["app", () => i18n("Приложение"), () => buildAppSection(info)],
     ["labels", () => i18n("Подписи интерфейса"), () => buildLabelsSection()],
     ["shortcuts", () => i18n("Горячие клавиши"), () => buildShortcutsSection()],
     ["tags", () => i18n("Теги"), () => buildTagsSection()],
     ["calendar", () => i18n("Календарь"), () => buildCalendarSection()],
     ["sync", () => i18n("Синхронизация"), () => buildSyncSection()],
     ["data", () => i18n("Данные"), () => buildDataSections()],
-    ["updates", () => i18n("Обновления"), () => buildUpdateSection(info)],
-    ["about", () => i18n("О приложении"), () => buildAboutSection(info)],
   ];
   if (!TABS.some(([key]) => key === activeSettingsTab)) activeSettingsTab = "appearance";
 
@@ -140,7 +137,20 @@ async function buildAppearanceSection() {
   return section;
 }
 
-// ── Язык ──────────────────────────────────────
+// ── Приложение ────────────────────────────────
+// Язык, масштаб окна, обновления и «о приложении» были четырьмя
+// отдельными вкладками, хотя в каждой — по одной небольшой секции.
+// Слиты в одну «Приложение» по тому же принципу, что и «Данные»
+// (data-panel.js): несколько секций внутри одной вкладки, а не пункт
+// сайдбара на каждую мелочь. Масштаб раньше жил на вкладке «Редактор»
+// вместе с размером шрифта; шрифт переехал в саму главу (manuscript.js,
+// шапка редактора) — он про то, что читаешь прямо сейчас, а не про
+// приложение целиком, — и вкладка «Редактор» с одним лишь масштабом
+// внутри стала не нужна отдельным пунктом.
+async function buildAppSection(info) {
+  return [buildLanguageSection(), await buildZoomSection(), buildUpdateSection(info), buildAboutSection(info)];
+}
+
 // Переводится оболочка приложения (навигация, настройки, данные,
 // поиск, первый запуск, уведомления об обновлении) — формы внутри
 // модулей (Персонажи/Локации/Таймлайн и т.д.) пока остаются на
@@ -169,16 +179,14 @@ function buildLanguageSection() {
   return section;
 }
 
-// ── Редактор ──────────────────────────────────
-// Размер шрифта переехал в саму главу (manuscript.js, шапка редактора) —
-// это настройка того, что читаешь прямо сейчас, а не приложения в
-// целом, и логичнее видеть/менять её рядом с текстом, а не в отдельном
-// экране. Тут остаётся масштаб всего окна — он не про главу, а про
-// приложение целиком, так что при переезде правильно бы было тут.
-async function buildEditorSection() {
+// ── Масштаб ───────────────────────────────────
+// Масштаб всего окна приложения — не про главу и не про рукопись,
+// поэтому остался среди общих настроек приложения, а не уехал вместе
+// с размером шрифта в manuscript.js.
+async function buildZoomSection() {
   const section = document.createElement("div");
   section.className = "data-section";
-  section.innerHTML = `<h3>${i18n("Редактор")}</h3><p>${i18n("Масштаб окна приложения. Размер шрифта в тексте главы — в шапке самой рукописи.")}</p>`;
+  section.innerHTML = `<h3>${i18n("Масштаб")}</h3><p>${i18n("Масштаб окна приложения.")}</p>`;
 
   const zoom = await apiGet("/api/app/zoom").catch(() => null);
   if (zoom) {
