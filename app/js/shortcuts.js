@@ -31,7 +31,7 @@ export function initShortcuts(onOpenModule) {
   document.addEventListener("keydown", (e) => {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     if (isTyping(e.target)) return;
-    if (e.key === "/" || e.key === "Escape") return; // свои обработчики (поиск и т.п.)
+    if (e.code === "Slash" || e.key === "Escape") return; // свои обработчики (поиск и т.п.)
     if (document.querySelector(".search-overlay:not(.hidden)")) return;
 
     for (const [module, binding] of Object.entries(customBindings)) {
