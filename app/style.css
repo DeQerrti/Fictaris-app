@@ -70,6 +70,14 @@ html, body {
    остаётся только сам текст. */
 body.focus-mode .sidebar { display: none; }
 
+.brand-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding-right: 4px;
+}
+
 .brand {
   font-family: Fraunces, Georgia, serif;
   font-weight: 600;
@@ -78,9 +86,38 @@ body.focus-mode .sidebar { display: none; }
   padding: 6px 10px 4px;
 }
 
+/* Значок настроек — чуть правее названия приложения, вместо отдельного
+   текстового пункта в общем списке разделов (см. main.js: сознательно
+   не .nav-item, чтобы не сбивать нумерацию цифровых горячих клавиш). */
+.settings-btn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  color: var(--text-dim);
+  font-size: 1.05rem;
+  cursor: pointer;
+}
+
+.settings-btn:hover { color: var(--text); background: var(--panel); }
+
+.settings-btn.active {
+  color: var(--accent-hover);
+  background: var(--panel);
+}
+
+/* Переключатель проекта теперь в самом низу сайдбара, под «Корзиной» —
+   верхняя граница отделяет его от списка разделов над ним. */
 .project-switcher {
   position: relative;
-  padding: 0 10px 16px;
+  margin-top: 8px;
+  padding: 14px 10px 12px;
+  border-top: 1px solid var(--border);
 }
 
 .project-current {
@@ -565,11 +602,33 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
 .font-size-btn.active { background: var(--accent); border-color: var(--accent); color: var(--panel); font-weight: 600; }
 
 /* ── Подписи интерфейса ────────────────────── */
+/* Ряд — только глазик (видимость) и само поле ввода (подпись); никакой
+   подписи слева нет, само поле и есть подпись раздела. */
 
-.labels-grid { display: grid; grid-template-columns: 160px 1fr; gap: 8px 12px; align-items: center; margin-bottom: 14px; max-width: 480px; }
-.label-row { display: contents; }
-.label-row-caption { color: var(--text-dim); font-size: 0.85rem; }
+.labels-grid { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; max-width: 420px; }
+.label-row { display: flex; align-items: center; gap: 8px; }
+
+.label-row-eye {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  line-height: 1;
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 0.95rem;
+  cursor: pointer;
+  border-radius: 5px;
+}
+
+.label-row-eye:hover { background: var(--panel); }
+
+.label-row.label-row-hidden .label-row-eye { color: var(--text-faint); }
+.label-row.label-row-hidden input[type="text"] { color: var(--text-faint); border-style: dashed; }
+
 .label-row input[type="text"] {
+  flex: 1;
   padding: 6px 10px;
   border-radius: 6px;
   border: 1px solid var(--border);
