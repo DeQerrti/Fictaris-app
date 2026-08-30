@@ -155,11 +155,15 @@ export async function openSearch() {
 export function initSearch(navigate) {
   onNavigate = navigate;
   document.addEventListener("keydown", (e) => {
+    // Физическая клавиша (e.code), а не символ (e.key) — по той же
+    // причине, что и в shortcuts.js: на русской раскладке та же клавиша
+    // отдаёт в e.key не "/", а "." (она стоит на месте точки), и поиск
+    // молча переставал бы открываться при переключении раскладки.
     // "/" открывает поиск — но не когда фокус уже в поле ввода/тексте
     // главы, иначе там нельзя было бы напечатать сам слэш.
     const tag = document.activeElement?.tagName;
     const typing = tag === "INPUT" || tag === "TEXTAREA" || document.activeElement?.isContentEditable;
-    if (e.key === "/" && !typing) {
+    if (e.code === "Slash" && !e.ctrlKey && !e.metaKey && !e.altKey && !typing) {
       e.preventDefault();
       openSearch();
     }
