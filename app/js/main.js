@@ -47,6 +47,11 @@ const navItems = document.querySelectorAll(".nav-item");
 const appEl = document.getElementById("app");
 const sidebarToggle = document.getElementById("sidebarToggle");
 const sidebarBackdrop = document.getElementById("sidebarBackdrop");
+// Настройки — отдельная кнопка-значок рядом с названием, а не пункт
+// в общем списке .nav-item: иначе она встряла бы первой в DOM-порядке
+// и сбила нумерацию цифровых горячих клавиш 1–9 (shortcuts.js), которые
+// считают именно по .nav-item.
+const settingsBtn = document.getElementById("settingsBtn");
 
 async function openModule(name, arg) {
   // Фокус-режим рукописи прячет сайдбар классом на body (manuscript.js) —
@@ -54,6 +59,7 @@ async function openModule(name, arg) {
   // страницы, скрывшей навигацию, можно было бы только через Esc.
   document.body.classList.remove("focus-mode");
   navItems.forEach((btn) => btn.classList.toggle("active", btn.dataset.module === name));
+  settingsBtn.classList.toggle("active", name === "settings");
   content.innerHTML = "";
   await MODULES[name](content, arg);
   appEl.classList.remove("sidebar-open"); // на телефоне — сайдбар выезжающий, после выбора закрываем
@@ -62,6 +68,7 @@ async function openModule(name, arg) {
 navItems.forEach((btn) => {
   btn.addEventListener("click", () => openModule(btn.dataset.module));
 });
+settingsBtn.addEventListener("click", () => openModule("settings"));
 
 sidebarToggle.addEventListener("click", () => appEl.classList.toggle("sidebar-open"));
 sidebarBackdrop.addEventListener("click", () => appEl.classList.remove("sidebar-open"));
