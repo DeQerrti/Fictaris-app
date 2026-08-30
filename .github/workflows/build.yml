@@ -24,8 +24,8 @@ jobs:
     name: Проверки
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -56,8 +56,8 @@ jobs:
             target: linux
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -69,7 +69,7 @@ jobs:
           # этой переменной electron-builder попробует подписать сам и
           # упадёт на отсутствующем сертификате.
           CSC_IDENTITY_AUTO_DISCOVERY: false
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           # По тегу имя релиза берётся из него самого; при ручном запуске
           # тега нет, поэтому версию спрашиваем во входных данных.
@@ -91,14 +91,14 @@ jobs:
       contents: write
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
       # Android собирается Gradle, а Gradle — это Java. На готовых
       # машинах GitHub сам Android SDK уже стоит, ставить нужно только её.
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: 21
@@ -120,7 +120,7 @@ jobs:
           version=${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
           mkdir -p dist
           cp android/app/build/outputs/apk/debug/app-debug.apk "dist/Fictaris-${version#v}.apk"
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', inputs.version) || github.ref_name }}
           files: dist/*.apk
