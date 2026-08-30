@@ -90,7 +90,7 @@ export const EN_DICT = {
   "Новая колонка": "New column",
   "Шаблон структуры…": "Structure template…",
   "Применить": "Apply",
-  "Заменит все колонки. Точно?": "This will replace all columns. Sure?",
+  "Удалит все карточки и колонки. Точно?": "This will delete all cards and columns. Sure?",
   "Три акта": "Three acts",
   "Завязка": "Setup",
   "Развитие": "Confrontation",
@@ -107,6 +107,7 @@ export const EN_DICT = {
   "+ Карточка": "+ Card",
   "Новая карточка": "New card",
   "Без метки": "No label",
+  "Заметки…": "Notes…",
   "Без персонажа": "No character",
 
   // ── Карта (map.js) ──
@@ -339,7 +340,7 @@ export const EN_DICT = {
   "Данные": "Data",
 
   // ── Поиск (search.js) ──
-  "🔍 Поиск": "🔍 Search",
+  "Поиск": "Search",
   "Персонажи, локации, фракции, таймлайн, рукопись…": "Characters, locations, factions, timeline, manuscript…",
   "Ничего не найдено": "Nothing found",
   "Без названия": "Untitled",
@@ -349,6 +350,12 @@ export const EN_DICT = {
   "Событие": "Event",
   "Глава": "Chapter",
   "Карточка": "Card",
+
+  // ── Сайдбар (sidebar.js) ──
+  "Меню закреплено — нажми, чтобы сворачивать его и разворачивать по наведению":
+    "Menu is pinned — click to make it collapse and expand on hover",
+  "Меню сворачивается — нажми, чтобы закрепить его открытым":
+    "Menu auto-collapses — click to pin it open",
 
   // ── Первый запуск (onboarding.js) ──
   "Добро пожаловать в Fictaris": "Welcome to Fictaris",
