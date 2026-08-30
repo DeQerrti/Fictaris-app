@@ -16,6 +16,7 @@ import { fileURLToPath } from "node:url";
 import { Vault } from "./vault.js";
 import { createServer, listen } from "./server.js";
 import { findUpdate, openDownload } from "./update.js";
+import { titleBarOptions, titleBarCss, overlayColors } from "./chrome.js";
 // Именно так, а не `import { autoUpdater } from "electron-updater"` — см.
 // тот же приём и тот же комментарий в electron/main.js у TasteID:
 // electron-updater — модуль CommonJS, и в упакованном app.asar именованный
@@ -232,6 +233,18 @@ function appRoutes() {
       if (vault) await shell.openPath(vault.root);
       return { ok: true };
     },
+
+    // Тему можно сменить и без перезагрузки страницы (Настройки →
+    // Оформление) — did-finish-load тогда не срабатывает, а рамка иначе
+    // так и осталась бы в цветах темы, с которой открылось окно.
+    "POST /api/app/set-titlebar-colors": async ({ body }) => {
+      applyTitleBarColors(body.bg, body.symbol);
+      if (isHexColor(body.bg)) {
+        const skin = body.skin === "light" ? "light" : "dark";
+        if (skin !== config.skin) await saveConfig({ skin });
+      }
+      return { ok: true };
+    },
   };
 }
 
@@ -334,13 +347,23 @@ function checkForUpdates() {
   });
 }
 
-// ── Масштаб и меню ───────────────────────────────
+// ── Масштаб, меню и рамка ────────────────────────
 // Раньше в v1 меню не было вовсе (Menu.setApplicationMenu(null)) — без
-// него не работали ни зум, ни F5, ни девтулы, а системная рамка окна и
-// так уже осталась (в отличие от безрамочного TasteID), так что своя
-// полоса меню сюда встаёт без лишней возни с electron/chrome.js.
+// него не работали ни зум, ни F5, ни девтулы.
 function applyZoom(percent) {
   win?.webContents.setZoomFactor(percent / 100);
+}
+
+const isHexColor = (v) => /^#[0-9a-f]{6}$/i.test(v || "");
+
+// Красит кнопки свернуть/развернуть/закрыть в переданные цвета — вызывается
+// и с посчитанными на did-finish-load (по вычисленным --bg/--text-dim
+// страницы), и с тем, что страница сама прислала при живой смене темы без
+// перезагрузки (см. POST /api/app/set-titlebar-colors в appRoutes).
+function applyTitleBarColors(bg, symbol) {
+  if (!win || process.platform === "darwin" || !win.setTitleBarOverlay) return;
+  if (!isHexColor(bg) || !isHexColor(symbol)) return;
+  win.setTitleBarOverlay(titleBarOptions(process.platform, { bg, symbol }).titleBarOverlay);
 }
 
 async function bumpZoom(deltaPercent) {
@@ -406,6 +429,9 @@ function buildContextMenu(webContents, params) {
   if (menu.items.length) menu.popup({ window: win });
 }
 
+// Полоса меню (Файл/Вид) — только ради акселераторов зума/F5/девтулов,
+// сама себя не показывает поверх контента. Рамку окна рисует
+// electron/chrome.js — своя, в цветах темы, как у TasteID.
 function buildMenu() {
   Menu.setApplicationMenu(
     Menu.buildFromTemplate([
@@ -445,7 +471,8 @@ function createWindow() {
     minWidth: 480,
     minHeight: 560,
     show: false,
-    backgroundColor: "#14110d",
+    backgroundColor: overlayColors(config.skin).bg,
+    ...titleBarOptions(process.platform, overlayColors(config.skin)),
     webPreferences: { nodeIntegration: false, contextIsolation: true, sandbox: true },
   });
   win.once("ready-to-show", () => win.show());
@@ -454,7 +481,42 @@ function createWindow() {
     shell.openExternal(url);
     return { action: "deny" };
   });
-  win.webContents.on("did-finish-load", () => applyZoom(config.zoom ?? 100));
+
+  // Полосу для перетаскивания вставляем на каждую загрузку страницы (и
+  // главного экрана, и /welcome) — dom-ready, а не did-finish-load: тот
+  // срабатывает уже после первой отрисовки, и страница на мгновение
+  // успевала бы нарисоваться без отступа сверху, а потом резко просесть
+  // вниз при подстановке CSS.
+  win.webContents.on("dom-ready", () => {
+    win.webContents.insertCSS(titleBarCss()).catch(() => {});
+  });
+
+  win.webContents.on("did-finish-load", async () => {
+    applyZoom(config.zoom ?? 100);
+    // Тему выбирают внутри приложения, а цвет кнопок окна рисует
+    // система — подхватываем его после загрузки по вычисленным цветам
+    // страницы, чтобы рамка не осталась в цветах предыдущей темы (и
+    // совпадала даже с акцентом, перекрашенным вручную).
+    try {
+      const { skin, bg, symbol } = await win.webContents.executeJavaScript(`
+        (() => {
+          const cs = getComputedStyle(document.documentElement);
+          return {
+            skin: document.documentElement.dataset.skin || "dark",
+            bg: cs.getPropertyValue("--bg").trim(),
+            symbol: cs.getPropertyValue("--text-dim").trim(),
+          };
+        })()
+      `);
+      if (skin !== config.skin) await saveConfig({ skin });
+      if (isHexColor(bg) && isHexColor(symbol)) applyTitleBarColors(bg, symbol);
+      else applyTitleBarColors(overlayColors(skin).bg, overlayColors(skin).symbol);
+    } catch {
+      // Экран приветствия (нет data-skin/CSS-переменных) или страница ещё
+      // не дочитала тему — рамка остаётся в цветах по умолчанию, и это не
+      // повод падать.
+    }
+  });
   win.webContents.on("context-menu", (_event, params) => buildContextMenu(win.webContents, params));
 
   // Дать автосинхронизации (app/js/sync.js) недолго доработать перед
