@@ -133,6 +133,10 @@ export const EN_DICT = {
   "Добавь персонажей, локаций или фракций, чтобы увидеть граф проекта.":
     "Add characters, locations or factions to see the project graph.",
   "Локации/фракции — цвет по типу": "Locations/factions — colored by type",
+  "Размер шрифта в тексте главы": "Chapter text font size",
+  "Тащи узлы мышью, крути колесо для зума, клик открывает карточку":
+    "Drag nodes with your mouse, scroll to zoom, click a node to open its card",
+  "Сбросить вид": "Reset view",
 
   // ── Проверка (continuity.js) ──
   "Связь «{label}» ссылается на несуществующего персонажа": "The relationship “{label}” refers to a character that doesn't exist",
@@ -400,9 +404,14 @@ export const EN_DICT = {
   "English": "English",
 
   "Редактор": "Editor",
-  "Размер шрифта в тексте главы.": "Font size for chapter text.",
+  "Масштаб окна приложения. Размер шрифта в тексте главы — в шапке самой рукописи.":
+    "App window zoom. Chapter text font size is now in the manuscript editor's own header.",
   "Масштаб окна: ": "Window zoom: ",
   "100%": "100%",
+
+  "Разделы": "Sections",
+  "Скрой из сайдбара те разделы, которые не нужны в этом проекте — их всегда можно включить обратно здесь же.":
+    "Hide sidebar sections you don't need for this project — you can always turn them back on here.",
 
   "Подписи интерфейса": "Interface labels",
   "Переименуй пункты меню под свою терминологию — применяется сразу, без перезагрузки.":
