@@ -33,17 +33,27 @@ export function defaultLabels() {
       stats: i18n("Статистика"),
       continuity: i18n("Проверка"),
       trash: i18n("Корзина"),
-      settings: i18n("⚙ Настройки"),
+      settings: i18n("⚙"),
     },
   };
 }
 
+// Название приложения и три служебных пункта (проверка, корзина,
+// настройки) не переименовываются — «Настройки» единственный путь
+// вернуть скрытые разделы обратно, а «Проверка»/«Корзина» держат
+// смысл, завязанный на их поведение (мусорная корзина, отчёт
+// целостности), а не просто подпись. Список тот же, что и в
+// visibility.js для HIDEABLE_TABS, но независимый: скрытие и
+// переименование — разные права, и об этом не должен знать один
+// модуль ради другого.
+const LOCKED_NAV_KEYS = ["settings", "continuity", "trash"];
+
 function mergeLabels(overrides) {
   const defaults = defaultLabels();
   const merged = { brand: defaults.brand, nav: { ...defaults.nav } };
-  if (typeof overrides?.brand === "string" && overrides.brand.trim()) merged.brand = overrides.brand.trim();
   if (overrides?.nav) {
     for (const key of Object.keys(merged.nav)) {
+      if (LOCKED_NAV_KEYS.includes(key)) continue;
       if (typeof overrides.nav[key] === "string" && overrides.nav[key].trim()) {
         merged.nav[key] = overrides.nav[key].trim();
       }
@@ -79,8 +89,15 @@ export async function applyLabels() {
 export async function saveLabels(patch) {
   const settings = (await apiGet("/api/site-settings").catch(() => ({}))) || {};
   const nextLabels = { ...settings.labels };
-  if (patch.brand !== undefined) nextLabels.brand = patch.brand;
-  if (patch.nav) nextLabels.nav = { ...settings.labels?.nav, ...patch.nav };
+  // brand и LOCKED_NAV_KEYS игнорируются здесь же, а не только в UI —
+  // на случай прямого вызова saveLabels() в обход настроек.
+  if (patch.nav) {
+    const nav = { ...settings.labels?.nav };
+    for (const [key, value] of Object.entries(patch.nav)) {
+      if (!LOCKED_NAV_KEYS.includes(key)) nav[key] = value;
+    }
+    nextLabels.nav = nav;
+  }
   await apiPost("/api/site-settings", { ...settings, labels: nextLabels });
   return applyLabels();
 }
