@@ -45,7 +45,6 @@ export async function renderSettings(root) {
 
   const TABS = [
     ["appearance", () => i18n("Оформление"), () => buildAppearanceSection()],
-    ["sections", () => i18n("Разделы"), () => buildSectionsSection()],
     ["language", () => i18n("Язык"), () => buildLanguageSection()],
     ["editor", () => i18n("Редактор"), () => buildEditorSection()],
     ["labels", () => i18n("Подписи интерфейса"), () => buildLabelsSection()],
@@ -230,58 +229,30 @@ async function buildEditorSection() {
   return section;
 }
 
-// ── Разделы ───────────────────────────────────
-// «В настройках должна быть возможность скрыть любую вкладку» — список
-// тех же пунктов, что и в сайдбаре (HIDEABLE_TABS, visibility.js), без
-// «Настроек» самих себя — иначе можно случайно спрятать единственный
-// путь всё вернуть обратно. Переключение применяется сразу же, без
-// отдельной кнопки «Сохранить».
-async function buildSectionsSection() {
+// ── Подписи интерфейса ─────────────────────────
+// Разделы («Разделы») и подписи («Подписи интерфейса») были двумя
+// отдельными вкладками с одинаковым списком пунктов — одна прятала,
+// другая переименовывала. Слиты в одну: слева от каждого поля глазик
+// прячет/возвращает раздел (HIDEABLE_TABS, visibility.js), само поле —
+// это и есть подпись, отдельной подписи-каптона рядом больше нет.
+// Название приложения и три служебных пункта (настройки, проверка,
+// корзина) сюда не попадают — их нельзя ни переименовать, ни спрятать
+// (см. LOCKED_NAV_KEYS в labels.js и комментарий в visibility.js).
+async function buildLabelsSection() {
   const section = document.createElement("div");
   section.className = "data-section";
-  section.innerHTML = `<h3>${i18n("Разделы")}</h3><p>${i18n("Скрой из сайдбара те разделы, которые не нужны в этом проекте — их всегда можно включить обратно здесь же.")}</p>`;
+  section.innerHTML = `<h3>${i18n("Подписи интерфейса")}</h3><p>${i18n("Переименуй пункты меню под свою терминологию — применяется сразу. Глазик слева прячет раздел из сайдбара, если он не нужен в этом проекте.")}</p>`;
 
   const defaults = defaultLabels();
+  const current = window.SITE_LABELS || defaults;
   const hidden = new Set(await getHiddenTabs());
 
   const grid = document.createElement("div");
   grid.className = "labels-grid";
 
   for (const key of HIDEABLE_TABS) {
-    const row = document.createElement("label");
-    row.style.cssText = "display:flex;align-items:center;gap:10px;padding:6px 0;cursor:pointer;";
-
-    const checkbox = document.createElement("input");
-    checkbox.type = "checkbox";
-    checkbox.checked = !hidden.has(key);
-    checkbox.addEventListener("change", () => setTabHidden(key, !checkbox.checked));
-    row.appendChild(checkbox);
-
-    const caption = document.createElement("span");
-    caption.textContent = defaults.nav[key] || key;
-    row.appendChild(caption);
-
-    grid.appendChild(row);
-  }
-
-  section.appendChild(grid);
-  return section;
-}
-
-async function buildLabelsSection() {
-  const section = document.createElement("div");
-  section.className = "data-section";
-  section.innerHTML = `<h3>${i18n("Подписи интерфейса")}</h3><p>${i18n("Переименуй пункты меню под свою терминологию — применяется сразу, без перезагрузки.")}</p>`;
-
-  const defaults = defaultLabels();
-  const current = window.SITE_LABELS || defaults;
-  const grid = document.createElement("div");
-  grid.className = "labels-grid";
-
-  grid.appendChild(buildLabelRow(i18n("Название приложения"), defaults.brand, current.brand, (value) => saveLabels({ brand: value })));
-  for (const [key, defaultLabel] of Object.entries(defaults.nav)) {
     grid.appendChild(
-      buildLabelRow(defaultLabel, defaultLabel, current.nav[key], (value) => saveLabels({ nav: { [key]: value } }))
+      buildLabelRow(key, defaults.nav[key], current.nav[key], hidden.has(key), (value) => saveLabels({ nav: { [key]: value } }))
     );
   }
 
@@ -297,12 +268,23 @@ async function buildLabelsSection() {
   return section;
 }
 
-function buildLabelRow(caption, defaultValue, currentValue, onSave) {
+function buildLabelRow(key, defaultValue, currentValue, isHidden, onSave) {
   const row = document.createElement("div");
-  row.className = "label-row";
-  const label = document.createElement("span");
-  label.className = "label-row-caption";
-  label.textContent = caption;
+  row.className = "label-row" + (isHidden ? " label-row-hidden" : "");
+
+  const eyeBtn = document.createElement("button");
+  eyeBtn.type = "button";
+  eyeBtn.className = "label-row-eye";
+  eyeBtn.textContent = isHidden ? "🙈" : "👁";
+  eyeBtn.title = isHidden ? i18n("Показать раздел") : i18n("Скрыть раздел");
+  eyeBtn.addEventListener("click", async () => {
+    isHidden = !isHidden;
+    await setTabHidden(key, isHidden);
+    row.classList.toggle("label-row-hidden", isHidden);
+    eyeBtn.textContent = isHidden ? "🙈" : "👁";
+    eyeBtn.title = isHidden ? i18n("Показать раздел") : i18n("Скрыть раздел");
+  });
+
   const input = document.createElement("input");
   input.type = "text";
   input.value = currentValue || defaultValue;
@@ -311,7 +293,8 @@ function buildLabelRow(caption, defaultValue, currentValue, onSave) {
     clearTimeout(timer);
     timer = setTimeout(() => onSave(input.value.trim() || defaultValue), 500);
   });
-  row.append(label, input);
+
+  row.append(eyeBtn, input);
   return row;
 }
 
@@ -455,6 +438,39 @@ function renderTagsManageList(list, merged, hidden, custom) {
         renderTagsManageList(list, merged, nextHidden, custom);
       });
       row.append(label, toggle);
+
+      // Удалить насовсем можно только свой тег — встроенный словарь
+      // (DEFAULT_TAGS_MAP, tags.js) задан в коде, его можно только
+      // спрятать, а не стереть из приложения. Тот же приём подтверждения
+      // в два клика, что и «Удалить навсегда» в корзине (trash.js) и
+      // удаление проекта (project-switcher.js) — не отдельный диалог, а
+      // требование нажать ещё раз в течение нескольких секунд.
+      if (custom[name]) {
+        const delBtn = document.createElement("button");
+        delBtn.className = "btn danger shortcut-clear";
+        delBtn.textContent = "🗑";
+        delBtn.title = i18n("Удалить тег навсегда");
+        delBtn.addEventListener("click", async () => {
+          if (delBtn.dataset.confirm === "1") {
+            const s = (await apiGet("/api/site-settings").catch(() => ({}))) || {};
+            const nextCustom = { ...s.customTags };
+            delete nextCustom[name];
+            const nextHidden = new Set(s.hiddenTags || []);
+            nextHidden.delete(name);
+            await apiPost("/api/site-settings", { ...s, customTags: nextCustom, hiddenTags: [...nextHidden] });
+            renderTagsManageList(list, { ...DEFAULT_TAGS_MAP, ...nextCustom }, nextHidden, nextCustom);
+            return;
+          }
+          delBtn.dataset.confirm = "1";
+          delBtn.textContent = i18n("Точно?");
+          setTimeout(() => {
+            delBtn.dataset.confirm = "";
+            delBtn.textContent = "🗑";
+          }, 3000);
+        });
+        row.appendChild(delBtn);
+      }
+
       group.appendChild(row);
     }
     list.appendChild(group);
