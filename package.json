@@ -29,11 +29,12 @@
     "esbuild": "^0.28.2"
   },
   "build": {
-    "appId": "ru.fictaris.app",
-    "productName": "Fictaris",
-    "directories": {
-      "output": "dist"
-    },
+  "appId": "ru.fictaris.app",
+  "productName": "Fictaris",
+  "artifactName": "Fictaris-Setup-${version}.${ext}",
+  "directories": {
+    "output": "dist"
+  },
     "files": [
       "app/**/*",
       "core/**/*",
