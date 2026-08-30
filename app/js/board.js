@@ -112,7 +112,14 @@ function buildTemplateBar() {
       return;
     }
     applyBtn.dataset.confirm = "1";
-    applyBtn.textContent = i18n("Заменит все колонки. Точно?");
+    // Шаблон — это не «переименовать колонки», а «начать доску заново»:
+    // старые колонки уйдут вместе со всеми карточками внутри них, без
+    // возможности восстановить (в отличие от удаления одной карточки —
+    // то через pushTrash). Раньше текст предупреждал только про колонки,
+    // и потерю карточек можно было принять за баг («применил шаблон — и
+    // всё пропало, шаблоны не работают»), а не за то, что и
+    // задумано.
+    applyBtn.textContent = i18n("Удалит все карточки и колонки. Точно?");
     setTimeout(() => {
       applyBtn.dataset.confirm = "";
       applyBtn.textContent = i18n("Применить");
@@ -234,6 +241,21 @@ function buildCard(card, colId) {
     persist();
   });
   el.appendChild(titleInput);
+
+  // Раньше в карточке помещалось только однострочное название — для
+  // самой сути сцены/задачи этого мало, приходилось держать подробности
+  // где-то отдельно. Заметки — необязательные, разворачиваются вручную
+  // (resize: vertical в style.css), не занимают места, пока пусты.
+  const notesArea = document.createElement("textarea");
+  notesArea.className = "board-card-notes";
+  notesArea.value = card.notes || "";
+  notesArea.placeholder = i18n("Заметки…");
+  notesArea.rows = 2;
+  notesArea.addEventListener("input", () => {
+    card.notes = notesArea.value;
+    persist();
+  });
+  el.appendChild(notesArea);
 
   const labelRow = document.createElement("div");
   labelRow.className = "card-label-row";
