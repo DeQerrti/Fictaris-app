@@ -12,6 +12,17 @@ const STATUSES = [
   ["done", "Готово"],
 ];
 
+// Размер шрифта текста главы — раньше жил в Настройках, отдельно от
+// того, что вообще-то настраивает («Настройки → Редактор» и сама глава,
+// которую читаешь, — не одно и то же место). Переехал в шапку
+// редактора: применяется через ту же CSS-переменную --editor-font-size
+// на :root (theme.js читает её при загрузке приложения, здесь — только
+// при живом изменении), значение по-прежнему общее на всё приложение,
+// не per-глава — сохраняется в site-settings.json, как и было.
+const FONT_SIZES = [15, 16, 17, 18, 20, 22];
+const DEFAULT_FONT_SIZE = 17;
+let editorFontSize = DEFAULT_FONT_SIZE;
+
 let manuscript = { chapters: [], activeChapterId: null };
 let characters = [];
 let viewMode = false;
@@ -72,7 +83,14 @@ document.addEventListener("keydown", (e) => {
 export async function renderManuscript(root, focusChapterId) {
   container = root;
   focusMode = false; // модуль всегда открывается в обычном виде, фокус — временное состояние сессии просмотра
-  [manuscript, characters] = await Promise.all([apiGet("/api/manuscript"), apiGet("/api/characters")]);
+  const [manuscriptData, charactersData, siteSettings] = await Promise.all([
+    apiGet("/api/manuscript"),
+    apiGet("/api/characters"),
+    apiGet("/api/site-settings").catch(() => ({})),
+  ]);
+  manuscript = manuscriptData;
+  characters = charactersData;
+  editorFontSize = FONT_SIZES.includes(siteSettings.editorFontSize) ? siteSettings.editorFontSize : DEFAULT_FONT_SIZE;
   if (!manuscript.chapters.length) {
     const c = blankChapter();
     manuscript.chapters = [c];
@@ -220,6 +238,26 @@ function buildEditor() {
     draw();
   });
   header.appendChild(focusBtn);
+
+  const fontSizeWrap = document.createElement("div");
+  fontSizeWrap.className = "font-size-row";
+  fontSizeWrap.title = i18n("Размер шрифта в тексте главы");
+  const fontButtons = new Map();
+  for (const size of FONT_SIZES) {
+    const sizeBtn = document.createElement("button");
+    sizeBtn.className = "btn font-size-btn" + (size === editorFontSize ? " active" : "");
+    sizeBtn.textContent = String(size);
+    sizeBtn.addEventListener("click", async () => {
+      editorFontSize = size;
+      fontButtons.forEach((b, s) => b.classList.toggle("active", s === size));
+      document.documentElement.style.setProperty("--editor-font-size", `${size}px`);
+      const s = (await apiGet("/api/site-settings").catch(() => ({}))) || {};
+      await apiPost("/api/site-settings", { ...s, editorFontSize: size });
+    });
+    fontButtons.set(size, sizeBtn);
+    fontSizeWrap.appendChild(sizeBtn);
+  }
+  header.appendChild(fontSizeWrap);
 
   const snapshotBtn = document.createElement("button");
   snapshotBtn.className = "btn";
