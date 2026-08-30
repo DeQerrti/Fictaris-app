@@ -182,6 +182,8 @@ body.focus-mode .sidebar { display: none; }
 
 .nav-item:hover { color: var(--text); background: var(--panel); }
 
+.nav-item-hidden { display: none; }
+
 .nav-item.active {
   color: var(--text);
   background: var(--panel);
@@ -1462,9 +1464,27 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 16px;
+  overflow: hidden;
 }
 
-.graph-holder svg g { transition: opacity 0.15s; }
+.graph-svg { cursor: grab; touch-action: none; }
+.graph-svg.panning { cursor: grabbing; }
+.graph-node { cursor: pointer; transition: opacity 0.15s; }
+.graph-holder svg text { pointer-events: none; user-select: none; }
+
+.graph-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  max-width: 920px;
+}
+
+.graph-hint {
+  font-size: 0.78rem;
+  color: var(--text-faint);
+}
 
 .graph-legend {
   display: flex;
