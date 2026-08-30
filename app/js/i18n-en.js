@@ -388,6 +388,8 @@ export const EN_DICT = {
   "Не удалось проверить обновления — нет сети или GitHub недоступен.": "Couldn't check for updates — no network or GitHub is unavailable.",
   "Проверка недоступна в режиме разработки (npm start).": "Not available in development mode (npm start).",
 
+  "Приложение": "App",
+
   "Оформление": "Appearance",
   "Тема и акцентный цвет — применяются сразу, без перезагрузки.": "Theme and accent color — applied instantly, no reload.",
   "Тёмная": "Dark",
@@ -403,9 +405,8 @@ export const EN_DICT = {
   "Русский": "Russian",
   "English": "English",
 
-  "Редактор": "Editor",
-  "Масштаб окна приложения. Размер шрифта в тексте главы — в шапке самой рукописи.":
-    "App window zoom. Chapter text font size is now in the manuscript editor's own header.",
+  "Масштаб": "Zoom",
+  "Масштаб окна приложения.": "App window zoom.",
   "Масштаб окна: ": "Window zoom: ",
   "100%": "100%",
 
@@ -494,8 +495,8 @@ export const EN_DICT = {
   "Отмена": "Cancel",
 
   "Заполнить примером": "Fill with example",
-  "Связный тестовый сюжет — персонажи, локации, связи, фракции, таймлайн, доска и две главы рукописи, чтобы сразу увидеть, как модули работают вместе.":
-    "A connected sample story — characters, locations, relationships, factions, timeline, board and two manuscript chapters, so you can see right away how the modules work together.",
+  "Связный тестовый сюжет — персонажи, локации, связи, фракции, таймлайн, доска, карта и две главы рукописи, чтобы сразу увидеть, как модули работают вместе.":
+    "A connected sample story — characters, locations, relationships, factions, timeline, board, map and two manuscript chapters, so you can see right away how the modules work together.",
   "Текущие данные будут заменены примером. Продолжить?": "Current data will be replaced with the example. Continue?",
 
   "История версий": "Version history",
