@@ -42,7 +42,7 @@ async function applyAll(bundle) {
 // «Заполнить примером» ниже, но без подтверждения: на первом запуске
 // заменять нечего, проект и так пуст.
 export async function fillWithDemoData() {
-  await applyAll(buildDemoBundle());
+  await applyAll(await buildDemoBundle());
   location.reload();
 }
 
@@ -223,7 +223,7 @@ function buildImportSection() {
 function buildDemoSection() {
   const section = document.createElement("div");
   section.className = "data-section";
-  section.innerHTML = `<h3>${i18n("Заполнить примером")}</h3><p>${i18n("Связный тестовый сюжет — персонажи, локации, связи, фракции, таймлайн, доска и две главы рукописи, чтобы сразу увидеть, как модули работают вместе.")}</p>`;
+  section.innerHTML = `<h3>${i18n("Заполнить примером")}</h3><p>${i18n("Связный тестовый сюжет — персонажи, локации, связи, фракции, таймлайн, доска, карта и две главы рукописи, чтобы сразу увидеть, как модули работают вместе.")}</p>`;
 
   const btn = document.createElement("button");
   btn.className = "btn";
@@ -231,7 +231,7 @@ function buildDemoSection() {
   const confirmBar = document.createElement("div");
   btn.addEventListener("click", () => {
     showConfirmBar(confirmBar, i18n("Текущие данные будут заменены примером. Продолжить?"), async () => {
-      await applyAll(buildDemoBundle());
+      await applyAll(await buildDemoBundle());
       location.reload();
     });
   });
