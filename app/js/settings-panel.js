@@ -7,6 +7,7 @@ import { defaultLabels, saveLabels, resetLabels } from "./labels.js";
 import { HIDEABLE_TABS, getHiddenTabs, setTabHidden, getTabOrder, setTabOrder } from "./visibility.js";
 import { captureKey, saveShortcut, clearShortcut } from "./shortcuts.js";
 import { DEFAULT_TAGS_MAP, CATEGORY_LABELS, parseTags, stringifyTags } from "./tags.js";
+import { DEFAULT_STATUSES, loadStatuses, saveStatuses, buildStatusDot } from "./chapter-status.js";
 import { defaultMonths, loadCalendar, saveCalendar } from "./calendar.js";
 import {
   getSyncConfig,
@@ -50,6 +51,7 @@ export async function renderSettings(root) {
     ["labels", () => i18n("Подписи интерфейса"), () => buildLabelsSection()],
     ["shortcuts", () => i18n("Горячие клавиши"), () => buildShortcutsSection()],
     ["tags", () => i18n("Теги"), () => buildTagsSection()],
+    ["statuses", () => i18n("Статусы глав"), () => buildStatusesSection()],
     ["calendar", () => i18n("Календарь"), () => buildCalendarSection()],
     ["sync", () => i18n("Синхронизация"), () => buildSyncSection()],
     ["data", () => i18n("Данные"), () => buildDataSections()],
@@ -603,6 +605,126 @@ function renderTagsManageList(list, merged, hidden, custom) {
       group.appendChild(row);
     }
     list.appendChild(group);
+  }
+}
+
+// ── Статусы глав и папок ──────────────────────
+// Раньше три статуса (Черновик/На редактуре/Готово) были зашиты кодом —
+// теперь настраиваемый список (chapter-status.js), общий для глав и
+// папок рукописи (manuscript.js). Тот же приём подтверждения удаления в
+// два клика, что и у тегов выше.
+
+async function buildStatusesSection() {
+  const section = document.createElement("div");
+  section.className = "data-section";
+  section.innerHTML = `<h3>${i18n("Статусы глав")}</h3><p>${i18n("Переименуй, задай свой цвет или смайлик вместо цвета — статусы глав и папок в «Рукописи».")}</p>`;
+
+  const list = document.createElement("div");
+  list.className = "tags-manage-list";
+  const statuses = await loadStatuses();
+  renderStatusesList(list, statuses);
+  section.appendChild(list);
+
+  const addBtn = document.createElement("button");
+  addBtn.className = "btn";
+  addBtn.textContent = i18n("Добавить статус");
+  addBtn.addEventListener("click", async () => {
+    const current = await loadStatuses();
+    const next = [...current, { key: `status-${Date.now()}`, label: i18n("Новый статус"), color: "#7c7157", emoji: "" }];
+    await saveStatuses(next);
+    renderStatusesList(list, next);
+  });
+  section.appendChild(addBtn);
+
+  const resetBtn = document.createElement("button");
+  resetBtn.className = "btn";
+  resetBtn.style.marginLeft = "8px";
+  resetBtn.textContent = i18n("Сбросить к трём стандартным");
+  resetBtn.addEventListener("click", async () => {
+    await saveStatuses(DEFAULT_STATUSES);
+    renderStatusesList(list, DEFAULT_STATUSES);
+  });
+  section.appendChild(resetBtn);
+
+  return section;
+}
+
+function renderStatusesList(list, statuses) {
+  list.innerHTML = "";
+  for (const status of statuses) {
+    const row = document.createElement("div");
+    row.className = "tags-manage-row";
+
+    row.appendChild(buildStatusDot(status));
+
+    const nameInput = document.createElement("input");
+    nameInput.type = "text";
+    nameInput.className = "tags-manage-rename-input";
+    nameInput.value = status.label;
+    let nameTimer;
+    nameInput.addEventListener("input", () => {
+      clearTimeout(nameTimer);
+      nameTimer = setTimeout(async () => {
+        status.label = nameInput.value.trim() || status.label;
+        const current = await loadStatuses();
+        await saveStatuses(current.map((s) => (s.key === status.key ? status : s)));
+      }, 500);
+    });
+    row.appendChild(nameInput);
+
+    const colorInput = document.createElement("input");
+    colorInput.type = "color";
+    colorInput.value = /^#[0-9a-f]{6}$/i.test(status.color || "") ? status.color : "#7c7157";
+    colorInput.title = i18n("Цвет (используется, если не задан смайлик)");
+    colorInput.addEventListener("input", async () => {
+      status.color = colorInput.value;
+      const current = await loadStatuses();
+      await saveStatuses(current.map((s) => (s.key === status.key ? status : s)));
+    });
+    row.appendChild(colorInput);
+
+    const emojiInput = document.createElement("input");
+    emojiInput.type = "text";
+    emojiInput.className = "status-emoji-input";
+    emojiInput.placeholder = "🙂";
+    emojiInput.maxLength = 4;
+    emojiInput.value = status.emoji || "";
+    emojiInput.title = i18n("Смайлик вместо цветного кружка (необязательно)");
+    let emojiTimer;
+    emojiInput.addEventListener("input", () => {
+      clearTimeout(emojiTimer);
+      emojiTimer = setTimeout(async () => {
+        status.emoji = emojiInput.value.trim();
+        const current = await loadStatuses();
+        await saveStatuses(current.map((s) => (s.key === status.key ? status : s)));
+        row.replaceChild(buildStatusDot(status), row.firstChild);
+      }, 400);
+    });
+    row.appendChild(emojiInput);
+
+    const delBtn = document.createElement("button");
+    delBtn.className = "btn danger shortcut-clear";
+    delBtn.textContent = "🗑";
+    delBtn.title = i18n("Удалить статус навсегда");
+    delBtn.addEventListener("click", async () => {
+      if (statuses.length <= 1) return;
+      if (delBtn.dataset.confirm === "1") {
+        const current = await loadStatuses();
+        const next = current.filter((s) => s.key !== status.key);
+        await saveStatuses(next);
+        renderStatusesList(list, next);
+        return;
+      }
+      delBtn.dataset.confirm = "1";
+      delBtn.textContent = i18n("Точно?");
+      setTimeout(() => {
+        delBtn.dataset.confirm = "";
+        delBtn.textContent = "🗑";
+      }, 3000);
+    });
+    row.appendChild(delBtn);
+
+    list.appendChild(row);
   }
 }
 

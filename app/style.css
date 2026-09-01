@@ -1056,6 +1056,17 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
   font-size: 0.85rem;
   padding: 2px 8px;
 }
+.status-emoji-input {
+  width: 40px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 0.9rem;
+  text-align: center;
+  padding: 2px 4px;
+}
+
 .tags-manage-add { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .tags-manage-add select {
   padding: 6px 10px;
@@ -1286,9 +1297,35 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
 .chapter-item.active { background: var(--card); color: var(--text); }
 
 .status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-.status-draft { background: var(--text-faint); }
-.status-editing { background: var(--accent); }
-.status-done { background: var(--color-2); }
+.status-emoji { font-size: 0.85rem; line-height: 1; flex-shrink: 0; }
+
+.chapter-folder-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 8px 4px;
+  margin-top: 6px;
+}
+
+.chapter-folder-header:first-child { margin-top: 0; }
+
+.chapter-folder-name {
+  flex: 1;
+  background: none;
+  border: none;
+  border-bottom: 1px solid transparent;
+  color: var(--text-faint);
+  font-family: inherit;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 0;
+}
+
+.chapter-folder-name:hover,
+.chapter-folder-name:focus { border-bottom-color: var(--border); color: var(--text-dim); }
+
+.chapter-list .chapter-item { margin-left: 10px; }
 
 .add-chapter {
   width: 100%;

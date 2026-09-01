@@ -1,17 +1,16 @@
 import { apiGet, apiPost, uid } from "./api.js";
 import { debounceSave } from "./save-badge.js";
-import { escapeHtml } from "./chips.js";
 import { mentionsToHtml, attachMentionAutocomplete, attachMentionHoverPreview } from "./mentions.js";
 import { stickersToHtml, attachStickyPopover } from "./stickies.js";
 import { buildManuscriptDocx } from "./docx.js";
 import { openContextMenu } from "./context-menu.js";
+import { loadStatuses, buildStatusDot } from "./chapter-status.js";
 import { i18n } from "./i18n.js";
 
-export const STATUSES = [
-  ["draft", "Черновик"],
-  ["editing", "На редактуре"],
-  ["done", "Готово"],
-];
+// Список статусов — настраиваемый (Настройки → Статусы глав, см.
+// chapter-status.js), общий для глав и папок; читается заново при
+// каждом открытии вкладки в renderManuscript.
+let statuses = [];
 
 // Размер шрифта текста главы — раньше жил в Настройках, отдельно от
 // того, что вообще-то настраивает («Настройки → Редактор» и сама глава,
@@ -41,7 +40,11 @@ function persist() {
 const SNAPSHOT_LIMIT = 20;
 
 function blankChapter() {
-  return { id: uid(), title: i18n("Новая глава"), content: "", status: "draft", authorNotes: "", stickies: [], snapshots: [] };
+  return { id: uid(), title: i18n("Новая глава"), content: "", status: statuses[0]?.key || "draft", authorNotes: "", stickies: [], snapshots: [], folderId: null };
+}
+
+function blankFolder() {
+  return { id: uid(), name: i18n("Новая папка"), status: null };
 }
 
 function wordCount(text) {
@@ -164,13 +167,16 @@ function attachEditorContextMenu(textarea, chapter) {
 export async function renderManuscript(root, focusChapterId) {
   container = root;
   focusMode = false; // модуль всегда открывается в обычном виде, фокус — временное состояние сессии просмотра
-  const [manuscriptData, charactersData, siteSettings] = await Promise.all([
+  const [manuscriptData, charactersData, siteSettings, statusList] = await Promise.all([
     apiGet("/api/manuscript"),
     apiGet("/api/characters"),
     apiGet("/api/site-settings").catch(() => ({})),
+    loadStatuses(),
   ]);
   manuscript = manuscriptData;
+  manuscript.folders = manuscript.folders || []; // старые проекты сохранялись без папок
   characters = charactersData;
+  statuses = statusList;
   const savedSize = Number(siteSettings.editorFontSize);
   editorFontSize =
     Number.isFinite(savedSize) && savedSize >= FONT_SIZE_MIN && savedSize <= FONT_SIZE_MAX ? savedSize : DEFAULT_FONT_SIZE;
@@ -200,57 +206,164 @@ function draw() {
   container.appendChild(view);
 }
 
+// dragId — id перетаскиваемой главы, общий для всех обработчиков drop
+// в списке (и на главах, и на заголовках папок).
+let dragId = null;
+
+function buildChapterItem(ch) {
+  const item = document.createElement("div");
+  item.className = "chapter-item" + (ch.id === manuscript.activeChapterId ? " active" : "");
+  item.dataset.chapterId = ch.id;
+  item.draggable = true;
+  item.appendChild(buildStatusDot(statuses.find((s) => s.key === ch.status) || statuses[0]));
+  const title = document.createElement("span");
+  title.textContent = ch.title || i18n("Без названия");
+  item.appendChild(title);
+
+  item.addEventListener("click", () => {
+    manuscript.activeChapterId = ch.id;
+    draw();
+  });
+  item.addEventListener("contextmenu", (e) => {
+    e.preventDefault();
+    openContextMenu(e.clientX, e.clientY, [
+      {
+        label: i18n("Статус"),
+        items: statuses.map((s) => ({
+          label: i18n(s.label),
+          checked: ch.status === s.key,
+          action: () => {
+            ch.status = s.key;
+            persist();
+            draw();
+          },
+        })),
+      },
+      {
+        label: i18n("Папка"),
+        items: [
+          { label: i18n("Без папки"), checked: !ch.folderId, action: () => { ch.folderId = null; persist(); draw(); } },
+          ...manuscript.folders.map((f) => ({
+            label: f.name || i18n("Без названия"),
+            checked: ch.folderId === f.id,
+            action: () => { ch.folderId = f.id; persist(); draw(); },
+          })),
+        ],
+      },
+      { separator: true },
+      { label: i18n("Экспорт главы в .md"), action: () => exportMarkdown([ch], `${safeFileName(ch.title)}.md`) },
+      { label: i18n("Экспорт главы в .docx"), action: () => exportDocx([ch], `${safeFileName(ch.title)}.docx`) },
+    ]);
+  });
+  item.addEventListener("dragstart", () => { dragId = ch.id; });
+  item.addEventListener("dragover", (e) => e.preventDefault());
+  item.addEventListener("drop", (e) => {
+    e.preventDefault();
+    if (dragId === null || dragId === ch.id) return;
+    const moved = manuscript.chapters.find((c) => c.id === dragId);
+    if (!moved) return;
+    // Дроп на другую главу — переставляет и заодно перенимает её папку
+    // (или «без папки»), так что перетаскивание внутрь папки работает и
+    // через дроп на любую из уже лежащих в ней глав, а не только на шапку.
+    moved.folderId = ch.folderId || null;
+    const from = manuscript.chapters.findIndex((c) => c.id === dragId);
+    const to = manuscript.chapters.findIndex((c) => c.id === ch.id);
+    manuscript.chapters.splice(from, 1);
+    manuscript.chapters.splice(to, 0, moved);
+    persist();
+    draw();
+  });
+  return item;
+}
+
+function buildFolderHeader(folder) {
+  const header = document.createElement("div");
+  header.className = "chapter-folder-header";
+
+  const status = folder.status ? statuses.find((s) => s.key === folder.status) : null;
+  if (status) header.appendChild(buildStatusDot(status));
+
+  const nameInput = document.createElement("input");
+  nameInput.className = "chapter-folder-name";
+  nameInput.value = folder.name || "";
+  nameInput.placeholder = i18n("Название папки");
+  nameInput.addEventListener("input", () => {
+    folder.name = nameInput.value;
+    persist();
+  });
+  header.appendChild(nameInput);
+
+  header.addEventListener("contextmenu", (e) => {
+    e.preventDefault();
+    const chaptersInFolder = manuscript.chapters.filter((c) => c.folderId === folder.id);
+    openContextMenu(e.clientX, e.clientY, [
+      {
+        label: i18n("Статус папки"),
+        items: [
+          { label: i18n("Без статуса"), checked: !folder.status, action: () => { folder.status = null; persist(); draw(); } },
+          ...statuses.map((s) => ({
+            label: i18n(s.label),
+            checked: folder.status === s.key,
+            action: () => { folder.status = s.key; persist(); draw(); },
+          })),
+        ],
+      },
+      { separator: true },
+      { label: i18n("Экспорт папки в .md"), action: () => exportMarkdown(chaptersInFolder, `${safeFileName(folder.name)}.md`) },
+      { label: i18n("Экспорт папки в .docx"), action: () => exportDocx(chaptersInFolder, `${safeFileName(folder.name)}.docx`) },
+      { separator: true },
+      {
+        label: i18n("Удалить папку"),
+        action: () => {
+          if (header.dataset.confirmDelete === "1") {
+            for (const c of chaptersInFolder) c.folderId = null;
+            manuscript.folders = manuscript.folders.filter((f) => f.id !== folder.id);
+            persist();
+            draw();
+            return;
+          }
+          header.dataset.confirmDelete = "1";
+          setTimeout(() => { header.dataset.confirmDelete = ""; }, 4000);
+          openContextMenu(e.clientX, e.clientY, [
+            { label: i18n("Точно удалить? Главы останутся, папка исчезнет."), action: () => {
+              for (const c of chaptersInFolder) c.folderId = null;
+              manuscript.folders = manuscript.folders.filter((f) => f.id !== folder.id);
+              persist();
+              draw();
+            } },
+          ]);
+        },
+      },
+    ]);
+  });
+
+  header.addEventListener("dragover", (e) => e.preventDefault());
+  header.addEventListener("drop", (e) => {
+    e.preventDefault();
+    if (dragId === null) return;
+    const ch = manuscript.chapters.find((c) => c.id === dragId);
+    if (!ch) return;
+    ch.folderId = folder.id;
+    persist();
+    draw();
+  });
+
+  return header;
+}
+
 function buildChapterList() {
   const list = document.createElement("div");
   list.className = "chapter-list";
 
-  let dragId = null;
+  for (const folder of manuscript.folders) {
+    list.appendChild(buildFolderHeader(folder));
+    for (const ch of manuscript.chapters.filter((c) => c.folderId === folder.id)) {
+      list.appendChild(buildChapterItem(ch));
+    }
+  }
 
-  for (const ch of manuscript.chapters) {
-    const item = document.createElement("div");
-    item.className = "chapter-item" + (ch.id === manuscript.activeChapterId ? " active" : "");
-    item.draggable = true;
-    item.innerHTML = `
-      <span class="status-dot status-${ch.status}"></span>
-      <span>${escapeHtml(ch.title || i18n("Без названия"))}</span>
-    `;
-    item.addEventListener("click", () => {
-      manuscript.activeChapterId = ch.id;
-      draw();
-    });
-    item.addEventListener("contextmenu", (e) => {
-      e.preventDefault();
-      openContextMenu(e.clientX, e.clientY, [
-        {
-          label: i18n("Статус"),
-          items: STATUSES.map(([key, name]) => ({
-            label: i18n(name),
-            checked: ch.status === key,
-            action: () => {
-              ch.status = key;
-              persist();
-              draw();
-            },
-          })),
-        },
-        { separator: true },
-        { label: i18n("Экспорт главы в .md"), action: () => exportMarkdown([ch], `${safeFileName(ch.title)}.md`) },
-        { label: i18n("Экспорт главы в .docx"), action: () => exportDocx([ch], `${safeFileName(ch.title)}.docx`) },
-      ]);
-    });
-    item.addEventListener("dragstart", () => { dragId = ch.id; });
-    item.addEventListener("dragover", (e) => e.preventDefault());
-    item.addEventListener("drop", (e) => {
-      e.preventDefault();
-      if (dragId === null || dragId === ch.id) return;
-      const from = manuscript.chapters.findIndex((c) => c.id === dragId);
-      const to = manuscript.chapters.findIndex((c) => c.id === ch.id);
-      const [moved] = manuscript.chapters.splice(from, 1);
-      manuscript.chapters.splice(to, 0, moved);
-      persist();
-      draw();
-    });
-    list.appendChild(item);
+  for (const ch of manuscript.chapters.filter((c) => !c.folderId)) {
+    list.appendChild(buildChapterItem(ch));
   }
 
   const addBtn = document.createElement("button");
@@ -265,16 +378,30 @@ function buildChapterList() {
   });
   list.appendChild(addBtn);
 
+  const addFolderBtn = document.createElement("button");
+  addFolderBtn.className = "add-chapter";
+  addFolderBtn.textContent = i18n("+ Папка");
+  addFolderBtn.addEventListener("click", () => {
+    manuscript.folders.push(blankFolder());
+    persist();
+    draw();
+  });
+  list.appendChild(addFolderBtn);
+
   const exportBtn = document.createElement("button");
   exportBtn.className = "add-chapter";
   exportBtn.textContent = i18n("Экспорт в .md");
-  exportBtn.addEventListener("click", exportMarkdown);
+  // Не exportMarkdown напрямую: addEventListener зовёт обработчик с
+  // самим click-событием первым аргументом — chapters получил бы Event
+  // вместо manuscript.chapters по умолчанию (Event, а не undefined, так
+  // что дефолтное значение параметра не подставилось бы).
+  exportBtn.addEventListener("click", () => exportMarkdown());
   list.appendChild(exportBtn);
 
   const exportDocxBtn = document.createElement("button");
   exportDocxBtn.className = "add-chapter";
   exportDocxBtn.textContent = i18n("Экспорт в .docx");
-  exportDocxBtn.addEventListener("click", exportDocx);
+  exportDocxBtn.addEventListener("click", () => exportDocx());
   list.appendChild(exportDocxBtn);
 
   return list;
@@ -307,11 +434,11 @@ function buildEditor() {
   header.appendChild(titleInput);
 
   const statusSelect = document.createElement("select");
-  for (const [value, label] of STATUSES) {
+  for (const s of statuses) {
     const opt = document.createElement("option");
-    opt.value = value;
-    opt.textContent = i18n(label);
-    if (chapter.status === value) opt.selected = true;
+    opt.value = s.key;
+    opt.textContent = i18n(s.label);
+    if (chapter.status === s.key) opt.selected = true;
     statusSelect.appendChild(opt);
   }
   statusSelect.style.cssText =
@@ -574,8 +701,8 @@ function buildSnapshots(chapter) {
 }
 
 function refreshChapterListTitles() {
-  const items = container.querySelectorAll(".chapter-item span:last-child");
-  manuscript.chapters.forEach((ch, i) => {
-    if (items[i]) items[i].textContent = ch.title || i18n("Без названия");
-  });
+  for (const ch of manuscript.chapters) {
+    const item = container.querySelector(`.chapter-item[data-chapter-id="${ch.id}"] span:last-child`);
+    if (item) item.textContent = ch.title || i18n("Без названия");
+  }
 }

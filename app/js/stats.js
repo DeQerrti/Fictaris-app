@@ -1,7 +1,7 @@
 import { apiGet } from "./api.js";
 import { escapeHtml } from "./chips.js";
 import { factionTypeInfo, locationTypeInfo } from "./icons.js";
-import { STATUSES } from "./manuscript.js";
+import { loadStatuses } from "./chapter-status.js";
 import { i18n, currentLang } from "./i18n.js";
 
 // ══════════════════════════════════════════════
@@ -64,7 +64,7 @@ export async function renderStats(root) {
   const wrap = document.createElement("div");
   wrap.className = "data-panel";
 
-  const [characters, locations, factions, timeline, board, manuscript, relationships] = await Promise.all([
+  const [characters, locations, factions, timeline, board, manuscript, relationships, statuses] = await Promise.all([
     apiGet("/api/characters"),
     apiGet("/api/locations"),
     apiGet("/api/factions"),
@@ -72,6 +72,7 @@ export async function renderStats(root) {
     apiGet("/api/board"),
     apiGet("/api/manuscript"),
     apiGet("/api/relationships"),
+    loadStatuses(),
   ]);
 
   const totalWords = manuscript.chapters.reduce((sum, c) => sum + wordCount(c.content), 0);
@@ -142,11 +143,10 @@ export async function renderStats(root) {
   wrap.appendChild(castSection);
 
   // ── Прогресс рукописи ────────────────────────────
-  const STATUS_COLORS = { draft: "#7c7157", editing: "#c9944a", done: "#6a9955" };
-  const statusRows = STATUSES.map(([key, label]) => ({
-    label: i18n(label),
-    value: manuscript.chapters.filter((c) => c.status === key).length,
-    color: STATUS_COLORS[key],
+  const statusRows = statuses.map((s) => ({
+    label: i18n(s.label),
+    value: manuscript.chapters.filter((c) => c.status === s.key).length,
+    color: s.color,
   }));
   const statusMax = Math.max(1, ...statusRows.map((r) => r.value));
 
