@@ -116,6 +116,42 @@ export class Vault {
     return JSON.parse(raw);
   }
 
+  async deleteVersion(name, id) {
+    if (!isAllowedFile(name)) throw new Error(`Неизвестный файл: ${name}`);
+    if (!/^[\w-]{1,48}$/.test(id)) throw new Error("Неизвестная версия");
+    await fs.rm(path.join(this.root, ".history", name, `${id}.json`), { force: true });
+  }
+
+  // Автоочистка (Настройки → Данные): удаляет снимки старше maxAgeDays
+  // сразу во всех модулях, а не только в открытом сейчас в витрине —
+  // человек выбирает период один раз (site-settings.json), а не гоняет
+  // очистку по каждому файлу отдельно.
+  async cleanupHistory(maxAgeDays) {
+    const cutoff = Date.now() - maxAgeDays * 24 * 60 * 60 * 1000;
+    const root = path.join(this.root, ".history");
+    let dirs;
+    try {
+      dirs = await fs.readdir(root, { withFileTypes: true });
+    } catch {
+      return 0;
+    }
+    let removed = 0;
+    for (const dirent of dirs) {
+      if (!dirent.isDirectory()) continue;
+      const dir = path.join(root, dirent.name);
+      const files = await fs.readdir(dir).catch(() => []);
+      for (const f of files) {
+        if (!f.endsWith(".json")) continue;
+        const t = new Date(historyDate(f)).getTime();
+        if (Number.isFinite(t) && t < cutoff) {
+          await fs.rm(path.join(dir, f), { force: true });
+          removed++;
+        }
+      }
+    }
+    return removed;
+  }
+
   // Изображения карты — отдельные файлы в maps/, а не base64 внутри
   // map.json: то самое, от чего предостерегал бриф (window.storage
   // упирался в лимит 5MB на ключ именно потому, что все картинки

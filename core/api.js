@@ -189,4 +189,18 @@ export const ROUTES = {
     const data = await vault.versionAt(body.file, body.id);
     return vault.writeJson(body.file, data);
   },
+  "POST /api/history/delete": async ({ vault, body }) => {
+    if (!body.file || !body.id) throw new ApiError("Не указан файл или версия");
+    await vault.deleteVersion(body.file, body.id);
+    return { ok: true };
+  },
+  // days — 0 значит "никогда не запускать" и сюда не доходит (см.
+  // AUTO_CLEANUP_OPTIONS в app/js/data-panel.js), но на всякий случай
+  // не даём случайно стереть всё разом отрицательным/нулевым сроком.
+  "POST /api/history/cleanup": async ({ vault, body }) => {
+    const days = Number(body.days);
+    if (!Number.isFinite(days) || days <= 0) throw new ApiError("Некорректный срок");
+    const removed = await vault.cleanupHistory(days);
+    return { removed };
+  },
 };

@@ -3,7 +3,7 @@ import { buildDataSections } from "./data-panel.js";
 import { i18n, currentLang, setLang } from "./i18n.js";
 import { THEME_PRESETS, saveTheme } from "./theme.js";
 import { defaultLabels, saveLabels, resetLabels } from "./labels.js";
-import { HIDEABLE_TABS, getHiddenTabs, setTabHidden } from "./visibility.js";
+import { HIDEABLE_TABS, getHiddenTabs, setTabHidden, getTabOrder, setTabOrder } from "./visibility.js";
 import { captureKey, saveShortcut, clearShortcut } from "./shortcuts.js";
 import { DEFAULT_TAGS_MAP, CATEGORY_LABELS, parseTags, stringifyTags } from "./tags.js";
 import { defaultMonths, loadCalendar, saveCalendar } from "./calendar.js";
@@ -244,19 +244,32 @@ async function buildZoomSection() {
 async function buildLabelsSection() {
   const section = document.createElement("div");
   section.className = "data-section";
-  section.innerHTML = `<h3>${i18n("Подписи интерфейса")}</h3><p>${i18n("Переименуй пункты меню под свою терминологию — применяется сразу. Глазик слева прячет раздел из сайдбара, если он не нужен в этом проекте.")}</p>`;
+  section.innerHTML = `<h3>${i18n("Подписи интерфейса")}</h3><p>${i18n("Переименуй пункты меню под свою терминологию — применяется сразу. Глазик слева прячет раздел из сайдбара, если он не нужен в этом проекте. Перетаскивай за ⠿, чтобы поменять порядок в сайдбаре.")}</p>`;
 
   const defaults = defaultLabels();
   const current = window.SITE_LABELS || defaults;
   const hidden = new Set(await getHiddenTabs());
+  const order = await getTabOrder();
 
   const grid = document.createElement("div");
   grid.className = "labels-grid";
 
-  for (const key of HIDEABLE_TABS) {
-    grid.appendChild(
-      buildLabelRow(key, defaults.nav[key], current.nav[key], hidden.has(key), (value) => saveLabels({ nav: { [key]: value } }))
-    );
+  let dragKey = null;
+  for (const key of order) {
+    const row = buildLabelRow(key, defaults.nav[key], current.nav[key], hidden.has(key), (value) => saveLabels({ nav: { [key]: value } }));
+    row.draggable = true;
+    row.dataset.key = key;
+    row.addEventListener("dragstart", () => { dragKey = key; });
+    row.addEventListener("dragover", (e) => e.preventDefault());
+    row.addEventListener("drop", async (e) => {
+      e.preventDefault();
+      if (dragKey === null || dragKey === key) return;
+      const dragRow = grid.querySelector(`[data-key="${dragKey}"]`);
+      if (!dragRow) return;
+      grid.insertBefore(dragRow, row);
+      await setTabOrder(Array.from(grid.children).map((el) => el.dataset.key));
+    });
+    grid.appendChild(row);
   }
 
   const resetBtn = document.createElement("button");
@@ -274,6 +287,12 @@ async function buildLabelsSection() {
 function buildLabelRow(key, defaultValue, currentValue, isHidden, onSave) {
   const row = document.createElement("div");
   row.className = "label-row" + (isHidden ? " label-row-hidden" : "");
+
+  const dragHandle = document.createElement("span");
+  dragHandle.className = "label-row-drag";
+  dragHandle.textContent = "⠿";
+  dragHandle.title = i18n("Перетащи, чтобы изменить порядок");
+  row.appendChild(dragHandle);
 
   const eyeBtn = document.createElement("button");
   eyeBtn.type = "button";

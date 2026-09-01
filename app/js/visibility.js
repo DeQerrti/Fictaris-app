@@ -53,3 +53,39 @@ export async function applyTabVisibility() {
   });
   return hidden;
 }
+
+// ── Порядок вкладок ────────────────────────────
+// Своя настройка, отдельная от видимости — можно перетащить пункт
+// повыше в сайдбаре, не пряча остальные. Список хранит только
+// HIDEABLE_TABS (те же, что можно скрыть) — «Настройки»/«Проверка»/
+// «Корзина» стоят фиксированно, их порядок не трогаем.
+export async function getTabOrder() {
+  const settings = await apiGet("/api/site-settings").catch(() => ({}));
+  const saved = Array.isArray(settings.tabOrder) ? settings.tabOrder.filter((k) => HIDEABLE_TABS.includes(k)) : [];
+  const rest = HIDEABLE_TABS.filter((k) => !saved.includes(k));
+  return [...saved, ...rest];
+}
+
+export async function setTabOrder(order) {
+  const settings = (await apiGet("/api/site-settings").catch(() => ({}))) || {};
+  const tabOrder = order.filter((k) => HIDEABLE_TABS.includes(k));
+  await apiPost("/api/site-settings", { ...settings, tabOrder });
+  await applyTabOrder();
+  return tabOrder;
+}
+
+// Переставляет сами кнопки в DOM — insertBefore(btn, spacer) в нужном
+// порядке: повторное вставление перед одной и той же точкой (граница
+// перед «Проверкой»/«Корзиной») сдвигает уже переставленные элементы
+// правильно одно за другим, без прыжков в конец всего сайдбара (как
+// было бы с обычным appendChild).
+export async function applyTabOrder() {
+  const order = await getTabOrder();
+  const spacer = document.querySelector(".sidebar-spacer");
+  if (!spacer?.parentNode) return order;
+  for (const key of order) {
+    const btn = document.querySelector(`.nav-item[data-module="${key}"]`);
+    if (btn) spacer.parentNode.insertBefore(btn, spacer);
+  }
+  return order;
+}

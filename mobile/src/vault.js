@@ -143,6 +143,43 @@ export class MobileVault {
     return JSON.parse(data);
   }
 
+  async deleteVersion(name, id) {
+    if (!isAllowedFile(name)) throw new Error(`Неизвестный файл: ${name}`);
+    if (!/^[\w-]{1,48}$/.test(id)) throw new Error("Неизвестная версия");
+    await Filesystem.deleteFile({ path: `${this.root}/.history/${name}/${id}.json`, directory: DIR }).catch(() => {});
+  }
+
+  async cleanupHistory(maxAgeDays) {
+    const cutoff = Date.now() - maxAgeDays * 24 * 60 * 60 * 1000;
+    const root = `${this.root}/.history`;
+    let dirs;
+    try {
+      ({ files: dirs } = await Filesystem.readdir({ path: root, directory: DIR }));
+    } catch {
+      return 0;
+    }
+    let removed = 0;
+    for (const dirent of dirs) {
+      if (dirent.type !== "directory") continue;
+      const dir = `${root}/${dirent.name}`;
+      let files;
+      try {
+        ({ files } = await Filesystem.readdir({ path: dir, directory: DIR }));
+      } catch {
+        continue;
+      }
+      for (const f of files) {
+        if (!f.name.endsWith(".json")) continue;
+        const t = new Date(historyDate(f.name)).getTime();
+        if (Number.isFinite(t) && t < cutoff) {
+          await Filesystem.deleteFile({ path: `${dir}/${f.name}`, directory: DIR }).catch(() => {});
+          removed++;
+        }
+      }
+    }
+    return removed;
+  }
+
   // base64 приходит уже сжатым с клиента (compressImage через <canvas>,
   // см. app/js/image-compress.js) — тот же путь, что на компьютере,
   // только запись идёт через Capacitor, а не node:fs.

@@ -90,13 +90,64 @@ function historyFiles() {
   ];
 }
 
+// days: null/0 — автоочистка выключена. Ключ в site-settings.json —
+// свойство устройства-независимое, живёт с самим проектом, как и всё
+// остальное там: открыл тот же vault с другого компьютера — та же
+// настройка, а не заново её включать.
+const AUTO_CLEANUP_OPTIONS = [
+  [0, "Никогда"],
+  [7, "Раз в неделю"],
+  [30, "Раз в месяц"],
+  [182, "Раз в полгода"],
+  [365, "Раз в год"],
+];
+
+// Раз в день максимум (при каждом запуске приложения, но не чаще) —
+// сама очистка не заводит фоновый таймер (десктоп-приложение не всегда
+// открыто, ждать неделю в фоне бессмысленно), а просто проверяет при
+// каждом старте, не пора ли, и досрочно ничего не трогает.
+const CLEANUP_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
+
+export async function maybeRunHistoryCleanup() {
+  const settings = await apiGet("/api/site-settings").catch(() => ({}));
+  const days = Number(settings.historyCleanupDays) || 0;
+  if (days <= 0) return;
+  const last = Date.parse(settings.historyCleanupLastRun || "");
+  if (Number.isFinite(last) && Date.now() - last < CLEANUP_CHECK_INTERVAL_MS) return;
+  await apiPost("/api/history/cleanup", { days }).catch(() => {});
+  await apiPost("/api/site-settings", { ...settings, historyCleanupLastRun: new Date().toISOString() }).catch(() => {});
+}
+
 // Vault пишет .history на каждое сохранение (см. electron/vault.js) —
 // здесь просто витрина для того, что уже лежит на диске: посмотреть
-// прошлые версии файла модуля и откатиться на любую из них.
+// прошлые версии файла модуля, откатиться на любую из них или стереть
+// её насовсем, плюс настройка автоочистки старых версий целиком.
 function buildHistorySection() {
   const section = document.createElement("div");
   section.className = "data-section";
   section.innerHTML = `<h3>${i18n("История версий")}</h3><p>${i18n("Каждое сохранение оставляет прошлую версию файла в папке")} <code>.history</code>. ${i18n("Выбери модуль, чтобы увидеть его версии.")}</p>`;
+
+  const cleanupRow = document.createElement("div");
+  cleanupRow.className = "sync-actions";
+  const cleanupLabel = document.createElement("span");
+  cleanupLabel.textContent = i18n("Автоочистка старых версий: ");
+  cleanupLabel.style.color = "var(--text-dim)";
+  const cleanupSelect = document.createElement("select");
+  for (const [days, label] of AUTO_CLEANUP_OPTIONS) {
+    const opt = document.createElement("option");
+    opt.value = days;
+    opt.textContent = i18n(label);
+    cleanupSelect.appendChild(opt);
+  }
+  apiGet("/api/site-settings").then((s) => {
+    cleanupSelect.value = Number(s?.historyCleanupDays) || 0;
+  });
+  cleanupSelect.addEventListener("change", async () => {
+    const s = (await apiGet("/api/site-settings").catch(() => ({}))) || {};
+    await apiPost("/api/site-settings", { ...s, historyCleanupDays: Number(cleanupSelect.value) });
+  });
+  cleanupRow.append(cleanupLabel, cleanupSelect);
+  section.appendChild(cleanupRow);
 
   const select = document.createElement("select");
   const placeholder = document.createElement("option");
@@ -155,7 +206,28 @@ function buildHistoryRow(file, version) {
       btn.textContent = i18n("Восстановить");
     }, 4000);
   });
-  row.appendChild(btn);
+  const actions = document.createElement("div");
+  actions.className = "history-row-actions";
+  actions.appendChild(btn);
+
+  const delBtn = document.createElement("button");
+  delBtn.className = "btn danger";
+  delBtn.textContent = "🗑";
+  delBtn.title = i18n("Удалить этот снимок навсегда");
+  delBtn.addEventListener("click", () => {
+    if (delBtn.dataset.confirm === "1") {
+      apiPost("/api/history/delete", { file, id: version.id }).then(() => row.remove());
+      return;
+    }
+    delBtn.dataset.confirm = "1";
+    delBtn.textContent = i18n("Точно?");
+    setTimeout(() => {
+      delBtn.dataset.confirm = "";
+      delBtn.textContent = "🗑";
+    }, 4000);
+  });
+  actions.appendChild(delBtn);
+  row.appendChild(actions);
 
   return row;
 }

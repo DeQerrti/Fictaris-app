@@ -150,9 +150,11 @@ body.focus-mode .sidebar { display: none; }
   padding: 6px 10px 4px;
 }
 
-/* Значок настроек — чуть правее названия приложения, вместо отдельного
-   текстового пункта в общем списке разделов (см. main.js: сознательно
-   не .nav-item, чтобы не сбивать нумерацию цифровых горячих клавиш). */
+/* Значок настроек — рядом с переключателем проекта в самом низу
+   сайдбара (как в Обсидиане), вместо отдельного текстового пункта в
+   общем списке разделов (см. main.js: сознательно не .nav-item, чтобы
+   не сбивать нумерацию цифровых горячих клавиш). Разметка — в
+   .project-switcher-row ниже. */
 .settings-btn {
   flex-shrink: 0;
   display: flex;
@@ -267,7 +269,9 @@ body.focus-mode .sidebar { display: none; }
 }
 
 /* Переключатель проекта теперь в самом низу сайдбара, под «Корзиной» —
-   верхняя граница отделяет его от списка разделов над ним. */
+   верхняя граница отделяет его от списка разделов над ним. Значок
+   настроек — в той же строке, справа от названия проекта (см.
+   .settings-btn выше). */
 .project-switcher {
   position: relative;
   margin-top: 8px;
@@ -275,8 +279,15 @@ body.focus-mode .sidebar { display: none; }
   border-top: 1px solid var(--border);
 }
 
+.project-switcher-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .project-current {
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   text-align: left;
   background: var(--panel);
   border: 1px solid var(--border);
@@ -293,18 +304,24 @@ body.focus-mode .sidebar { display: none; }
 
 .project-current:hover { border-color: var(--accent); color: var(--text); }
 
+/* Открывается вверх, а не вниз: кнопка и так в самом низу сайдбара —
+   вниз меню упёрлось бы в край окна и обрезалось (или "проваливалось"
+   за пределы видимой области). Тот же приём, что у переключателя
+   хранилища в Обсидиане. */
 .project-menu {
   display: none;
   position: absolute;
   left: 10px;
   right: 10px;
-  top: calc(100% - 12px);
+  bottom: calc(100% + 2px);
   z-index: 30;
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 6px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.4);
+  max-height: min(60vh, 420px);
+  overflow-y: auto;
 }
 
 .project-row {
@@ -849,9 +866,24 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
 
 /* ── Редактор ──────────────────────────────── */
 
-.font-size-row { display: flex; gap: 8px; }
-.font-size-btn { min-width: 40px; }
-.font-size-btn.active { background: var(--accent); border-color: var(--accent); color: var(--panel); font-weight: 600; }
+.font-size-row { display: flex; align-items: center; gap: 4px; }
+.font-size-step { width: 28px; padding: 0; }
+.font-size-input {
+  width: 48px;
+  text-align: center;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 0.85rem;
+  padding: 4px 2px;
+  font-family: inherit;
+}
+/* Стрелочки number-инпута — своя пара +/- рядом уже есть, системные
+   дублируют её и по-разному выглядят в Chromium/Electron. */
+.font-size-input::-webkit-inner-spin-button,
+.font-size-input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.font-size-input { appearance: textfield; }
 
 /* ── Подписи интерфейса ────────────────────── */
 /* Ряд — только глазик (видимость) и само поле ввода (подпись); никакой
@@ -859,6 +891,16 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
 
 .labels-grid { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; max-width: 420px; }
 .label-row { display: flex; align-items: center; gap: 8px; }
+
+.label-row-drag {
+  flex-shrink: 0;
+  width: 16px;
+  text-align: center;
+  color: var(--text-faint);
+  cursor: grab;
+  user-select: none;
+}
+.label-row-drag:active { cursor: grabbing; }
 
 .label-row-eye {
   flex-shrink: 0;
@@ -1078,6 +1120,57 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
 .update-modal p { margin: 0 0 20px; color: var(--text); font-size: 0.95rem; }
 
 .update-modal .update-banner-actions { justify-content: center; }
+
+/* Карточка персонажа/локации/фракции поверх текущего экрана — клик по
+   узлу графа, по @упоминанию в тексте и т.п. (app/js/entity-modal.js).
+   Ниже z-index модалки обновления (та критичнее — блокирует всё окно),
+   но выше обычного контента и контекстных меню. */
+.entity-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 15000;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 30px;
+}
+
+.entity-modal-panel {
+  position: relative;
+  width: 100%;
+  max-width: 1100px;
+  height: 100%;
+  max-height: 820px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+  display: flex;
+}
+
+.entity-modal-body { flex: 1; min-width: 0; overflow-y: auto; }
+
+.entity-modal-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  color: var(--text-dim);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.entity-modal-close:hover { color: var(--text); border-color: var(--accent); }
 
 /* ── Рукопись ──────────────────────────────── */
 
@@ -1778,6 +1871,8 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
   flex-direction: column;
   gap: 6px;
 }
+
+.history-row-actions { display: flex; gap: 6px; flex-shrink: 0; }
 
 .history-row {
   display: flex;

@@ -20,7 +20,9 @@ const STATUSES = [
 // на :root (theme.js читает её при загрузке приложения, здесь — только
 // при живом изменении), значение по-прежнему общее на всё приложение,
 // не per-глава — сохраняется в site-settings.json, как и было.
-const FONT_SIZES = [15, 16, 17, 18, 20, 22];
+const FONT_SIZE_PRESETS = [12, 14, 15, 16, 17, 18, 20, 22, 24, 28, 32];
+const FONT_SIZE_MIN = 10;
+const FONT_SIZE_MAX = 72;
 const DEFAULT_FONT_SIZE = 17;
 let editorFontSize = DEFAULT_FONT_SIZE;
 
@@ -29,6 +31,7 @@ let characters = [];
 let viewMode = false;
 let focusMode = false;
 let container = null;
+let syncFontSizeDisplay = null; // обновляет число в шапке редактора без полной перерисовки — ставит buildEditor()
 const save = debounceSave((data) => apiPost("/api/manuscript", data));
 
 function persist() {
@@ -46,32 +49,36 @@ function wordCount(text) {
   return m ? m.length : 0;
 }
 
-// Заметки автора не входят — они и на сайте, и здесь предназначены для
-// самого пишущего, а не для читателя итогового текста.
-function exportMarkdown() {
-  const body = manuscript.chapters
-    .map((ch) => `# ${ch.title || i18n("Без названия")}\n\n${ch.content || ""}`)
-    .join("\n\n---\n\n");
-  const blob = new Blob([body], { type: "text/markdown" });
+function safeFileName(title) {
+  return (title || i18n("Без названия")).replace(/[\\/:*?"<>|]/g, "").trim() || "chapter";
+}
+
+function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "manuscript.md";
+  a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
 }
 
-function exportDocx() {
-  const bytes = buildManuscriptDocx(manuscript.chapters);
-  const blob = new Blob([bytes], {
-    type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "manuscript.docx";
-  a.click();
-  URL.revokeObjectURL(url);
+// Заметки автора не входят — они и на сайте, и здесь предназначены для
+// самого пишущего, а не для читателя итогового текста. chapters/filename —
+// по умолчанию вся рукопись, но то же самое зовёт и экспорт одной главы
+// через ПКМ на ней в списке (см. buildChapterList).
+function exportMarkdown(chapters = manuscript.chapters, filename = "manuscript.md") {
+  const body = chapters
+    .map((ch) => `# ${ch.title || i18n("Без названия")}\n\n${ch.content || ""}`)
+    .join("\n\n---\n\n");
+  downloadBlob(new Blob([body], { type: "text/markdown" }), filename);
+}
+
+function exportDocx(chapters = manuscript.chapters, filename = "manuscript.docx") {
+  const bytes = buildManuscriptDocx(chapters);
+  downloadBlob(
+    new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }),
+    filename
+  );
 }
 
 document.addEventListener("keydown", (e) => {
@@ -108,6 +115,18 @@ function wrapSelection(textarea, before, after) {
   textarea.dispatchEvent(new Event("input"));
 }
 
+// Общая точка для смены размера шрифта — зовут и число в шапке
+// редактора, и подменю правого клика (см. attachEditorContextMenu),
+// чтобы оба места не разъезжались в логике сохранения/клампа.
+async function setFontSize(size) {
+  const clamped = Math.min(FONT_SIZE_MAX, Math.max(FONT_SIZE_MIN, Math.round(size) || DEFAULT_FONT_SIZE));
+  editorFontSize = clamped;
+  document.documentElement.style.setProperty("--editor-font-size", `${clamped}px`);
+  const s = (await apiGet("/api/site-settings").catch(() => ({}))) || {};
+  await apiPost("/api/site-settings", { ...s, editorFontSize: clamped });
+  return clamped;
+}
+
 // Правый клик в тексте главы раньше не делал ничего — берём набор,
 // привычный по Obsidian/Word: форматирование выделения, вставка стикера
 // и счётчик слов у самого выделения (полезнее, чем общий по главе,
@@ -122,6 +141,15 @@ function attachEditorContextMenu(textarea, chapter) {
       { label: i18n("Курсив"), disabled: !hasSelection, action: () => wrapSelection(textarea, "*", "*") },
       { separator: true },
       { label: i18n("Вставить стикер-заметку"), action: () => insertSticky(textarea, chapter) },
+      { separator: true },
+      {
+        label: i18n("Размер шрифта: {n}px", { n: editorFontSize }),
+        items: FONT_SIZE_PRESETS.map((size) => ({
+          label: `${size}px`,
+          checked: size === editorFontSize,
+          action: () => setFontSize(size).then((v) => syncFontSizeDisplay?.(v)),
+        })),
+      },
       { separator: true },
       { label: i18n("Вырезать"), disabled: !hasSelection, action: () => document.execCommand("cut") },
       { label: i18n("Копировать"), disabled: !hasSelection, action: () => document.execCommand("copy") },
@@ -143,7 +171,9 @@ export async function renderManuscript(root, focusChapterId) {
   ]);
   manuscript = manuscriptData;
   characters = charactersData;
-  editorFontSize = FONT_SIZES.includes(siteSettings.editorFontSize) ? siteSettings.editorFontSize : DEFAULT_FONT_SIZE;
+  const savedSize = Number(siteSettings.editorFontSize);
+  editorFontSize =
+    Number.isFinite(savedSize) && savedSize >= FONT_SIZE_MIN && savedSize <= FONT_SIZE_MAX ? savedSize : DEFAULT_FONT_SIZE;
   if (!manuscript.chapters.length) {
     const c = blankChapter();
     manuscript.chapters = [c];
@@ -187,6 +217,26 @@ function buildChapterList() {
     item.addEventListener("click", () => {
       manuscript.activeChapterId = ch.id;
       draw();
+    });
+    item.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      openContextMenu(e.clientX, e.clientY, [
+        {
+          label: i18n("Статус"),
+          items: STATUSES.map(([key, name]) => ({
+            label: i18n(name),
+            checked: ch.status === key,
+            action: () => {
+              ch.status = key;
+              persist();
+              draw();
+            },
+          })),
+        },
+        { separator: true },
+        { label: i18n("Экспорт главы в .md"), action: () => exportMarkdown([ch], `${safeFileName(ch.title)}.md`) },
+        { label: i18n("Экспорт главы в .docx"), action: () => exportDocx([ch], `${safeFileName(ch.title)}.docx`) },
+      ]);
     });
     item.addEventListener("dragstart", () => { dragId = ch.id; });
     item.addEventListener("dragover", (e) => e.preventDefault());
@@ -292,24 +342,36 @@ function buildEditor() {
   });
   header.appendChild(focusBtn);
 
+  // Свободный ввод числа — раньше было всего 6 фиксированных размеров
+  // на выбор, теперь любое значение в разумных пределах (FONT_SIZE_MIN/
+  // MAX), плюс те же пресеты доступны через ПКМ в самом тексте (см.
+  // attachEditorContextMenu) — как размер шрифта обычно и предлагают
+  // менять текстовые редакторы.
   const fontSizeWrap = document.createElement("div");
   fontSizeWrap.className = "font-size-row";
   fontSizeWrap.title = i18n("Размер шрифта в тексте главы");
-  const fontButtons = new Map();
-  for (const size of FONT_SIZES) {
-    const sizeBtn = document.createElement("button");
-    sizeBtn.className = "btn font-size-btn" + (size === editorFontSize ? " active" : "");
-    sizeBtn.textContent = String(size);
-    sizeBtn.addEventListener("click", async () => {
-      editorFontSize = size;
-      fontButtons.forEach((b, s) => b.classList.toggle("active", s === size));
-      document.documentElement.style.setProperty("--editor-font-size", `${size}px`);
-      const s = (await apiGet("/api/site-settings").catch(() => ({}))) || {};
-      await apiPost("/api/site-settings", { ...s, editorFontSize: size });
-    });
-    fontButtons.set(size, sizeBtn);
-    fontSizeWrap.appendChild(sizeBtn);
-  }
+
+  const sizeMinus = document.createElement("button");
+  sizeMinus.className = "btn font-size-step";
+  sizeMinus.textContent = "−";
+  sizeMinus.addEventListener("click", () => setFontSize(editorFontSize - 1).then((v) => (sizeInput.value = v)));
+
+  const sizeInput = document.createElement("input");
+  sizeInput.type = "number";
+  sizeInput.className = "font-size-input";
+  sizeInput.min = String(FONT_SIZE_MIN);
+  sizeInput.max = String(FONT_SIZE_MAX);
+  sizeInput.value = editorFontSize;
+  sizeInput.addEventListener("change", () => setFontSize(sizeInput.valueAsNumber).then((v) => (sizeInput.value = v)));
+
+  const sizePlus = document.createElement("button");
+  sizePlus.className = "btn font-size-step";
+  sizePlus.textContent = "+";
+  sizePlus.addEventListener("click", () => setFontSize(editorFontSize + 1).then((v) => (sizeInput.value = v)));
+
+  syncFontSizeDisplay = (v) => (sizeInput.value = v);
+
+  fontSizeWrap.append(sizeMinus, sizeInput, sizePlus);
   header.appendChild(fontSizeWrap);
 
   const snapshotBtn = document.createElement("button");

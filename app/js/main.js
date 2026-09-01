@@ -12,19 +12,20 @@ import { renderGraph } from "./graph.js";
 import { renderStats } from "./stats.js";
 import { renderFamilyTree } from "./family-tree.js";
 import { renderContinuity } from "./continuity.js";
-import { fillWithDemoData } from "./data-panel.js";
+import { fillWithDemoData, maybeRunHistoryCleanup } from "./data-panel.js";
 import { renderSettings } from "./settings-panel.js";
 import { renderTrash, trashCount } from "./trash.js";
 import { initProjectSwitcher } from "./project-switcher.js";
 import { initUpdateBanner } from "./update-banner.js";
 import { applyTheme } from "./theme.js";
 import { applyLabels } from "./labels.js";
-import { applyTabVisibility, getHiddenTabs } from "./visibility.js";
+import { applyTabVisibility, applyTabOrder, getHiddenTabs } from "./visibility.js";
 import { initSearch, openSearch } from "./search.js";
 import { initShortcuts, loadShortcuts } from "./shortcuts.js";
 import { initSidebar } from "./sidebar.js";
 import { maybeShowOnboarding } from "./onboarding.js";
 import { loadLang, i18n } from "./i18n.js";
+import { initEntityModal, openEntityModal } from "./entity-modal.js";
 
 const MODULES = {
   manuscript: renderManuscript,
@@ -61,9 +62,11 @@ const settingsBtn = document.getElementById("settingsBtn");
 // свой модуль поверх уже выбранного новой вкладки — подсветка в сайдбаре
 // будет показывать одно, а содержимое — другое.
 let openRequestId = 0;
+let currentModuleName = null;
 
 async function openModule(name, arg) {
   const requestId = ++openRequestId;
+  currentModuleName = name;
   // Фокус-режим рукописи прячет сайдбар классом на body (manuscript.js) —
   // сбрасываем его при любом переключении модуля, иначе уйти со
   // страницы, скрывшей навигацию, можно было бы только через Esc.
@@ -98,10 +101,18 @@ document.getElementById("searchTrigger").addEventListener("click", () => openSea
 initSearch((module, focusId) => openModule(module, focusId));
 initShortcuts((module) => openModule(module));
 
-// Клик по @упоминанию в тексте главы (mentions.js) — открывает карточку
-// персонажа в модуле «Персонажи», а не только подсвечивает имя.
+initEntityModal(MODULES);
+
+// Клик по @упоминанию в тексте главы (mentions.js), по узлу графа
+// (graph.js) и похожим ссылкам — открывает карточку персонажа, а не
+// только подсвечивает имя. Если сейчас открыт уже тот же модуль —
+// просто переключаем фокус на месте (как и раньше); если открыт
+// какой-то другой (граф, рукопись, таймлайн…) — карточка всплывает
+// модалкой поверх текущего экрана, а не уводит с него полной сменой
+// модуля (см. entity-modal.js).
 document.addEventListener("fictaris:open-character", (e) => {
-  openModule("characters", e.detail.id);
+  if (currentModuleName === "characters") openModule("characters", e.detail.id);
+  else openEntityModal("characters", e.detail.id);
 });
 
 // Граф проекта (graph.js) держит персонажей, локаций и фракций в одном
@@ -112,7 +123,9 @@ document.addEventListener("fictaris:open-character", (e) => {
 const ENTITY_MODULES = { character: "characters", location: "locations", faction: "factions" };
 document.addEventListener("fictaris:open-entity", (e) => {
   const module = ENTITY_MODULES[e.detail.type];
-  if (module) openModule(module, e.detail.id);
+  if (!module) return;
+  if (currentModuleName === module) openModule(module, e.detail.id);
+  else openEntityModal(module, e.detail.id);
 });
 
 const trashBadge = document.getElementById("trashBadge");
@@ -126,6 +139,7 @@ async function boot() {
   await loadLang(); // до всего остального — applyLabels и любой другой i18n() ниже должны видеть уже загруженный язык
   applyTheme(); // независимо от info — кэш уже применён инлайн-скриптом, здесь только свежие данные
   applyLabels();
+  applyTabOrder();
   applyTabVisibility();
   loadShortcuts();
   initSidebar();
@@ -147,6 +161,7 @@ async function boot() {
   // На телефоне обновления проверяет сам mobile.bundle.js (полностью на
   // клиенте, без /api/app/update-status) — там своя полоска.
   if (!info.mobile) initUpdateBanner();
+  maybeRunHistoryCleanup();
 }
 
 boot();
