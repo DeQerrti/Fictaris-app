@@ -8,9 +8,13 @@
 //  открытие нового закрывает предыдущее, как и везде в приложении
 //  (project-switcher.js, search.js).
 //
-//  items: Array<{ label, action?, disabled?, danger?, items? } | { separator: true }>
+//  items: Array<{ label, icon?, action?, disabled?, danger?, items? } | { separator: true }>
 //  submenu — вложенный items той же формы, раскрывается по наведению.
+//  icon — имя из icons.js (iconSvg), рисуется перед подписью тем же
+//  приёмом, что и swatch (цветной кружок).
 // ══════════════════════════════════════════════
+
+import { iconSvg } from "./icons.js";
 
 let menuEl = null;
 
@@ -45,13 +49,28 @@ function buildList(items) {
     if (item.disabled) row.classList.add("disabled");
     row.innerHTML =
       (item.swatch ? `<span class="context-menu-swatch" style="background:${item.swatch}"></span>` : "") +
+      (item.icon ? `<span class="context-menu-icon">${iconSvg(item.icon, 14)}</span>` : "") +
       `<span class="context-menu-label">${item.label}</span>` +
       (item.items ? `<span class="context-menu-arrow">›</span>` : "");
+    // Любая строка этого же списка — не только те, у которых есть своё
+    // подменю — при наведении закрывает чужие открытые подменю. Раньше
+    // это делали только строки с items, и то неправильно: подменю —
+    // потомок самой строки (row.appendChild(sub) ниже), а искали его
+    // через ":scope > .context-menu-submenu" — прямых потомков list, у
+    // которых подменю никогда не было. Из-за этого старое подменю не
+    // находилось и оставалось висеть, даже когда курсор уходил на
+    // соседний пункт совсем другого меню (см. скриншот — Статус и Папка
+    // открыты разом).
+    row.addEventListener("mouseenter", () => {
+      const own = row.querySelector(":scope > .context-menu-submenu");
+      list.querySelectorAll(".context-menu-submenu").forEach((s) => {
+        if (s !== own) s.remove();
+      });
+    });
     if (item.items && !item.disabled) {
-      let sub = null;
       row.addEventListener("mouseenter", () => {
-        list.querySelectorAll(":scope > .context-menu-submenu").forEach((s) => s.remove());
-        sub = buildList(item.items);
+        if (row.querySelector(":scope > .context-menu-submenu")) return; // уже открыто — не пересоздавать
+        const sub = buildList(item.items);
         sub.classList.add("context-menu-submenu");
         row.appendChild(sub);
         const r = sub.getBoundingClientRect();

@@ -431,6 +431,9 @@ body.focus-mode .sidebar { display: none; }
   flex-shrink: 0;
 }
 
+.context-menu-icon { display: flex; flex-shrink: 0; color: var(--text-faint); }
+.context-menu-item:hover:not(.disabled) .context-menu-icon { color: inherit; }
+
 .context-menu-submenu {
   position: absolute;
   top: -4px;
@@ -774,6 +777,22 @@ button.btn:disabled {
 button.btn:disabled:hover { border-color: var(--border); color: var(--text-faint); }
 
 button.btn.danger:hover { border-color: var(--color-3); color: var(--color-3); }
+
+/* Кнопка-иконка без подписи (⋯ в шапке редактора главы и т.п.) — тот
+   же .btn, но квадратная и без текста, сам SVG по центру. Неприметная
+   по умолчанию (без рамки), рамка/фон — только на ховере, чтобы не
+   отвлекать взгляд, пока в неё не целятся мышью. */
+button.btn.icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  background: none;
+  border-color: transparent;
+}
+button.btn.icon-btn:hover { background: var(--panel-alt); border-color: var(--border); }
 
 button.btn.accent {
   background: var(--accent);

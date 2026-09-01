@@ -566,74 +566,64 @@ function buildEditor() {
   });
   header.appendChild(titleInput);
 
-  const statusSelect = document.createElement("select");
-  for (const s of statuses) {
-    const opt = document.createElement("option");
-    opt.value = s.key;
-    opt.textContent = i18n(s.label);
-    if (chapter.status === s.key) opt.selected = true;
-    statusSelect.appendChild(opt);
-  }
-  statusSelect.className = "field-inline-control";
-  statusSelect.addEventListener("change", () => {
-    chapter.status = statusSelect.value;
-    persist();
-    draw();
-  });
-  header.appendChild(statusSelect);
-
-  const modeBtn = document.createElement("button");
-  modeBtn.className = "btn";
-  modeBtn.textContent = viewMode ? i18n("Правка") : i18n("Просмотр");
-  modeBtn.addEventListener("click", () => {
-    viewMode = !viewMode;
-    draw();
-  });
-  header.appendChild(modeBtn);
-
-  const focusBtn = document.createElement("button");
-  focusBtn.className = "btn";
-  focusBtn.title = focusMode ? i18n("Выйти из фокус-режима (Esc)") : i18n("Фокус-режим — скрыть сайдбар и список глав");
-  focusBtn.textContent = focusMode ? "⤢" : "⛶";
-  focusBtn.addEventListener("click", () => {
-    focusMode = !focusMode;
-    draw();
-  });
-  header.appendChild(focusBtn);
-
-  const snapshotBtn = document.createElement("button");
-  snapshotBtn.className = "btn";
-  snapshotBtn.textContent = i18n("Снимок");
-  snapshotBtn.title = i18n("Сохранить текущий текст как снимок версии (до 20 на главу)");
-  snapshotBtn.addEventListener("click", () => {
-    const snapshot = { id: uid(), content: chapter.content, savedAt: new Date().toISOString() };
-    chapter.snapshots = [snapshot, ...(chapter.snapshots || [])].slice(0, SNAPSHOT_LIMIT);
-    persist();
-    draw();
-  });
-  header.appendChild(snapshotBtn);
-
-  // Заметки автора/стикеры/снимки версий раньше всегда лежали открытыми
-  // блоками под текстом — во время самого писательства это было лишним
-  // визуальным шумом. Теперь всё три — в отдельной выезжающей панели
-  // (buildExtrasPanel, drag её нет — просто показать/скрыть), а размер
-  // шрифта и вставка стикера полностью переехали в ПКМ по тексту
-  // (attachEditorContextMenu) — кнопки-дубли для них здесь больше не нужны.
-  const extrasBtn = document.createElement("button");
-  extrasBtn.className = "btn" + (extrasOpen ? " accent" : "");
-  extrasBtn.textContent = i18n("Заметки и снимки");
-  extrasBtn.title = i18n("Заметки автора, стикеры, снимки версий — правый клик по тексту вставляет стикер и меняет размер шрифта");
-  extrasBtn.addEventListener("click", () => {
-    extrasOpen = !extrasOpen;
-    draw();
-  });
-  header.appendChild(extrasBtn);
-
   const wc = document.createElement("div");
   wc.className = "word-count";
   const total = manuscript.chapters.reduce((sum, c) => sum + wordCount(c.content), 0);
   wc.textContent = i18n("{count} слов · всего {total}", { count: wordCount(chapter.content), total });
   header.appendChild(wc);
+
+  // Статус — уже переехал в ПКМ по главе в списке слева (chapter-list),
+  // размер шрифта и вставка стикера — в ПКМ по самому тексту
+  // (attachEditorContextMenu). Здесь, перед лицом во время письма,
+  // остаются только заголовок и счётчик слов — всё остальное (Правка/
+  // Просмотр, Снимок, Заметки и снимки, Фокус-режим) спрятано за одной
+  // неприметной кнопкой «⋯», как в Obsidian.
+  const moreBtn = document.createElement("button");
+  moreBtn.className = "btn icon-btn";
+  moreBtn.innerHTML = iconSvg("more", 16);
+  moreBtn.title = i18n("Ещё");
+  moreBtn.addEventListener("click", () => {
+    const r = moreBtn.getBoundingClientRect();
+    openContextMenu(r.right, r.bottom + 4, [
+      {
+        label: viewMode ? i18n("Правка") : i18n("Просмотр"),
+        icon: viewMode ? "pencil" : "eye",
+        action: () => {
+          viewMode = !viewMode;
+          draw();
+        },
+      },
+      {
+        label: i18n("Снимок"),
+        icon: "camera",
+        action: () => {
+          const snapshot = { id: uid(), content: chapter.content, savedAt: new Date().toISOString() };
+          chapter.snapshots = [snapshot, ...(chapter.snapshots || [])].slice(0, SNAPSHOT_LIMIT);
+          persist();
+          draw();
+        },
+      },
+      {
+        label: i18n("Заметки и снимки"),
+        icon: "note",
+        checked: extrasOpen,
+        action: () => {
+          extrasOpen = !extrasOpen;
+          draw();
+        },
+      },
+      { separator: true },
+      {
+        label: focusMode ? i18n("Выйти из фокус-режима") : i18n("Фокус-режим"),
+        icon: "focus",
+        action: () => {
+          focusMode = !focusMode;
+          draw();
+        },
+      },
+    ]);
+  });
+  header.appendChild(moreBtn);
 
   pane.appendChild(header);
 
