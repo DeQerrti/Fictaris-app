@@ -5,6 +5,7 @@ import { stickersToHtml, attachStickyPopover } from "./stickies.js";
 import { buildManuscriptDocx } from "./docx.js";
 import { openContextMenu } from "./context-menu.js";
 import { loadStatuses, buildStatusDot } from "./chapter-status.js";
+import { pushTrash } from "./trash.js";
 import { iconSvg } from "./icons.js";
 import { i18n } from "./i18n.js";
 
@@ -41,7 +42,17 @@ function persist() {
 const SNAPSHOT_LIMIT = 20;
 
 function blankChapter(folderId = null) {
-  return { id: uid(), title: i18n("Новая глава"), content: "", status: statuses[0]?.key || "draft", authorNotes: "", stickies: [], snapshots: [], folderId };
+  return { id: uid(), title: i18n("Новая глава"), content: "", status: statuses[0]?.key || "draft", notes: [], stickies: [], snapshots: [], folderId };
+}
+
+// Раньше в главе была одна общая заметка автора (authorNotes, строка) —
+// теперь заметок можно завести сколько нужно (notes: [{id, text}], как
+// у стикеров). Старые главы переводятся в новый вид при каждом открытии
+// вкладки: одна заметка, если старое поле было не пустым, иначе пусто.
+function migrateChapterNotes(chapter) {
+  if (Array.isArray(chapter.notes)) return;
+  chapter.notes = chapter.authorNotes ? [{ id: uid(), text: chapter.authorNotes }] : [];
+  delete chapter.authorNotes;
 }
 
 function blankFolder(parentId = null) {
@@ -52,9 +63,8 @@ function folderParent(folder) {
   return folder.parentId || null;
 }
 
-// Все главы папки и вложенных в неё подпапок разом — экспорт папки
-// должен захватывать всё дерево, а не только прямых детей.
-function collectFolderChapters(folderId) {
+// id папки и всех вложенных в неё подпапок разом, любой глубины.
+function collectFolderIds(folderId) {
   const ids = new Set([folderId]);
   let grew = true;
   while (grew) {
@@ -66,6 +76,13 @@ function collectFolderChapters(folderId) {
       }
     }
   }
+  return ids;
+}
+
+// Все главы папки и вложенных в неё подпапок разом — экспорт папки
+// должен захватывать всё дерево, а не только прямых детей.
+function collectFolderChapters(folderId) {
+  const ids = collectFolderIds(folderId);
   return manuscript.chapters.filter((c) => c.folderId && ids.has(c.folderId));
 }
 
@@ -123,6 +140,12 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
+// Раньше вставка стикера просто роняла маркер в текст и ничего больше
+// не показывала — со стороны выглядело как непонятный мусор в строке,
+// без единого намёка, что это и как это заполнить. Теперь она же сразу
+// открывает панель «Заметки и снимки» и ставит курсор в текстовое поле
+// нового стикера — писать можно сразу, не разыскивая, куда делась
+// только что вставленная заметка.
 function insertSticky(textarea, chapter) {
   const sticky = { id: nextStickyId(chapter), text: "" };
   chapter.stickies = [...(chapter.stickies || []), sticky];
@@ -130,8 +153,11 @@ function insertSticky(textarea, chapter) {
   const marker = `[[note:${sticky.id}]]`;
   textarea.value = textarea.value.slice(0, pos) + marker + textarea.value.slice(pos);
   chapter.content = textarea.value;
+  extrasOpen = true;
   persist();
   draw();
+  const area = container?.querySelector(`.sticky-editor-textarea[data-sticky-id="${sticky.id}"]`);
+  area?.focus();
 }
 
 // Оборачивает выделение маркерами (**жирный**/*курсив*) — так же, как
@@ -191,7 +217,7 @@ function attachEditorContextMenu(textarea, chapter) {
       { label: i18n("Вставить"), action: () => document.execCommand("paste") },
       { label: i18n("Выделить всё"), action: () => textarea.select() },
       { separator: true },
-      { label: hasSelection ? i18n("Слов в выделении: {n}", { n: selectedWords }) : i18n("Слов в главе: {n}", { n: wordCount(chapter.content) }), disabled: true },
+      { label: hasSelection ? i18n("Слов выделено: {n}", { n: selectedWords }) : i18n("Слов в главе: {n}", { n: wordCount(chapter.content) }), disabled: true },
     ]);
   });
 }
@@ -207,6 +233,7 @@ export async function renderManuscript(root, focusChapterId) {
   ]);
   manuscript = manuscriptData;
   manuscript.folders = manuscript.folders || []; // старые проекты сохранялись без папок
+  for (const c of manuscript.chapters) migrateChapterNotes(c);
   characters = charactersData;
   statuses = statusList;
   const savedSize = Number(siteSettings.editorFontSize);
@@ -262,7 +289,9 @@ function buildChapterItem(ch, depth) {
   item.addEventListener("contextmenu", (e) => {
     e.preventDefault();
     e.stopPropagation();
-    openContextMenu(e.clientX, e.clientY, [
+    const x = e.clientX;
+    const y = e.clientY;
+    openContextMenu(x, y, [
       {
         label: i18n("Статус"),
         items: statuses.map((s) => ({
@@ -289,6 +318,18 @@ function buildChapterItem(ch, depth) {
       { separator: true },
       { label: i18n("Экспорт главы в .md"), action: () => exportMarkdown([ch], `${safeFileName(ch.title)}.md`) },
       { label: i18n("Экспорт главы в .docx"), action: () => exportDocx([ch], `${safeFileName(ch.title)}.docx`) },
+      { separator: true },
+      {
+        label: i18n("Удалить главу"),
+        danger: true,
+        // Как и удаление папки ниже — не сразу, второй клик поверх
+        // нового меню с одним пунктом-подтверждением.
+        action: () => {
+          openContextMenu(x, y, [
+            { label: i18n("Точно удалить главу «{title}»?", { title: ch.title || i18n("Без названия") }), danger: true, action: () => deleteChapter(ch) },
+          ]);
+        },
+      },
     ]);
   });
   item.addEventListener("dragstart", (e) => { e.stopPropagation(); dragId = ch.id; });
@@ -313,13 +354,33 @@ function buildChapterItem(ch, depth) {
   return item;
 }
 
-function deleteFolder(folder) {
-  // Не трогает содержимое: главы становятся «без папки», вложенные
-  // подпапки поднимаются на уровень выше — удаляется только сама
-  // папка-контейнер, не то, что в ней лежало.
-  for (const c of manuscript.chapters) if (c.folderId === folder.id) c.folderId = null;
-  for (const f of manuscript.folders) if (folderParent(f) === folder.id) f.parentId = folderParent(folder);
-  manuscript.folders = manuscript.folders.filter((f) => f.id !== folder.id);
+// Удаление главы — тоже не насовсем: как и везде в приложении, глава
+// уходит в корзину (trash.js) и её можно оттуда вернуть.
+async function deleteChapter(ch) {
+  await pushTrash("chapter", ch);
+  manuscript.chapters = manuscript.chapters.filter((c) => c.id !== ch.id);
+  if (manuscript.activeChapterId === ch.id) {
+    manuscript.activeChapterId = manuscript.chapters[0]?.id || null;
+  }
+  persist();
+  draw();
+}
+
+// Удаляет папку целиком вместе со всеми вложенными подпапками и главами
+// в них — раньше главы просто расфасовывались обратно как «без папки»,
+// но это оказалось неожиданным поведением: удаление папки должно
+// убирать и её содержимое, как в обычном файловом менеджере. Сами главы
+// при этом не пропадают насовсем — уходят в корзину.
+async function deleteFolder(folder) {
+  const ids = collectFolderIds(folder.id);
+  const chaptersToDelete = manuscript.chapters.filter((c) => c.folderId && ids.has(c.folderId));
+  for (const c of chaptersToDelete) await pushTrash("chapter", c);
+  const deletedIds = new Set(chaptersToDelete.map((c) => c.id));
+  manuscript.chapters = manuscript.chapters.filter((c) => !deletedIds.has(c.id));
+  manuscript.folders = manuscript.folders.filter((f) => !ids.has(f.id));
+  if (manuscript.activeChapterId && deletedIds.has(manuscript.activeChapterId)) {
+    manuscript.activeChapterId = manuscript.chapters[0]?.id || null;
+  }
   persist();
   draw();
 }
@@ -370,7 +431,7 @@ function folderContextMenuItems(folder, x, y) {
       // меню с одним пунктом-подтверждением (см. board.js/data-panel.js).
       action: () => {
         openContextMenu(x, y, [
-          { label: i18n("Точно удалить? Главы и подпапки останутся, без этой папки."), danger: true, action: () => deleteFolder(folder) },
+          { label: i18n("Точно удалить папку «{name}» со всем содержимым?", { name: folder.name || i18n("Без названия") }), danger: true, action: () => deleteFolder(folder) },
         ]);
       },
     },
@@ -569,7 +630,7 @@ function buildEditor() {
   const wc = document.createElement("div");
   wc.className = "word-count";
   const total = manuscript.chapters.reduce((sum, c) => sum + wordCount(c.content), 0);
-  wc.textContent = i18n("{count} слов · всего {total}", { count: wordCount(chapter.content), total });
+  wc.textContent = i18n("{count} слов в главе · всего в рукописи: {total}", { count: wordCount(chapter.content), total });
   header.appendChild(wc);
 
   // Статус — уже переехал в ПКМ по главе в списке слева (chapter-list),
@@ -648,7 +709,7 @@ function buildEditor() {
     textarea.placeholder = i18n("Пиши здесь… @имя вставит упоминание персонажа");
     textarea.addEventListener("input", () => {
       chapter.content = textarea.value;
-      wc.textContent = i18n("{count} слов · всего {total}", { count: wordCount(chapter.content), total: manuscript.chapters.reduce((s, c) => s + wordCount(c.content), 0) });
+      wc.textContent = i18n("{count} слов в главе · всего в рукописи: {total}", { count: wordCount(chapter.content), total: manuscript.chapters.reduce((s, c) => s + wordCount(c.content), 0) });
       persist();
     });
     wrap.appendChild(textarea);
@@ -671,9 +732,11 @@ function buildExtrasPanel(chapter) {
   closeRow.className = "drawer-actions";
   closeRow.style.marginTop = "0";
   closeRow.style.marginBottom = "12px";
+  closeRow.style.justifyContent = "flex-end";
   const closeBtn = document.createElement("button");
-  closeBtn.className = "btn";
-  closeBtn.textContent = i18n("Закрыть ×");
+  closeBtn.className = "btn icon-btn";
+  closeBtn.innerHTML = iconSvg("close", 14);
+  closeBtn.title = i18n("Закрыть");
   closeBtn.addEventListener("click", () => {
     extrasOpen = false;
     draw();
@@ -681,26 +744,68 @@ function buildExtrasPanel(chapter) {
   closeRow.appendChild(closeBtn);
   panel.appendChild(closeRow);
 
-  const notes = document.createElement("details");
-  notes.className = "author-notes";
-  notes.open = true;
-  const summary = document.createElement("summary");
-  summary.textContent = i18n("Заметки");
-  notes.appendChild(summary);
-  const notesArea = document.createElement("textarea");
-  notesArea.value = chapter.authorNotes || "";
-  notesArea.placeholder = i18n("Не входит в текст главы и в экспорт.");
-  notesArea.addEventListener("input", () => {
-    chapter.authorNotes = notesArea.value;
-    persist();
-  });
-  notes.appendChild(notesArea);
-  panel.appendChild(notes);
-
+  panel.appendChild(buildNotesEditor(chapter));
   panel.appendChild(buildStickyEditor(chapter));
   panel.appendChild(buildSnapshots(chapter));
 
   return panel;
+}
+
+// Заметок теперь может быть сколько угодно на главу (раньше — одно
+// общее поле authorNotes) — тот же список-с-кнопкой-добавить, что и у
+// стикеров ниже, только без связи с текстом главы: это заметки только
+// для себя, не привязанные к конкретному месту в тексте.
+function buildNotesEditor(chapter) {
+  const notes = chapter.notes || [];
+  const details = document.createElement("details");
+  details.className = "author-notes";
+  details.open = true;
+  const summary = document.createElement("summary");
+  summary.textContent = i18n("Заметки ({n})", { n: notes.length });
+  details.appendChild(summary);
+
+  if (!notes.length) {
+    const empty = document.createElement("div");
+    empty.className = "hint-text";
+    empty.textContent = i18n("Не входят в текст главы и в экспорт.");
+    details.appendChild(empty);
+  }
+
+  for (const note of notes) {
+    const row = document.createElement("div");
+    row.className = "sticky-editor-row";
+    const area = document.createElement("textarea");
+    area.className = "sticky-editor-textarea";
+    area.value = note.text || "";
+    area.placeholder = i18n("Текст заметки…");
+    area.addEventListener("input", () => { note.text = area.value; persist(); });
+    row.appendChild(area);
+
+    const delBtn = document.createElement("button");
+    delBtn.className = "btn danger";
+    delBtn.textContent = "✕";
+    delBtn.title = i18n("Удалить заметку");
+    delBtn.addEventListener("click", () => {
+      chapter.notes = chapter.notes.filter((n) => n.id !== note.id);
+      persist();
+      draw();
+    });
+    row.appendChild(delBtn);
+
+    details.appendChild(row);
+  }
+
+  const addBtn = document.createElement("button");
+  addBtn.className = "btn";
+  addBtn.textContent = i18n("+ Заметка");
+  addBtn.addEventListener("click", () => {
+    chapter.notes = [...(chapter.notes || []), { id: uid(), text: "" }];
+    persist();
+    draw();
+  });
+  details.appendChild(addBtn);
+
+  return details;
 }
 
 function buildStickyEditor(chapter) {
@@ -724,6 +829,7 @@ function buildStickyEditor(chapter) {
     row.className = "sticky-editor-row";
     const area = document.createElement("textarea");
     area.className = "sticky-editor-textarea";
+    area.dataset.stickyId = sticky.id; // чтобы insertSticky мог найти и сфокусировать именно этот стикер сразу после вставки
     area.value = sticky.text || "";
     area.placeholder = i18n("Текст заметки…");
     area.addEventListener("input", () => { sticky.text = area.value; persist(); });
@@ -732,9 +838,16 @@ function buildStickyEditor(chapter) {
     const delBtn = document.createElement("button");
     delBtn.className = "btn danger";
     delBtn.textContent = "✕";
-    delBtn.title = i18n("Удалить стикер (маркер [[note:…]] в тексте останется как обычный текст)");
+    delBtn.title = i18n("Удалить стикер вместе с его маркером в тексте главы");
     delBtn.addEventListener("click", () => {
+      // Раньше маркер [[note:id]] оставался в тексте главы как обычный
+      // текст — стикер пропадал из списка, но в самой главе всё ещё
+      // торчал нечитаемый огрызок разметки.
       chapter.stickies = chapter.stickies.filter((s) => s.id !== sticky.id);
+      chapter.content = (chapter.content || "").replace(
+        new RegExp(`\\[\\[note:${sticky.id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\]\\]`, "g"),
+        ""
+      );
       persist();
       draw();
     });
@@ -767,6 +880,7 @@ function buildSnapshots(chapter) {
 
     const row = document.createElement("div");
     row.className = "snapshot-row";
+    row.title = i18n("Снимок — сохранённая копия текста главы на этот момент. «Просмотреть» покажет её, не трогая текущий текст; «Восстановить» заменит им текущий текст главы.");
 
     const date = document.createElement("span");
     date.className = "snapshot-date";

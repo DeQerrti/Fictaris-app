@@ -184,7 +184,7 @@ export const EN_DICT = {
   "Фокус-режим — скрыть сайдбар и список глав": "Focus mode — hide the sidebar and chapter list",
   "Снимок": "Snapshot",
   "Сохранить текущий текст как снимок версии (до 20 на главу)": "Save the current text as a version snapshot (up to 20 per chapter)",
-  "{count} слов · всего {total}": "{count} words · {total} total",
+  "{count} слов в главе · всего в рукописи: {total}": "{count} words in this chapter · {total} in the whole manuscript",
   "Глава пуста.": "The chapter is empty.",
   "Пиши здесь… @имя вставит упоминание персонажа": "Write here… @name inserts a character mention",
   "📌 Стикер": "📌 Sticky note",

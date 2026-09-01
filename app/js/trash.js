@@ -26,6 +26,7 @@ function typeInfo() {
     faction: { label: i18n("Фракция"), listPath: "/api/factions", displayName: (i) => i.name },
     timeline: { label: i18n("Событие таймлайна"), listPath: "/api/timeline", displayName: (i) => i.title },
     "board-card": { label: i18n("Карточка доски"), listPath: null, displayName: (i) => i.title },
+    chapter: { label: i18n("Глава"), listPath: null, displayName: (i) => i.title || i18n("Без названия") },
   };
 }
 
@@ -53,8 +54,22 @@ async function restoreBoardCard(card) {
   await apiPost("/api/board", board);
 }
 
+// Глава — тоже не плоский массив на верхнем уровне, а manuscript.chapters
+// внутри manuscript.json; папка, в которой она когда-то лежала, к
+// моменту восстановления могла и сама уже быть удалена — тогда глава
+// просто возвращается «без папки», а не теряется вовсе.
+async function restoreChapter(chapter) {
+  const manuscript = await apiGet("/api/manuscript");
+  if (manuscript.chapters.some((c) => c.id === chapter.id)) return;
+  const folders = manuscript.folders || [];
+  const folderId = folders.some((f) => f.id === chapter.folderId) ? chapter.folderId : null;
+  manuscript.chapters.push({ ...chapter, folderId });
+  await apiPost("/api/manuscript", manuscript);
+}
+
 async function restoreEntry(entry) {
   if (entry.type === "board-card") await restoreBoardCard(entry.item);
+  else if (entry.type === "chapter") await restoreChapter(entry.item);
   else await restoreArrayItem(typeInfo()[entry.type].listPath, entry.item);
 }
 
