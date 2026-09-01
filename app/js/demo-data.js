@@ -66,7 +66,18 @@ export async function buildDemoBundle() {
     goal: "Вывезти Астру из города", flaws: "Продаст кого угодно, если цена достаточно высока",
     backstory: "Знает все контрабандные тропы побережья", tags: "союзница, ненадёжная" };
 
-  const characters = [aster, kael, varn, nessa];
+  // Родители Астры — только для родословной (family-tree.js читает
+  // character.parentIds), сами не появляются больше нигде в сюжете: без
+  // них вкладка «Родословная» у демо-проекта оставалась бы пустой.
+  const father = { id: "demo-c-father", name: "Лорд Эдвин Вирен", color: "#9a9250",
+    role: "Прежний глава Дома Вирен", age: "†", appearance: "Известен только по портретам",
+    personality: "", motivation: "", goal: "", flaws: "", backstory: "Убит во время переворота Варна", tags: "погиб" };
+  const mother = { id: "demo-c-mother", name: "Леди Мира Вирен", color: "#6a8fae",
+    role: "Прежняя глава Дома Вирен", age: "†", appearance: "Известна только по портретам",
+    personality: "", motivation: "", goal: "", flaws: "", backstory: "Убита во время переворота Варна", tags: "погиб" };
+  aster.parentIds = [father.id, mother.id];
+
+  const characters = [aster, kael, varn, nessa, father, mother];
 
   const fortress = { id: "demo-l-fortress", name: "Крепость Раскола", type: "dungeon",
     description: "Полуразрушенный орденский замок в горах", notes: "Здесь хранится клинок", tags: "орден, руины" };
