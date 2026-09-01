@@ -9,12 +9,13 @@
 //    хранилища нет, оно пропало, или это первый запуск → экран приветствия
 // ══════════════════════════════════════════════
 
-import { app, BrowserWindow, dialog, shell, Menu, MenuItem } from "electron";
+import { app, BrowserWindow, dialog, shell, Menu, MenuItem, ipcMain } from "electron";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Vault } from "./vault.js";
-import { createServer, listen } from "./server.js";
+import { registerAppScheme, registerAppProtocol, appUrl } from "./protocol.js";
+import { ROUTES, ApiError } from "../core/api.js";
 import { findUpdate, openDownload } from "./update.js";
 import { titleBarOptions, titleBarCss, overlayColors } from "./chrome.js";
 // Именно так, а не `import { autoUpdater } from "electron-updater"` — см.
@@ -27,6 +28,10 @@ const { autoUpdater } = pkg;
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const APP_DIR = path.join(HERE, "..", "app");
+
+// Привилегии схемы app:// нужно зарегистрировать до app.whenReady() —
+// сам протокол.handle подключается уже внутри него (см. ниже).
+registerAppScheme();
 
 // Масштаб — проценты, а не «уровни» setZoomLevel: тот множит на 1.2 за
 // шаг, поэтому от 100% сразу прыгает на 120%, потом на 144% — с таким
@@ -50,7 +55,6 @@ const configFile = () => path.join(app.getPath("userData"), "config.json");
 
 let vault = null;
 let win = null;
-let port = null;
 let config = {};
 
 async function readConfig() {
@@ -247,6 +251,53 @@ function appRoutes() {
     },
   };
 }
+
+// ── Диспетчер IPC ────────────────────────────────
+// Раньше это был http.createServer (electron/server.js) — тот же
+// порядок разбора запроса (сперва appRoutes, не требующий vault, потом
+// ROUTES из core/api.js), но без HTTP: канал один на всё, "какой роут"
+// решается здесь же по паре "METHOD /path", как раньше решалось по
+// URL. Записи в ROUTES по-прежнему идут строго по одной (inQueue) —
+// иначе два подряд идущих автосохранения могли бы затереть правки друг
+// друга, не дождавшись записи на диск.
+let queue = Promise.resolve();
+function inQueue(task) {
+  const result = queue.then(task, task);
+  queue = result.then(
+    () => {},
+    () => {}
+  );
+  return result;
+}
+
+ipcMain.handle("api", async (_event, { method, path: rawPath, body }) => {
+  const url = new URL(rawPath, "app://local");
+  const pathname = url.pathname;
+  const query = url.searchParams;
+
+  try {
+    const appHandler = appRoutes()[`${method} ${pathname}`];
+    if (appHandler) {
+      return { status: 200, data: (await appHandler({ body: body || {}, query })) || { ok: true } };
+    }
+
+    if (pathname.startsWith("/api/")) {
+      const handler = ROUTES[`${method} ${pathname}`];
+      if (!handler) return { status: 404, data: { error: "Not Found" } };
+
+      if (!vault) return { status: 503, data: { error: "Хранилище не выбрано" } };
+
+      const run = () => handler({ vault, body: body || {}, query });
+      const data = await (method === "POST" ? inQueue(run) : run());
+      return { status: 200, data };
+    }
+
+    return { status: 404, data: { error: "Not Found" } };
+  } catch (e) {
+    const status = e instanceof ApiError ? e.status : 500;
+    return { status, data: { error: e.message } };
+  }
+});
 
 // ── Обновления ─────────────────────────────────
 // На Windows и Linux — тихо: electron-updater сам качает файл в фоне,
@@ -457,11 +508,11 @@ function buildMenu() {
 }
 
 function openMain() {
-  win?.loadURL(`http://127.0.0.1:${port}/`);
+  win?.loadURL(appUrl("/index.html"));
 }
 
 function openWelcome() {
-  win?.loadURL(`http://127.0.0.1:${port}/welcome`);
+  win?.loadURL(appUrl("/welcome"));
 }
 
 function createWindow() {
@@ -473,7 +524,12 @@ function createWindow() {
     show: false,
     backgroundColor: overlayColors(config.skin).bg,
     ...titleBarOptions(process.platform, overlayColors(config.skin)),
-    webPreferences: { nodeIntegration: false, contextIsolation: true, sandbox: true },
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: true,
+      preload: path.join(HERE, "preload.js"),
+    },
   });
   win.once("ready-to-show", () => win.show());
   if (process.platform !== "darwin") win.removeMenu();
@@ -562,8 +618,7 @@ app.whenReady().then(async () => {
   const known = current && (await exists(current.path));
   if (known) await useVault(current.path);
 
-  const server = createServer({ appDir: APP_DIR, getVault: () => vault, appRoutes: appRoutes() });
-  port = await listen(server);
+  registerAppProtocol({ appDir: APP_DIR, getVault: () => vault });
 
   // Полоса меню — только ради зума/F5/девтулов, сама себя не показывает
   // поверх контента (win.removeMenu() ниже, в createWindow). Рамку окна
