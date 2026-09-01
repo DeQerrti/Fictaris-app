@@ -915,6 +915,41 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
 .theme-accent-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; color: var(--text-dim); font-size: 0.85rem; }
 .theme-accent-row input[type="color"] { width: 40px; height: 28px; padding: 0; border: 1px solid var(--border); border-radius: 6px; background: none; cursor: pointer; }
 
+.palette-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px 20px;
+  margin-bottom: 14px;
+  max-width: 720px;
+}
+
+.palette-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.palette-row input[type="color"] {
+  flex-shrink: 0;
+  width: 36px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: none;
+  cursor: pointer;
+}
+
+.palette-row span {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.85rem;
+  color: var(--text);
+}
+
+.palette-row span small { color: var(--text-faint); font-size: 0.72rem; }
+
 /* ── Редактор ──────────────────────────────── */
 
 .font-size-row { display: flex; align-items: center; gap: 4px; }

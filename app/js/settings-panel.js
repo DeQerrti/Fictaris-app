@@ -1,7 +1,8 @@
 import { apiGet, apiPost } from "./api.js";
 import { buildDataSections } from "./data-panel.js";
 import { i18n, currentLang, setLang } from "./i18n.js";
-import { THEME_PRESETS, saveTheme } from "./theme.js";
+import { THEME_PRESETS, CUSTOM_COLOR_TOKENS, saveTheme } from "./theme.js";
+import { escapeHtml } from "./chips.js";
 import { defaultLabels, saveLabels, resetLabels } from "./labels.js";
 import { HIDEABLE_TABS, getHiddenTabs, setTabHidden, getTabOrder, setTabOrder } from "./visibility.js";
 import { captureKey, saveShortcut, clearShortcut } from "./shortcuts.js";
@@ -133,8 +134,56 @@ async function buildAppearanceSection() {
     location.reload(); // проще перечитать цвет темы по умолчанию, чем тянуть его сюда из style.css
   });
 
-  section.append(swatches, accentRow, resetBtn);
+  section.append(swatches, accentRow, resetBtn, buildPaletteSection(settings));
   return section;
+}
+
+// Полная палитра — каждый токен темы поверх готовых пресетов, для тех,
+// кому мало выбора между двумя темами и акцентом. Живёт в той же
+// вкладке «Оформление», отдельным блоком под пресетами. Начальные
+// значения — то, что реально сейчас на экране (getComputedStyle), а не
+// значения по умолчанию из style.css: так свои правки одной темы не
+// сбрасываются при переключении на другую половину экрана.
+function buildPaletteSection(settings) {
+  const wrap = document.createElement("div");
+  wrap.style.marginTop = "20px";
+  wrap.innerHTML = `<h4 style="margin:0 0 4px;">${i18n("Палитра")}</h4><p style="margin:0 0 10px;color:var(--text-dim);font-size:0.85rem;">${i18n("Свой цвет для каждого элемента интерфейса — поверх темы и акцента.")}</p>`;
+
+  const custom = { ...(settings.customColors || {}) };
+  const cs = getComputedStyle(document.documentElement);
+  const grid = document.createElement("div");
+  grid.className = "palette-grid";
+
+  for (const [key, cssVar, label, hint] of CUSTOM_COLOR_TOKENS) {
+    const row = document.createElement("label");
+    row.className = "palette-row";
+
+    const input = document.createElement("input");
+    input.type = "color";
+    const current = /^#[0-9a-f]{6}$/i.test(custom[key] || "") ? custom[key] : cs.getPropertyValue(cssVar).trim();
+    input.value = /^#[0-9a-f]{6}$/i.test(current) ? current : "#000000";
+    input.addEventListener("input", () => {
+      custom[key] = input.value;
+      saveTheme({ customColors: custom });
+    });
+
+    const text = document.createElement("span");
+    text.innerHTML = `${escapeHtml(i18n(label))}<small>${escapeHtml(i18n(hint))}</small>`;
+
+    row.append(input, text);
+    grid.appendChild(row);
+  }
+
+  const resetBtn = document.createElement("button");
+  resetBtn.className = "btn";
+  resetBtn.textContent = i18n("Сбросить палитру");
+  resetBtn.addEventListener("click", async () => {
+    await saveTheme({ customColors: null });
+    location.reload();
+  });
+
+  wrap.append(grid, resetBtn);
+  return wrap;
 }
 
 // ── Приложение ────────────────────────────────

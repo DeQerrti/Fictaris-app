@@ -17,6 +17,21 @@ export const THEME_PRESETS = {
   light: { label: "Пергамент", hint: "Тёплая бумага", defaultAccent: "#a4653a", direction: "darken" },
 };
 
+// Полная кастомизация палитры — поверх темы/акцента. Список — ровно те
+// переменные, что уже определены в style.css :root/[data-skin] (см.
+// шапку файла); ключ (первый элемент) — то, чем это лежит в
+// site-settings.json → customColors, второй — сама CSS-переменная.
+export const CUSTOM_COLOR_TOKENS = [
+  ["bg", "--bg", "Фон страницы", "Самый нижний слой"],
+  ["panelAlt", "--panel-alt", "Фон второго уровня", "Поля ввода, вложенные подложки"],
+  ["card", "--card", "Блоки и карточки", "Карточки, панели, модалки"],
+  ["panel", "--panel", "Блоки второго уровня", "Вкладки, чипы, поле поиска"],
+  ["border", "--border", "Границы", "Тонкие разделители"],
+  ["text", "--text", "Основной текст", "Тело текста и подписи"],
+  ["textDim", "--text-dim", "Приглушённый текст", "Даты, вторичные пометки"],
+  ["textFaint", "--text-faint", "Едва заметный текст", "Плейсхолдеры, декоративные детали"],
+];
+
 const CACHE_KEY = "fictaris_theme_cache";
 
 function isHex(value) {
@@ -82,7 +97,7 @@ function resolveAccent(settings, skin) {
   return null; // нет своего — используется акцент из CSS темы как есть
 }
 
-function applyOverrides(skin, accent) {
+function applyOverrides(skin, accent, customColors) {
   document.documentElement.setAttribute("data-skin", skin);
   let style = document.getElementById("theme-overrides");
   if (!style) {
@@ -90,12 +105,16 @@ function applyOverrides(skin, accent) {
     style.id = "theme-overrides";
     document.head.appendChild(style);
   }
-  if (!accent) {
-    style.textContent = "";
-    return;
+
+  const vars = [];
+  if (accent) {
+    const hover = accentHover(accent, THEME_PRESETS[skin]?.direction || "lighten");
+    vars.push(`--accent: ${accent}`, `--accent-hover: ${hover}`);
   }
-  const hover = accentHover(accent, THEME_PRESETS[skin]?.direction || "lighten");
-  style.textContent = `:root { --accent: ${accent}; --accent-hover: ${hover}; }`;
+  for (const [key, cssVar] of CUSTOM_COLOR_TOKENS) {
+    if (isHex(customColors?.[key])) vars.push(`${cssVar}: ${customColors[key]}`);
+  }
+  style.textContent = vars.length ? `:root { ${vars.join("; ")}; }` : "";
 }
 
 // Сообщает окну Electron, в какие цвета красить кнопки
@@ -118,7 +137,8 @@ export async function applyTheme() {
   }
   const skin = THEME_PRESETS[settings.theme] ? settings.theme : "dark";
   const accent = resolveAccent(settings, skin);
-  applyOverrides(skin, accent);
+  const customColors = settings.customColors || null;
+  applyOverrides(skin, accent, customColors);
   // Размер шрифта редактора (Настройки → Редактор) — читает --editor-font-size
   // .chapter-content в style.css. Тоже «как выглядит приложение», поэтому
   // применяется тут же, а не отдельным модулем.
@@ -126,7 +146,7 @@ export async function applyTheme() {
     document.documentElement.style.setProperty("--editor-font-size", `${settings.editorFontSize}px`);
   }
   try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify({ skin, accent }));
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ skin, accent, customColors }));
   } catch {
     // приватный режим/квота — не страшно, это только кэш для FOUC
   }
