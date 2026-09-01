@@ -627,10 +627,12 @@ function buildEditor() {
   });
   header.appendChild(titleInput);
 
+  // Только счёт по этой главе — сумма по всей рукописи дублировала
+  // «Статистику» (там уже есть «слов написано» по всему проекту), а не
+  // по папке, как можно было подумать глядя на неё здесь.
   const wc = document.createElement("div");
   wc.className = "word-count";
-  const total = manuscript.chapters.reduce((sum, c) => sum + wordCount(c.content), 0);
-  wc.textContent = i18n("{count} слов в главе · всего в рукописи: {total}", { count: wordCount(chapter.content), total });
+  wc.textContent = i18n("{count} слов", { count: wordCount(chapter.content) });
   header.appendChild(wc);
 
   // Статус — уже переехал в ПКМ по главе в списке слева (chapter-list),
@@ -709,7 +711,7 @@ function buildEditor() {
     textarea.placeholder = i18n("Пиши здесь… @имя вставит упоминание персонажа");
     textarea.addEventListener("input", () => {
       chapter.content = textarea.value;
-      wc.textContent = i18n("{count} слов в главе · всего в рукописи: {total}", { count: wordCount(chapter.content), total: manuscript.chapters.reduce((s, c) => s + wordCount(c.content), 0) });
+      wc.textContent = i18n("{count} слов", { count: wordCount(chapter.content) });
       persist();
     });
     wrap.appendChild(textarea);
