@@ -1,8 +1,9 @@
 import { apiGet, apiPost, uid } from "./api.js";
 import { debounceSave } from "./save-badge.js";
-import { characterSelect } from "./chips.js";
 import { pushTrash } from "./trash.js";
 import { buildExportPngButton } from "./png-export.js";
+import { openContextMenu } from "./context-menu.js";
+import { escapeHtml } from "./chips.js";
 import { i18n } from "./i18n.js";
 
 const LABEL_COLORS = [
@@ -19,6 +20,7 @@ const TEMPLATES = [
 
 let board = { columns: [], cards: {}, cardOrder: {} };
 let characters = [];
+let factions = [];
 let container = null;
 const save = debounceSave((data) => apiPost("/api/board", data));
 
@@ -41,9 +43,13 @@ function charById(id) {
   return characters.find((c) => c.id === id);
 }
 
+function factionById(id) {
+  return factions.find((f) => f.id === id);
+}
+
 export async function renderBoard(root) {
   container = root;
-  [board, characters] = await Promise.all([apiGet("/api/board"), apiGet("/api/characters")]);
+  [board, characters, factions] = await Promise.all([apiGet("/api/board"), apiGet("/api/characters"), apiGet("/api/factions")]);
   if (!board.columns.length) {
     board = defaultBoard();
     persist();
@@ -195,7 +201,7 @@ function buildColumn(col) {
   addCard.className = "add-chapter";
   addCard.textContent = i18n("+ Карточка");
   addCard.addEventListener("click", () => {
-    const card = { id: uid(), title: i18n("Новая карточка"), characterId: null, labelColor: null };
+    const card = { id: uid(), title: i18n("Новая карточка"), notes: "", characterId: null, factionId: null, labelColor: null };
     board.cards[card.id] = card;
     board.cardOrder[col.id].push(card.id);
     persist();
@@ -215,6 +221,54 @@ function moveCard(cardId, targetColId, index) {
   draw();
 }
 
+async function deleteCard(card, colId) {
+  await pushTrash("board-card", card);
+  board.cardOrder[colId] = board.cardOrder[colId].filter((id) => id !== card.id);
+  delete board.cards[card.id];
+  persist();
+  draw();
+}
+
+// Пункты «Цвет»/«Персонаж»/«Фракция»/«Удалить» — по ПКМ, а не постоянными
+// виджетами на лицевой стороне карточки (как было раньше): раньше
+// свотчи и выпадающий список персонажа отъедали половину карточки под
+// собственно текст, а места для сути сцены оставалось на одну-две
+// строки. Лицевая сторона теперь — заголовок и заметки на весь рост,
+// а привязки — второстепенное действие, как в Trello/Obsidian.
+function cardContextItems(card, colId) {
+  const colorItems = [
+    { label: i18n("Без метки"), swatch: "var(--panel-alt)", checked: !card.labelColor, action: () => { card.labelColor = null; persist(); draw(); } },
+    ...LABEL_COLORS.map((color) => ({
+      label: color, swatch: color, checked: card.labelColor === color,
+      action: () => { card.labelColor = color; persist(); draw(); },
+    })),
+  ];
+
+  const characterItems = [
+    { label: i18n("Без персонажа"), checked: !card.characterId, action: () => { card.characterId = null; persist(); draw(); } },
+    ...characters.map((c) => ({
+      label: escapeHtml(c.name), swatch: c.color || "#7c7157", checked: card.characterId === c.id,
+      action: () => { card.characterId = c.id; persist(); draw(); },
+    })),
+  ];
+
+  const factionItems = [
+    { label: i18n("Без фракции"), checked: !card.factionId, action: () => { card.factionId = null; persist(); draw(); } },
+    ...factions.map((f) => ({
+      label: escapeHtml(f.name), checked: card.factionId === f.id,
+      action: () => { card.factionId = f.id; persist(); draw(); },
+    })),
+  ];
+
+  return [
+    { label: i18n("Цвет метки"), items: colorItems },
+    { label: i18n("Связать с персонажем"), items: characterItems, disabled: !characters.length },
+    { label: i18n("Связать с фракцией"), items: factionItems, disabled: !factions.length },
+    { separator: true },
+    { label: i18n("Удалить карточку"), danger: true, action: () => deleteCard(card, colId) },
+  ];
+}
+
 function buildCard(card, colId) {
   const el = document.createElement("div");
   el.className = "board-card";
@@ -232,6 +286,10 @@ function buildCard(card, colId) {
     const index = board.cardOrder[colId].indexOf(card.id);
     moveCard(dragCardId, colId, index);
   });
+  el.addEventListener("contextmenu", (e) => {
+    e.preventDefault();
+    openContextMenu(e.clientX, e.clientY, cardContextItems(card, colId));
+  });
 
   const titleInput = document.createElement("input");
   titleInput.className = "board-card-title";
@@ -242,70 +300,47 @@ function buildCard(card, colId) {
   });
   el.appendChild(titleInput);
 
-  // Раньше в карточке помещалось только однострочное название — для
-  // самой сути сцены/задачи этого мало, приходилось держать подробности
-  // где-то отдельно. Заметки — необязательные, разворачиваются вручную
-  // (resize: vertical в style.css), не занимают места, пока пусты.
+  // Лицевая сторона — в основном свободный текст: заметки растут на всё
+  // оставшееся место карточки (flex, а не фиксированные rows), заголовок
+  // и линки внизу — второстепенны.
   const notesArea = document.createElement("textarea");
   notesArea.className = "board-card-notes";
   notesArea.value = card.notes || "";
-  notesArea.placeholder = i18n("Заметки…");
-  notesArea.rows = 2;
+  notesArea.placeholder = i18n("Пиши здесь свободно — правый клик даёт цвет и связи…");
+  notesArea.rows = 5;
   notesArea.addEventListener("input", () => {
     card.notes = notesArea.value;
     persist();
   });
   el.appendChild(notesArea);
 
-  const labelRow = document.createElement("div");
-  labelRow.className = "card-label-row";
-  const noneSwatch = document.createElement("div");
-  noneSwatch.className = "swatch label-swatch" + (!card.labelColor ? " selected" : "");
-  noneSwatch.style.background = "var(--panel-alt)";
-  noneSwatch.title = i18n("Без метки");
-  noneSwatch.addEventListener("click", () => { card.labelColor = null; persist(); draw(); });
-  labelRow.appendChild(noneSwatch);
-  for (const color of LABEL_COLORS) {
-    const sw = document.createElement("div");
-    sw.className = "swatch label-swatch" + (card.labelColor === color ? " selected" : "");
-    sw.style.background = color;
-    sw.addEventListener("click", () => { card.labelColor = color; persist(); draw(); });
-    labelRow.appendChild(sw);
-  }
-  el.appendChild(labelRow);
-
-  if (characters.length) {
-    const select = characterSelect(characters, card.characterId, i18n("Без персонажа"));
-    select.className = "board-card-select";
-    select.addEventListener("change", () => {
-      card.characterId = select.value || null;
-      persist();
-      draw();
-    });
-    el.appendChild(select);
-  }
-
-  const linked = charById(card.characterId);
-  if (linked) {
+  const chipsRow = document.createElement("div");
+  chipsRow.className = "board-card-chips";
+  const linkedChar = charById(card.characterId);
+  if (linkedChar) {
     const chip = document.createElement("span");
     chip.className = "chip";
-    chip.style.background = linked.color || "#7c7157";
-    chip.style.marginTop = "6px";
-    chip.style.display = "inline-block";
-    chip.textContent = linked.name;
-    el.appendChild(chip);
+    chip.style.background = linkedChar.color || "#7c7157";
+    chip.textContent = linkedChar.name;
+    chipsRow.appendChild(chip);
   }
+  const linkedFaction = factionById(card.factionId);
+  if (linkedFaction) {
+    const chip = document.createElement("span");
+    chip.className = "chip";
+    chip.style.background = "var(--panel-alt)";
+    chip.style.color = "var(--text-dim)";
+    chip.style.border = "1px solid var(--border)";
+    chip.textContent = linkedFaction.name;
+    chipsRow.appendChild(chip);
+  }
+  if (chipsRow.children.length) el.appendChild(chipsRow);
 
   const delBtn = document.createElement("button");
   delBtn.className = "board-card-del";
   delBtn.textContent = "✕";
-  delBtn.addEventListener("click", async () => {
-    await pushTrash("board-card", card);
-    board.cardOrder[colId] = board.cardOrder[colId].filter((id) => id !== card.id);
-    delete board.cards[card.id];
-    persist();
-    draw();
-  });
+  delBtn.title = i18n("Удалить карточку");
+  delBtn.addEventListener("click", () => deleteCard(card, colId));
   el.appendChild(delBtn);
 
   return el;

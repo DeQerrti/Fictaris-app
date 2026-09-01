@@ -4,6 +4,7 @@ import { escapeHtml } from "./chips.js";
 import { mentionsToHtml, attachMentionAutocomplete, attachMentionHoverPreview } from "./mentions.js";
 import { stickersToHtml, attachStickyPopover } from "./stickies.js";
 import { buildManuscriptDocx } from "./docx.js";
+import { openContextMenu } from "./context-menu.js";
 import { i18n } from "./i18n.js";
 
 const STATUSES = [
@@ -79,6 +80,58 @@ document.addEventListener("keydown", (e) => {
     draw();
   }
 });
+
+function insertSticky(textarea, chapter) {
+  const sticky = { id: uid(), text: "" };
+  chapter.stickies = [...(chapter.stickies || []), sticky];
+  const pos = textarea.selectionStart;
+  const marker = `[[note:${sticky.id}]]`;
+  textarea.value = textarea.value.slice(0, pos) + marker + textarea.value.slice(pos);
+  chapter.content = textarea.value;
+  persist();
+  draw();
+}
+
+// Оборачивает выделение маркерами (**жирный**/*курсив*) — так же, как
+// в текстовом редакторе Obsidian: если ничего не выделено, оборачивает
+// пустую пару и ставит курсор внутрь, чтобы можно было сразу печатать.
+function wrapSelection(textarea, before, after) {
+  const start = textarea.selectionStart;
+  const end = textarea.selectionEnd;
+  const value = textarea.value;
+  const selected = value.slice(start, end);
+  textarea.value = value.slice(0, start) + before + selected + after + value.slice(end);
+  const cursor = start + before.length;
+  textarea.selectionStart = cursor;
+  textarea.selectionEnd = cursor + selected.length;
+  textarea.focus();
+  textarea.dispatchEvent(new Event("input"));
+}
+
+// Правый клик в тексте главы раньше не делал ничего — берём набор,
+// привычный по Obsidian/Word: форматирование выделения, вставка стикера
+// и счётчик слов у самого выделения (полезнее, чем общий по главе,
+// который и так виден в шапке редактора).
+function attachEditorContextMenu(textarea, chapter) {
+  textarea.addEventListener("contextmenu", (e) => {
+    e.preventDefault();
+    const hasSelection = textarea.selectionStart !== textarea.selectionEnd;
+    const selectedWords = hasSelection ? wordCount(textarea.value.slice(textarea.selectionStart, textarea.selectionEnd)) : 0;
+    openContextMenu(e.clientX, e.clientY, [
+      { label: i18n("Жирный"), disabled: !hasSelection, action: () => wrapSelection(textarea, "**", "**") },
+      { label: i18n("Курсив"), disabled: !hasSelection, action: () => wrapSelection(textarea, "*", "*") },
+      { separator: true },
+      { label: i18n("Вставить стикер-заметку"), action: () => insertSticky(textarea, chapter) },
+      { separator: true },
+      { label: i18n("Вырезать"), disabled: !hasSelection, action: () => document.execCommand("cut") },
+      { label: i18n("Копировать"), disabled: !hasSelection, action: () => document.execCommand("copy") },
+      { label: i18n("Вставить"), action: () => document.execCommand("paste") },
+      { label: i18n("Выделить всё"), action: () => textarea.select() },
+      { separator: true },
+      { label: hasSelection ? i18n("Слов в выделении: {n}", { n: selectedWords }) : i18n("Слов в главе: {n}", { n: wordCount(chapter.content) }), disabled: true },
+    ]);
+  });
+}
 
 export async function renderManuscript(root, focusChapterId) {
   container = root;
@@ -305,21 +358,13 @@ function buildEditor() {
     });
     wrap.appendChild(textarea);
     attachMentionAutocomplete(textarea, () => characters);
+    attachEditorContextMenu(textarea, chapter);
 
     const stickyBtn = document.createElement("button");
     stickyBtn.className = "btn sticky-insert-btn";
     stickyBtn.textContent = i18n("📌 Стикер");
     stickyBtn.title = i18n("Вставить инлайн-заметку в текст");
-    stickyBtn.addEventListener("click", () => {
-      const sticky = { id: uid(), text: "" };
-      chapter.stickies = [...(chapter.stickies || []), sticky];
-      const pos = textarea.selectionStart;
-      const marker = `[[note:${sticky.id}]]`;
-      textarea.value = textarea.value.slice(0, pos) + marker + textarea.value.slice(pos);
-      chapter.content = textarea.value;
-      persist();
-      draw();
-    });
+    stickyBtn.addEventListener("click", () => insertSticky(textarea, chapter));
     wrap.appendChild(stickyBtn);
     pane.appendChild(wrap);
   }
