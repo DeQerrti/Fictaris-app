@@ -441,8 +441,7 @@ function buildEditor() {
     if (chapter.status === s.key) opt.selected = true;
     statusSelect.appendChild(opt);
   }
-  statusSelect.style.cssText =
-    "background:var(--panel-alt);border:1px solid var(--border);color:var(--text-dim);border-radius:6px;padding:6px 10px;font-family:inherit;font-size:0.82rem;";
+  statusSelect.className = "field-inline-control";
   statusSelect.addEventListener("change", () => {
     chapter.status = statusSelect.value;
     persist();
@@ -535,7 +534,7 @@ function buildEditor() {
     pane.appendChild(view);
   } else {
     const wrap = document.createElement("div");
-    wrap.style.cssText = "position:relative;flex:1;display:flex;overflow:hidden;";
+    wrap.className = "editor-textarea-wrap";
     const textarea = document.createElement("textarea");
     textarea.className = "chapter-content";
     textarea.value = chapter.content;
@@ -592,12 +591,11 @@ function buildStickyEditor(chapter) {
 
   for (const sticky of chapter.stickies) {
     const row = document.createElement("div");
-    row.style.cssText = "display:flex;gap:6px;align-items:flex-start;margin-top:8px;";
+    row.className = "sticky-editor-row";
     const area = document.createElement("textarea");
+    area.className = "sticky-editor-textarea";
     area.value = sticky.text || "";
     area.placeholder = i18n("Текст заметки…");
-    area.style.cssText =
-      "flex:1;background:none;border:1px solid var(--border);border-radius:6px;color:var(--text-dim);font-family:inherit;font-size:0.85rem;padding:6px 8px;resize:vertical;min-height:34px;";
     area.addEventListener("input", () => { sticky.text = area.value; persist(); });
     row.appendChild(area);
 
@@ -627,7 +625,7 @@ function buildSnapshots(chapter) {
 
   if (!(chapter.snapshots || []).length) {
     const empty = document.createElement("div");
-    empty.style.cssText = "color:var(--text-faint);font-size:0.82rem;margin-top:8px;";
+    empty.className = "hint-text";
     empty.textContent = i18n("Пока нет снимков — кнопка «Снимок» в шапке главы сохранит текущий текст.");
     details.appendChild(empty);
     return details;
@@ -635,18 +633,18 @@ function buildSnapshots(chapter) {
 
   for (const snap of chapter.snapshots) {
     const wrap = document.createElement("div");
-    wrap.style.marginTop = "8px";
+    wrap.className = "snapshot-item";
 
     const row = document.createElement("div");
-    row.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:10px;";
+    row.className = "snapshot-row";
 
     const date = document.createElement("span");
-    date.style.cssText = "font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:var(--text-faint);";
+    date.className = "snapshot-date";
     date.textContent = new Date(snap.savedAt).toLocaleString();
     row.appendChild(date);
 
     const actions = document.createElement("div");
-    actions.style.cssText = "display:flex;gap:6px;";
+    actions.className = "snapshot-actions";
 
     // Раньше приходилось восстанавливать вслепую, чтобы вспомнить, что
     // именно в снимке — теперь можно развернуть текст прямо тут,

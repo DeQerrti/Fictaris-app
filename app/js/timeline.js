@@ -313,8 +313,7 @@ function buildDrawer(ev) {
 
   const titleInput = document.createElement("input");
   titleInput.value = ev.title;
-  titleInput.style.cssText =
-    "background:none;border:none;color:var(--text);font-family:Fraunces,serif;font-size:1.3rem;font-weight:600;width:100%;";
+  titleInput.className = "drawer-name-field";
   titleInput.addEventListener("input", () => { ev.title = titleInput.value; persist(); });
   drawer.appendChild(titleInput);
 

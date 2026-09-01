@@ -134,8 +134,7 @@ function buildDrawer(loc) {
   nameRow.className = "drawer-name-row";
   const nameField = document.createElement("input");
   nameField.value = loc.name;
-  nameField.style.cssText =
-    "background:none;border:none;color:var(--text);font-family:Fraunces,serif;font-size:1.3rem;font-weight:600;width:100%;";
+  nameField.className = "drawer-name-field";
   nameField.addEventListener("input", () => {
     loc.name = nameField.value;
     persist();

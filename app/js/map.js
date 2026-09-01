@@ -320,8 +320,7 @@ function buildDrawer(pin) {
 
   const labelInput = document.createElement("input");
   labelInput.value = pin.label;
-  labelInput.style.cssText =
-    "background:none;border:none;color:var(--text);font-family:Fraunces,serif;font-size:1.2rem;font-weight:600;width:100%;";
+  labelInput.className = "drawer-name-field drawer-name-field-sm";
   labelInput.addEventListener("input", () => { pin.label = labelInput.value; persist(); draw(); });
   drawer.appendChild(labelInput);
 

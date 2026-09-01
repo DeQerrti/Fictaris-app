@@ -64,7 +64,7 @@ export async function renderRelationships(root) {
 function draw() {
   container.innerHTML = "";
   const wrap = document.createElement("div");
-  wrap.style.cssText = "flex:1;overflow-y:auto;padding:24px;display:flex;flex-direction:column;gap:24px;";
+  wrap.className = "rel-view";
 
   if (characters.length < 2) {
     const empty = document.createElement("div");
@@ -378,10 +378,10 @@ function buildHint() {
 // ── Список связей ───────────────────────────────
 function buildList() {
   const box = document.createElement("div");
-  box.style.cssText = "display:flex;flex-direction:column;gap:10px;max-width:640px;";
+  box.className = "rel-list";
 
   const title = document.createElement("h3");
-  title.style.cssText = "margin:0;font-family:Fraunces,serif;font-size:1.05rem;color:var(--text);";
+  title.className = "rel-list-title";
   title.textContent = i18n("Список связей");
   box.appendChild(title);
 
@@ -390,9 +390,8 @@ function buildList() {
   }
 
   const addBtn = document.createElement("button");
-  addBtn.className = "btn";
+  addBtn.className = "btn rel-list-add";
   addBtn.textContent = i18n("+ Добавить связь");
-  addBtn.style.alignSelf = "flex-start";
   addBtn.addEventListener("click", () => {
     relationships.push({
       id: uid(),
@@ -412,24 +411,23 @@ function buildList() {
 
 function buildRelRow(rel) {
   const row = document.createElement("div");
-  row.style.cssText = "background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;";
+  row.className = "rel-row";
 
   const top = document.createElement("div");
-  top.style.cssText = "display:flex;align-items:center;gap:8px;margin-bottom:8px;";
+  top.className = "rel-row-top";
 
   const selA = characterSelect(characters, rel.charA);
   selA.addEventListener("change", () => { rel.charA = selA.value; persist(); draw(); });
   const arrow = document.createElement("span");
+  arrow.className = "rel-row-arrow";
   arrow.textContent = "↔";
-  arrow.style.color = "var(--text-faint)";
   const selB = characterSelect(characters, rel.charB);
   selB.addEventListener("change", () => { rel.charB = selB.value; persist(); draw(); });
 
   const label = document.createElement("input");
+  label.className = "field-inline-control field-inline-control-bright rel-row-label";
   label.placeholder = i18n("Метка (наставник, вражда…)");
   label.value = rel.label || "";
-  label.style.flex = "1";
-  label.style.cssText += "background:var(--panel-alt);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:6px 8px;font-family:inherit;font-size:0.85rem;";
   label.addEventListener("input", () => { rel.label = label.value; persist(); });
 
   const delBtn = document.createElement("button");
@@ -446,16 +444,16 @@ function buildRelRow(rel) {
   row.appendChild(top);
 
   const sliderRow = document.createElement("div");
-  sliderRow.style.cssText = "display:flex;align-items:center;gap:10px;";
+  sliderRow.className = "rel-sliders";
   const scoreLabel = document.createElement("span");
-  scoreLabel.style.cssText = "font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:var(--text-faint);width:36px;text-align:right;";
+  scoreLabel.className = "rel-score-label";
   scoreLabel.textContent = rel.score;
   const slider = document.createElement("input");
   slider.type = "range";
+  slider.className = "rel-slider";
   slider.min = -100;
   slider.max = 100;
   slider.value = rel.score || 0;
-  slider.style.flex = "1";
   slider.addEventListener("input", () => {
     rel.score = Number(slider.value);
     scoreLabel.textContent = rel.score;
@@ -465,9 +463,9 @@ function buildRelRow(rel) {
   row.appendChild(sliderRow);
 
   const note = document.createElement("textarea");
+  note.className = "field-inline-control rel-note";
   note.placeholder = i18n("Заметка о связи…");
   note.value = rel.note || "";
-  note.style.cssText = "width:100%;margin-top:8px;background:var(--panel-alt);border:1px solid var(--border);border-radius:6px;color:var(--text-dim);padding:6px 8px;font-family:inherit;font-size:0.85rem;resize:vertical;min-height:36px;";
   note.addEventListener("input", () => { rel.note = note.value; persist(); });
   row.appendChild(note);
 

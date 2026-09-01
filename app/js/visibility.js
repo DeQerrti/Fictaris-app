@@ -1,4 +1,5 @@
 import { apiGet, apiPost } from "./api.js";
+import { i18n } from "./i18n.js";
 
 // ══════════════════════════════════════════════
 //  ВИДИМОСТЬ РАЗДЕЛОВ
@@ -25,6 +26,27 @@ export const HIDEABLE_TABS = [
   "canvas",
   "stats",
 ];
+
+// Смысловые группы для подписей в сайдбаре (applyTabOrder ниже) и для
+// того же деления в «Подписи интерфейса» (settings-panel.js) — черновик
+// и доска про сам текст, персонажи/локации/фракции/связи/таймлайн про
+// сам мир, карта/граф/родословная/холст — визуальные инструменты по
+// миру, статистика — отдельно, обзорная. Пункты без группы (не
+// перечисленные здесь) заголовка перед собой не получают.
+export const TAB_GROUPS = {
+  manuscript: () => i18n("Сюжет"),
+  board: () => i18n("Сюжет"),
+  characters: () => i18n("Мир"),
+  locations: () => i18n("Мир"),
+  factions: () => i18n("Мир"),
+  relationships: () => i18n("Мир"),
+  timeline: () => i18n("Мир"),
+  map: () => i18n("Инструменты"),
+  graph: () => i18n("Инструменты"),
+  familytree: () => i18n("Инструменты"),
+  canvas: () => i18n("Инструменты"),
+  stats: () => i18n("Обзор"),
+};
 
 export async function getHiddenTabs() {
   const settings = await apiGet("/api/site-settings").catch(() => ({}));
@@ -84,9 +106,26 @@ export async function applyTabOrder() {
   const order = await getTabOrder();
   const spacer = document.querySelector(".sidebar-spacer");
   if (!spacer?.parentNode) return order;
+  const parent = spacer.parentNode;
+  // Подписи групп — не часть order (только пункты сайдбара) и
+  // перестраиваются с нуля при каждом вызове: перетаскивание пункта в
+  // Настройках меняет order и вызывает эту же функцию заново, поэтому
+  // расставлять их проще каждый раз по новой, чем пытаться подвинуть
+  // уже существующие.
+  parent.querySelectorAll(".nav-group-label").forEach((el) => el.remove());
+  let lastGroup = null;
   for (const key of order) {
-    const btn = document.querySelector(`.nav-item[data-module="${key}"]`);
-    if (btn) spacer.parentNode.insertBefore(btn, spacer);
+    const btn = parent.querySelector(`.nav-item[data-module="${key}"]`);
+    if (!btn) continue;
+    const group = TAB_GROUPS[key]?.();
+    if (group && group !== lastGroup) {
+      const label = document.createElement("div");
+      label.className = "nav-group-label";
+      label.textContent = group;
+      parent.insertBefore(label, spacer);
+      lastGroup = group;
+    }
+    parent.insertBefore(btn, spacer);
   }
   return order;
 }
