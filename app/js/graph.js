@@ -104,10 +104,19 @@ function draw() {
   }
 
   const wrap = document.createElement("div");
-  wrap.className = "graph-view";
+  wrap.className = "pgraph-view";
 
-  const width = Math.max(560, Math.min(920, container.clientWidth || 720));
-  const height = Math.max(440, Math.min(680, 140 + nodes.length * 18));
+  // Раньше был зажат в 920×680 и центрирован в узкой карточке — почти
+  // всё окно вкладки пустовало вокруг. Теперь весь размер под
+  // viewBox — почти вся доступная площадь #content за вычетом полосы
+  // тулбара/легенды сверху/снизу (buildToolbar/buildLegend, ~110px);
+  // сам SVG растягивается на 100% контейнера через CSS (.pgraph-holder,
+  // style.css) — toGraphPoint ниже уже переводит координаты клика через
+  // отношение отрисованного размера к width/height viewBox, так что
+  // несовпадение реального рендер-размера с этими числами не ломает ни
+  // клики, ни перетаскивание, ни зум.
+  const width = Math.max(560, container.clientWidth || 900);
+  const height = Math.max(440, (container.clientHeight || 700) - 110);
   const cx = width / 2;
   const cy = height / 2;
 
@@ -129,10 +138,13 @@ function draw() {
 
   const svgNS = "http://www.w3.org/2000/svg";
   const svg = document.createElementNS(svgNS, "svg");
-  svg.setAttribute("width", width);
-  svg.setAttribute("height", height);
+  // width/height растягиваются через CSS (.pgraph-svg) на весь холдер —
+  // viewBox остаётся в логических координатах симуляции, toGraphPoint
+  // сам пересчитывает клики через отношение отрисованного размера к
+  // этим числам (см. attachInteraction).
   svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
-  svg.classList.add("graph-svg");
+  svg.setAttribute("preserveAspectRatio", "none");
+  svg.classList.add("pgraph-svg");
 
   const viewport = document.createElementNS(svgNS, "g");
   viewport.classList.add("graph-viewport");
@@ -207,7 +219,7 @@ function draw() {
   positionAll();
 
   const holder = document.createElement("div");
-  holder.className = "graph-holder";
+  holder.className = "pgraph-holder";
   holder.appendChild(svg);
   wrap.appendChild(holder);
   wrap.appendChild(buildToolbar());
