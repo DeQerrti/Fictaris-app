@@ -18,14 +18,33 @@ const TEMPLATES = [
   ["hero_journey", "Путь героя", ["Обычный мир", "Зов к приключению", "Испытания", "Кризис", "Награда", "Возвращение"]],
 ];
 
-let board = { columns: [], cards: {}, cardOrder: {} };
+// Несколько досок в одном хранилище (например, отдельные книги в одном
+// мире) — data.boards держит их все, board всегда указывает на
+// активную (data.boards.find по data.activeBoardId). Весь остальной
+// код файла как читал/писал board.columns/board.cards/board.cardOrder
+// напрямую, так и продолжает — переключение досок только переставляет,
+// на что указывает board, и меняет data.activeBoardId.
+let data = { boards: [], activeBoardId: null };
+let board = null;
 let characters = [];
 let factions = [];
 let container = null;
-const save = debounceSave((data) => apiPost("/api/board", data));
+const save = debounceSave((d) => apiPost("/api/board", d));
 
 function persist() {
-  save(board);
+  save(data);
+}
+
+// Формат на диске раньше был одной доской ({columns, cards, cardOrder}
+// без обёртки) — заворачиваем в { boards: [...], activeBoardId } при
+// первой загрузке, ничего не теряя из уже сохранённого.
+function migrate(raw) {
+  if (raw && Array.isArray(raw.boards) && raw.boards.length) {
+    return { boards: raw.boards, activeBoardId: raw.activeBoardId || raw.boards[0].id };
+  }
+  const legacy = raw && raw.columns ? raw : { columns: [], cards: {}, cardOrder: {} };
+  const first = { id: uid(), name: i18n("Доска 1"), ...legacy };
+  return { boards: [first], activeBoardId: first.id };
 }
 
 function columnsFromTitles(titles) {
@@ -35,8 +54,88 @@ function columnsFromTitles(titles) {
   return { columns: cols, cards: {}, cardOrder };
 }
 
-function defaultBoard() {
+function defaultColumns() {
   return columnsFromTitles([i18n("Задумано"), i18n("В работе"), i18n("Готово")]);
+}
+
+function addBoard() {
+  const b = { id: uid(), name: i18n("Новая доска"), ...defaultColumns() };
+  data.boards.push(b);
+  data.activeBoardId = b.id;
+  board = b;
+  persist();
+  draw();
+}
+
+function switchBoard(id) {
+  const b = data.boards.find((x) => x.id === id);
+  if (!b) return;
+  data.activeBoardId = id;
+  board = b;
+  persist();
+  draw();
+}
+
+function deleteBoard() {
+  if (data.boards.length <= 1) return;
+  data.boards = data.boards.filter((b) => b.id !== board.id);
+  switchBoard(data.boards[0].id);
+}
+
+function buildBoardSwitcher() {
+  const bar = document.createElement("div");
+  bar.className = "board-switcher-bar";
+
+  const select = document.createElement("select");
+  for (const b of data.boards) {
+    const opt = document.createElement("option");
+    opt.value = b.id;
+    opt.textContent = b.name;
+    if (b.id === board.id) opt.selected = true;
+    select.appendChild(opt);
+  }
+  select.addEventListener("change", () => switchBoard(select.value));
+  bar.appendChild(select);
+
+  const nameInput = document.createElement("input");
+  nameInput.type = "text";
+  nameInput.className = "board-switcher-rename";
+  nameInput.value = board.name;
+  nameInput.title = i18n("Название доски");
+  nameInput.addEventListener("input", () => {
+    board.name = nameInput.value;
+    select.selectedOptions[0].textContent = nameInput.value;
+    persist();
+  });
+  bar.appendChild(nameInput);
+
+  const addBtn = document.createElement("button");
+  addBtn.className = "btn";
+  addBtn.textContent = i18n("+ Доска");
+  addBtn.addEventListener("click", addBoard);
+  bar.appendChild(addBtn);
+
+  if (data.boards.length > 1) {
+    const delBtn = document.createElement("button");
+    delBtn.className = "btn danger";
+    delBtn.textContent = "🗑";
+    delBtn.title = i18n("Удалить эту доску навсегда");
+    delBtn.addEventListener("click", () => {
+      if (delBtn.dataset.confirm === "1") {
+        deleteBoard();
+        return;
+      }
+      delBtn.dataset.confirm = "1";
+      delBtn.textContent = i18n("Точно?");
+      setTimeout(() => {
+        delBtn.dataset.confirm = "";
+        delBtn.textContent = "🗑";
+      }, 3000);
+    });
+    bar.appendChild(delBtn);
+  }
+
+  return bar;
 }
 
 function charById(id) {
@@ -49,11 +148,15 @@ function factionById(id) {
 
 export async function renderBoard(root) {
   container = root;
-  [board, characters, factions] = await Promise.all([apiGet("/api/board"), apiGet("/api/characters"), apiGet("/api/factions")]);
+  const [rawBoard, chars, facs] = await Promise.all([apiGet("/api/board"), apiGet("/api/characters"), apiGet("/api/factions")]);
+  characters = chars;
+  factions = facs;
+  data = migrate(rawBoard);
+  board = data.boards.find((b) => b.id === data.activeBoardId) || data.boards[0];
   if (!board.columns.length) {
-    board = defaultBoard();
-    persist();
+    Object.assign(board, defaultColumns());
   }
+  persist();
   draw();
 }
 
@@ -61,6 +164,8 @@ function draw() {
   container.innerHTML = "";
   const outer = document.createElement("div");
   outer.className = "board-outer";
+
+  outer.appendChild(buildBoardSwitcher());
 
   const view = document.createElement("div");
   view.className = "board-view";
@@ -112,7 +217,7 @@ function buildTemplateBar() {
     if (!select.value) return;
     if (applyBtn.dataset.confirm === "1") {
       const template = TEMPLATES.find((t) => t[0] === select.value);
-      board = columnsFromTitles(template[2].map((t) => i18n(t)));
+      Object.assign(board, columnsFromTitles(template[2].map((t) => i18n(t))));
       persist();
       draw();
       return;

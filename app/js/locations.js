@@ -6,6 +6,7 @@ import { LOCATION_TYPES, locationTypeInfo, iconSvg } from "./icons.js";
 import { buildReverseLinks } from "./reverse-links.js";
 import { loadTagsMap, buildTagsField } from "./tags.js";
 import { buildNameGeneratorButton } from "./name-generator.js";
+import { avatarInnerHtml, buildAvatarsField } from "./avatars.js";
 import { i18n } from "./i18n.js";
 
 function fields() {
@@ -94,7 +95,7 @@ function draw() {
     const card = document.createElement("button");
     card.className = "char-card";
     card.innerHTML = `
-      <div class="char-avatar" style="background:${color}">${iconSvg(iconName, 20)}</div>
+      <div class="char-avatar" style="background:${color}">${avatarInnerHtml(loc, iconSvg(iconName, 20))}</div>
       <div class="char-name">${escapeHtml(loc.name || i18n("Без имени"))}</div>
       <div class="char-role">${escapeHtml(i18n(locationTypeInfo(loc.type)[1]))}</div>
     `;
@@ -170,6 +171,8 @@ function buildDrawer(loc) {
   });
   typeField.appendChild(typeSelect);
   drawer.appendChild(typeField);
+
+  drawer.appendChild(buildAvatarsField(loc, () => { persist(); draw(); }));
 
   for (const [key, label, kind] of fields()) {
     const field = document.createElement("div");

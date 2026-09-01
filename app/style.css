@@ -543,7 +543,58 @@ body.focus-mode .sidebar { display: none; }
   font-weight: 600;
   color: #14110d;
   margin-bottom: 10px;
+  overflow: hidden;
 }
+
+.char-avatar-img { width: 100%; height: 100%; object-fit: cover; }
+
+/* Галерея изображений в дровере (app/js/avatars.js) — первое становится
+   .char-avatar-img на лицевой стороне карточки (см. выше), остальные —
+   просто хранятся при сущности. */
+.avatar-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.avatar-thumb {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--panel-alt);
+  border: 1px solid var(--border);
+}
+
+.avatar-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.avatar-thumb-del {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 18px;
+  height: 18px;
+  line-height: 16px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.avatar-thumb-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-faint);
+  font-size: 1.3rem;
+  cursor: pointer;
+  border-style: dashed;
+}
+.avatar-thumb-add:hover { color: var(--text); border-color: var(--accent); }
 
 .char-name {
   font-family: Fraunces, serif;
@@ -1428,6 +1479,36 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
   border: 1px solid var(--border);
   border-radius: 6px;
   color: var(--text-dim);
+  padding: 6px 10px;
+  font-family: inherit;
+  font-size: 0.82rem;
+}
+
+.board-switcher-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 20px 0;
+}
+
+.board-switcher-bar select {
+  background: var(--panel-alt);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-dim);
+  padding: 6px 10px;
+  font-family: inherit;
+  font-size: 0.82rem;
+  max-width: 200px;
+}
+
+.board-switcher-rename {
+  flex: 1;
+  max-width: 260px;
+  background: var(--panel-alt);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
   padding: 6px 10px;
   font-family: inherit;
   font-size: 0.82rem;

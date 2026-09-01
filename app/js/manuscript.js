@@ -7,7 +7,7 @@ import { buildManuscriptDocx } from "./docx.js";
 import { openContextMenu } from "./context-menu.js";
 import { i18n } from "./i18n.js";
 
-const STATUSES = [
+export const STATUSES = [
   ["draft", "Черновик"],
   ["editing", "На редактуре"],
   ["done", "Готово"],

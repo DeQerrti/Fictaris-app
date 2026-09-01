@@ -1,6 +1,6 @@
 {
   "name": "fictaris",
-  "version": "0.3.4",
+  "version": "0.3.5",
   "private": true,
   "description": "Fictaris — инструмент для писателей и мастеров миров. Настольное приложение: данные лежат папкой на твоём диске.",
   "type": "module",

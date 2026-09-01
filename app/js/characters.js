@@ -5,6 +5,7 @@ import { pushTrash } from "./trash.js";
 import { buildReverseLinks } from "./reverse-links.js";
 import { loadTagsMap, buildTagsField } from "./tags.js";
 import { buildNameGeneratorButton } from "./name-generator.js";
+import { avatarInnerHtml, buildAvatarsField } from "./avatars.js";
 import { i18n } from "./i18n.js";
 
 const PALETTE = [
@@ -131,7 +132,7 @@ function draw() {
     const card = document.createElement("button");
     card.className = "char-card";
     card.innerHTML = `
-      <div class="char-avatar" style="background:${c.color}">${initials(c.name)}</div>
+      <div class="char-avatar" style="background:${c.color}">${avatarInnerHtml(c, initials(c.name))}</div>
       <div class="char-name">${escapeHtml(c.name || i18n("Без имени"))}</div>
       <div class="char-role">${escapeHtml(c.role || "")}</div>
     `;
@@ -203,6 +204,8 @@ function buildDrawer(c) {
     colorRow.appendChild(sw);
   }
   drawer.appendChild(colorRow);
+
+  drawer.appendChild(buildAvatarsField(c, () => { persist(); draw(); }));
 
   drawer.appendChild(
     buildToggleGroup(

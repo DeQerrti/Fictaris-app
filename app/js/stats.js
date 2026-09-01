@@ -1,6 +1,7 @@
 import { apiGet } from "./api.js";
 import { escapeHtml } from "./chips.js";
-import { factionTypeInfo } from "./icons.js";
+import { factionTypeInfo, locationTypeInfo } from "./icons.js";
+import { STATUSES } from "./manuscript.js";
 import { i18n, currentLang } from "./i18n.js";
 
 // ══════════════════════════════════════════════
@@ -63,13 +64,14 @@ export async function renderStats(root) {
   const wrap = document.createElement("div");
   wrap.className = "data-panel";
 
-  const [characters, locations, factions, timeline, board, manuscript] = await Promise.all([
+  const [characters, locations, factions, timeline, board, manuscript, relationships] = await Promise.all([
     apiGet("/api/characters"),
     apiGet("/api/locations"),
     apiGet("/api/factions"),
     apiGet("/api/timeline"),
     apiGet("/api/board"),
     apiGet("/api/manuscript"),
+    apiGet("/api/relationships"),
   ]);
 
   const totalWords = manuscript.chapters.reduce((sum, c) => sum + wordCount(c.content), 0);
@@ -85,7 +87,11 @@ export async function renderStats(root) {
     buildTile(timeline.length, i18n("событий")),
     buildTile(cardCount, i18n("карточек на доске")),
     buildTile(manuscript.chapters.length, i18n("глав")),
-    buildTile(totalWords.toLocaleString(currentLang() === "en" ? "en-US" : "ru-RU"), i18n("слов написано"))
+    buildTile(totalWords.toLocaleString(currentLang() === "en" ? "en-US" : "ru-RU"), i18n("слов написано")),
+    buildTile(
+      manuscript.chapters.length ? Math.round(totalWords / manuscript.chapters.length).toLocaleString(currentLang() === "en" ? "en-US" : "ru-RU") : 0,
+      i18n("слов в среднем на главу")
+    )
   );
   overview.appendChild(tiles);
   wrap.appendChild(overview);
@@ -134,6 +140,52 @@ export async function renderStats(root) {
   const castSection = buildSection(i18n("Чаще всего в таймлайне"), i18n("Сколько раз персонаж указан участником события — топ-8."));
   castSection.appendChild(buildBarList(castRows, castMax));
   wrap.appendChild(castSection);
+
+  // ── Прогресс рукописи ────────────────────────────
+  const STATUS_COLORS = { draft: "#7c7157", editing: "#c9944a", done: "#6a9955" };
+  const statusRows = STATUSES.map(([key, label]) => ({
+    label: i18n(label),
+    value: manuscript.chapters.filter((c) => c.status === key).length,
+    color: STATUS_COLORS[key],
+  }));
+  const statusMax = Math.max(1, ...statusRows.map((r) => r.value));
+
+  const progressSection = buildSection(i18n("Прогресс рукописи"), i18n("Главы по статусу."));
+  progressSection.appendChild(buildBarList(statusRows, statusMax));
+  wrap.appendChild(progressSection);
+
+  // ── Локации по типу ──────────────────────────────
+  const byType = new Map();
+  for (const loc of locations) byType.set(loc.type, (byType.get(loc.type) || 0) + 1);
+  const locationRows = [...byType.entries()].map(([type, value]) => {
+    const [, label, , color] = locationTypeInfo(type);
+    return { label: i18n(label), value, color };
+  });
+  const locationMax = Math.max(1, ...locationRows.map((r) => r.value));
+
+  const locationSection = buildSection(i18n("Локации по типу"));
+  locationSection.appendChild(buildBarList(locationRows, locationMax));
+  wrap.appendChild(locationSection);
+
+  // ── Больше всего связей ──────────────────────────
+  const degree = new Map();
+  for (const rel of relationships) {
+    if (rel.charA) degree.set(rel.charA, (degree.get(rel.charA) || 0) + 1);
+    if (rel.charB) degree.set(rel.charB, (degree.get(rel.charB) || 0) + 1);
+  }
+  const degreeRows = [...degree.entries()]
+    .map(([id, count]) => {
+      const c = characters.find((x) => x.id === id);
+      return c ? { label: c.name, value: count, color: c.color } : null;
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 8);
+  const degreeMax = Math.max(1, ...degreeRows.map((r) => r.value));
+
+  const degreeSection = buildSection(i18n("Больше всего связей"), i18n("Сколько связей у персонажа в модуле «Связи» — топ-8."));
+  degreeSection.appendChild(buildBarList(degreeRows, degreeMax));
+  wrap.appendChild(degreeSection);
 
   root.appendChild(wrap);
 }

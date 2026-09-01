@@ -4,6 +4,7 @@ import { escapeHtml, characterSelect, buildToggleGroup } from "./chips.js";
 import { FACTION_TYPES, factionTypeInfo, iconSvg } from "./icons.js";
 import { pushTrash } from "./trash.js";
 import { loadTagsMap, buildTagsField } from "./tags.js";
+import { avatarInnerHtml, buildAvatarsField } from "./avatars.js";
 import { i18n } from "./i18n.js";
 
 let factions = [];
@@ -63,7 +64,7 @@ function draw() {
     const card = document.createElement("button");
     card.className = "char-card";
     card.innerHTML = `
-      <div class="char-avatar" style="background:${color}">${iconSvg(iconName, 20)}</div>
+      <div class="char-avatar" style="background:${color}">${avatarInnerHtml(f, iconSvg(iconName, 20))}</div>
       <div class="char-name">${escapeHtml(f.name || i18n("Без имени"))}</div>
       <div class="char-role">${escapeHtml(i18n(typeLabel))}</div>
     `;
@@ -122,6 +123,8 @@ function buildDrawer(f) {
   typeSelect.addEventListener("change", () => { f.type = typeSelect.value; persist(); draw(); });
   typeField.appendChild(typeSelect);
   drawer.appendChild(typeField);
+
+  drawer.appendChild(buildAvatarsField(f, () => { persist(); draw(); }));
 
   const leaderField = document.createElement("div");
   leaderField.className = "field";
