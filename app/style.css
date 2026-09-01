@@ -2156,6 +2156,141 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
 .ftree-node circle { transition: opacity 0.15s; }
 .ftree-node:hover circle { opacity: 0.8; }
 
+/* ── Холст (app/js/canvas.js) ──────────────────
+   Свободные текстовые карточки на панорамируемом/масштабируемом поле —
+   по духу Obsidian Canvas. viewport — обычный div с CSS transform
+   (translate+scale), а не SVG-группа, как у графов: карточкам нужен
+   живой <textarea>. */
+.canvas-view-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  padding: 16px 20px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.canvas-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+.canvas-name-input {
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  font-family: Fraunces, serif;
+  font-size: 1rem;
+  padding: 4px 2px;
+  min-width: 160px;
+}
+
+.canvas-holder {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: grab;
+  touch-action: none;
+}
+
+.canvas-holder.panning { cursor: grabbing; }
+
+.canvas-viewport {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+}
+
+.canvas-edges-svg {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.canvas-card-layer { position: absolute; left: 0; top: 0; }
+
+.canvas-card {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+}
+
+.canvas-card-head {
+  flex-shrink: 0;
+  padding: 4px 8px;
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  color: var(--text-faint);
+  cursor: grab;
+  user-select: none;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+}
+
+.canvas-card-head:active { cursor: grabbing; }
+
+.canvas-card-text {
+  flex: 1;
+  resize: none;
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-family: inherit;
+  font-size: 0.85rem;
+  padding: 8px;
+}
+
+.canvas-card-resize {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 14px;
+  height: 14px;
+  cursor: nwse-resize;
+}
+
+.canvas-card-resize::after {
+  content: "";
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  width: 6px;
+  height: 6px;
+  border-right: 2px solid var(--text-faint);
+  border-bottom: 2px solid var(--text-faint);
+}
+
+.canvas-connector {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent);
+  opacity: 0;
+  transition: opacity 0.12s;
+  cursor: crosshair;
+}
+
+.canvas-card:hover .canvas-connector { opacity: 0.85; }
+
+.canvas-connector-n { top: -5px; left: calc(50% - 5px); }
+.canvas-connector-s { bottom: -5px; left: calc(50% - 5px); }
+.canvas-connector-e { right: -5px; top: calc(50% - 5px); }
+.canvas-connector-w { left: -5px; top: calc(50% - 5px); }
+
 /* ── Проверка согласованности ─────────────────── */
 
 .continuity-panel {

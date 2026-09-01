@@ -15,6 +15,7 @@ const KNOWN_FILES = new Set([
   "board.json",
   "factions.json",
   "map.json",
+  "canvas.json",
   "trash.json",
   "site-settings.json",
 ]);

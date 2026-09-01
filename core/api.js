@@ -19,6 +19,7 @@ export class ApiError extends Error {
 const EMPTY_MANUSCRIPT = { chapters: [], activeChapterId: null };
 const EMPTY_BOARD = { columns: [], cards: {}, cardOrder: {} };
 const EMPTY_MAP = { rootIds: [], maps: {} };
+const EMPTY_CANVAS = { order: [], canvases: {} };
 const IMAGE_EXT = /^(jpg|jpeg|png|webp)$/i;
 
 // Резервная копия/синхронизация (app/js/sync.js) — весь проект одним
@@ -36,12 +37,24 @@ const BACKUP_FILES = [
   "board.json",
   "factions.json",
   "map.json",
+  "canvas.json",
 ];
 
 async function exportBackup({ vault }) {
   const files = {};
   for (const name of BACKUP_FILES) {
-    files[name] = await vault.readJson(name, name === "manuscript.json" ? EMPTY_MANUSCRIPT : name === "board.json" ? EMPTY_BOARD : name === "map.json" ? EMPTY_MAP : []);
+    files[name] = await vault.readJson(
+      name,
+      name === "manuscript.json"
+        ? EMPTY_MANUSCRIPT
+        : name === "board.json"
+        ? EMPTY_BOARD
+        : name === "map.json"
+        ? EMPTY_MAP
+        : name === "canvas.json"
+        ? EMPTY_CANVAS
+        : []
+    );
   }
 
   // По одной и с перехватом: копия без одной картинки несравнимо лучше,
@@ -163,6 +176,14 @@ export const ROUTES = {
     if (body.data.length > 28 * 1024 * 1024) throw new ApiError("Изображение слишком большое", 413);
     const relPath = await vault.saveImage(name, body.data);
     return { path: relPath };
+  },
+
+  "GET /api/canvas": async ({ vault }) => vault.readJson("canvas.json", EMPTY_CANVAS),
+  "POST /api/canvas": async ({ vault, body }) => {
+    if (!body || typeof body.canvases !== "object" || !Array.isArray(body.order)) {
+      throw new ApiError("Некорректный холст");
+    }
+    return vault.writeJson("canvas.json", body);
   },
 
   "GET /api/trash": async ({ vault }) => vault.readJson("trash.json", []),

@@ -30,6 +30,7 @@ export function defaultLabels() {
       map: i18n("Карта"),
       graph: i18n("Граф"),
       familytree: i18n("Родословная"),
+      canvas: i18n("Холст"),
       stats: i18n("Статистика"),
       continuity: i18n("Проверка"),
       trash: i18n("Корзина"),

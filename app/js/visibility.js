@@ -22,6 +22,7 @@ export const HIDEABLE_TABS = [
   "map",
   "graph",
   "familytree",
+  "canvas",
   "stats",
 ];
 

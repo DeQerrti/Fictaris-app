@@ -86,6 +86,7 @@ function historyFiles() {
     ["timeline.json", i18n("Таймлайн")],
     ["board.json", i18n("Доска")],
     ["map.json", i18n("Карта")],
+    ["canvas.json", i18n("Холст")],
     ["manuscript.json", i18n("Рукопись")],
   ];
 }
