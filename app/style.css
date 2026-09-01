@@ -2063,6 +2063,26 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
   width: 100%;
 }
 
+/* ── Граф связей (app/js/relationships.js) ────
+   Свой интерактивный граф — не общий ни с .graph-*/.pgraph-* (граф
+   проекта), ни с family-tree — там только персонажи, и длина пружины у
+   ребра зависит от score, чего у остальных графов нет. */
+.rgraph-outer { display: flex; flex-direction: column; gap: 6px; }
+
+.rgraph-holder {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.rgraph-svg { display: block; width: 100%; height: 100%; cursor: grab; touch-action: none; }
+.rgraph-svg.panning { cursor: grabbing; }
+.rgraph-svg text { pointer-events: none; user-select: none; }
+.rgraph-node { cursor: pointer; transition: opacity 0.15s; }
+
+.rgraph-hint { font-size: 0.78rem; color: var(--text-faint); }
+
 .graph-hint {
   font-size: 0.78rem;
   color: var(--text-faint);
