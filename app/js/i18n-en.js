@@ -369,7 +369,7 @@ export const EN_DICT = {
   "Понятно, дальше сам": "Got it, I'll explore",
 
   // ── Обновления (update-banner.js) ──
-  "Перезапустить": "Restart",
+  "Обновить": "Update",
   "Скачать": "Download",
   "Позже": "Later",
   "Обновление готово: {version}": "Update ready: {version}",

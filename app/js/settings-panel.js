@@ -883,7 +883,7 @@ function buildUpdateSection(info) {
 
   const restartBtn = document.createElement("button");
   restartBtn.className = "btn accent";
-  restartBtn.textContent = i18n("Перезапустить");
+  restartBtn.textContent = i18n("Обновить");
   restartBtn.style.display = "none";
   restartBtn.style.marginLeft = "8px";
   restartBtn.addEventListener("click", () => apiPost("/api/app/update-restart", {}));

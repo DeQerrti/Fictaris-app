@@ -46,7 +46,7 @@
 <body>
   <div class="card">
     <h1>Fictaris</h1>
-    <p id="intro">Инструмент для писателей и мастеров миров. Выбери папку, где будет жить проект.</p>
+    <p id="intro">Инструмент для писателей. Выбери папку, где будет жить проект.</p>
     <button id="pick">Выбрать папку</button>
     <div class="error" id="error"></div>
   </div>
@@ -57,7 +57,7 @@
     // папки, это язык самой системы.
     if (!/^ru/i.test(navigator.language || "")) {
       document.getElementById("intro").textContent =
-        "A tool for writers and worldbuilders. Choose the folder where your project will live.";
+        "A tool for writers. Choose the folder where your project will live.";
       document.getElementById("pick").textContent = "Choose folder";
     }
     const errorEl = document.getElementById("error");

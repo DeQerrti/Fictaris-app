@@ -17,11 +17,17 @@ import { i18n } from "./i18n.js";
 const POLL_MS = 60_000;
 let shown = false;
 
-function showBanner({ text, actionLabel, onAction, version }) {
+// Обновление готово (тихо скачано, осталось перезапустить) — модалка по
+// центру с фоном-заглушкой: перезапуск заменяет файлы приложения на
+// диске, поэтому продолжать работать в старой открытой копии до выбора
+// не должно быть можно — только «Обновить» или «Позже», без клика мимо.
+// «Доступно обновление» (macOS, просто ссылка на скачивание вручную) —
+// по-прежнему мягкая полоска снизу, ничего не блокирует.
+function showBanner({ text, actionLabel, onAction, version, modal = false }) {
   const bar = document.createElement("div");
-  bar.className = "update-banner";
+  bar.className = modal ? "update-modal" : "update-banner";
 
-  const span = document.createElement("span");
+  const span = document.createElement(modal ? "p" : "span");
   span.textContent = text;
 
   const actions = document.createElement("div");
@@ -31,7 +37,7 @@ function showBanner({ text, actionLabel, onAction, version }) {
   actionBtn.className = "btn accent";
   actionBtn.textContent = actionLabel;
   actionBtn.addEventListener("click", async () => {
-    bar.remove();
+    close();
     await onAction();
   });
 
@@ -39,14 +45,23 @@ function showBanner({ text, actionLabel, onAction, version }) {
   laterBtn.className = "btn";
   laterBtn.textContent = i18n("Позже");
   laterBtn.addEventListener("click", async () => {
-    bar.remove();
+    close();
     shown = false;
     await apiPost("/api/app/update-dismiss", { version }).catch(() => {});
   });
 
   actions.append(actionBtn, laterBtn);
   bar.append(span, actions);
-  document.body.appendChild(bar);
+
+  const root = modal ? document.createElement("div") : bar;
+  if (modal) {
+    root.className = "update-modal-backdrop";
+    root.appendChild(bar);
+  }
+  function close() {
+    root.remove();
+  }
+  document.body.appendChild(root);
 }
 
 async function poll() {
@@ -61,8 +76,9 @@ async function poll() {
     shown = true;
     showBanner({
       text: i18n("Обновление готово: {version}", status),
-      actionLabel: i18n("Перезапустить"),
+      actionLabel: i18n("Обновить"),
       version: status.version,
+      modal: true,
       onAction: () => apiPost("/api/app/update-restart", {}),
     });
   } else if (status.type === "available") {

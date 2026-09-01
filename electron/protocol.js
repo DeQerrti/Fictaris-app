@@ -66,6 +66,17 @@ export function registerAppProtocol({ appDir, getVault }) {
       return new Response("Не найдено", { status: 404 });
     }
 
+    // ── /api/* сюда попадать не должно (см. app/js/electron-bridge.js —
+    // такие запросы уходят через IPC) — если всё же дошло, значит мост
+    // не подключился, и это должно быть видно явной ошибкой, а не
+    // молча отдавать index.html вместо JSON.
+    if (pathname.startsWith("/api/")) {
+      return new Response(JSON.stringify({ error: "IPC bridge not connected" }), {
+        status: 500,
+        headers: { "Content-Type": "application/json; charset=utf-8" },
+      });
+    }
+
     // ── Экран приветствия ──
     if (pathname === "/welcome" || pathname === "/welcome.html") {
       const res = await fileResponse(path.join(UI_DIR, "welcome.html"));

@@ -164,10 +164,13 @@ function appRoutes() {
 
     "POST /api/app/update-restart": async () => {
       if (!pendingUpdateInfo) return { ok: false };
-      // Второй аргумент — isForceRunAfter: без него electron-updater не
-      // гарантирует перезапуск после тихой (oneClick) установки на
-      // Windows, и приложение просто закрывалось, не открываясь обратно.
-      autoUpdater.quitAndInstall(false, true);
+      // Первый аргумент — isSilent: false показывает мастер установки
+      // NSIS и просит человека самого пройти Next/Finish (а после
+      // закрытия мастера приложение само не открывалось — то самое
+      // "обновился, а перезапускать пришлось руками"). Тихо и с
+      // гарантированным перезапуском получается только сочетание
+      // (true, true) — isSilent + isForceRunAfter.
+      autoUpdater.quitAndInstall(true, true);
       return { ok: true };
     },
 
@@ -528,7 +531,12 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,
-      preload: path.join(HERE, "preload.js"),
+      // Обязательно .mjs: сандбоксовый preload грузится своим лёгким
+      // загрузчиком, который смотрит на расширение файла, а не на
+      // "type": "module" в package.json — с .js модульный import внутри
+      // preload молча не срабатывает (contextBridge ничего не
+      // экспортирует, и страница остаётся без window.fictaris).
+      preload: path.join(HERE, "preload.mjs"),
     },
   });
   win.once("ready-to-show", () => win.show());

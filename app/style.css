@@ -1029,6 +1029,35 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
 
 .update-banner-actions { display: flex; gap: 8px; flex-shrink: 0; }
 
+/* Обновление готово — модалка по центру поверх всего окна, а не просто
+   полоска: перезапуск подменяет файлы приложения на диске, так что
+   продолжать работать в уже открытой копии до явного выбора не должно
+   быть можно (см. app/js/update-banner.js). */
+.update-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20000;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.update-modal {
+  width: 360px;
+  max-width: calc(100vw - 40px);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 24px;
+  text-align: center;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+
+.update-modal p { margin: 0 0 20px; color: var(--text); font-size: 0.95rem; }
+
+.update-modal .update-banner-actions { justify-content: center; }
+
 /* ── Рукопись ──────────────────────────────── */
 
 .manuscript-view { display: flex; width: 100%; }
