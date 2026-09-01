@@ -21,7 +21,7 @@ import { initUpdateBanner } from "./update-banner.js";
 import { applyTheme } from "./theme.js";
 import { applyLabels } from "./labels.js";
 import { applyTabVisibility, applyTabOrder, getHiddenTabs } from "./visibility.js";
-import { initSearch, openSearch } from "./search.js";
+import { initSearch } from "./search.js";
 import { initShortcuts, loadShortcuts } from "./shortcuts.js";
 import { initSidebar } from "./sidebar.js";
 import { maybeShowOnboarding } from "./onboarding.js";
@@ -99,7 +99,6 @@ settingsBtn.addEventListener("click", () => openModule("settings"));
 sidebarToggle.addEventListener("click", () => appEl.classList.toggle("sidebar-open"));
 sidebarBackdrop.addEventListener("click", () => appEl.classList.remove("sidebar-open"));
 
-document.getElementById("searchTrigger").addEventListener("click", () => openSearch());
 initSearch((module, focusId) => openModule(module, focusId));
 initShortcuts((module) => openModule(module));
 
@@ -145,8 +144,6 @@ async function boot() {
   applyTabVisibility();
   loadShortcuts();
   initSidebar();
-  const searchTriggerText = document.getElementById("searchTrigger").childNodes[0];
-  if (searchTriggerText) searchTriggerText.textContent = `${i18n("Поиск")} `;
   const info = await apiGet("/api/app/info").catch(() => ({ vaultPath: null }));
   if (!info.vaultPath) {
     location.href = "/welcome";

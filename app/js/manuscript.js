@@ -5,6 +5,7 @@ import { stickersToHtml, attachStickyPopover } from "./stickies.js";
 import { buildManuscriptDocx } from "./docx.js";
 import { openContextMenu } from "./context-menu.js";
 import { loadStatuses, buildStatusDot } from "./chapter-status.js";
+import { iconSvg } from "./icons.js";
 import { i18n } from "./i18n.js";
 
 // Список статусов — настраиваемый (Настройки → Статусы глав, см.
@@ -29,8 +30,8 @@ let manuscript = { chapters: [], activeChapterId: null };
 let characters = [];
 let viewMode = false;
 let focusMode = false;
+let extrasOpen = false; // панель «Заметки/Стикеры/Снимки» справа от редактора — по требованию, не всегда на виду (см. buildExtrasPanel)
 let container = null;
-let syncFontSizeDisplay = null; // обновляет число в шапке редактора без полной перерисовки — ставит buildEditor()
 const save = debounceSave((data) => apiPost("/api/manuscript", data));
 
 function persist() {
@@ -39,12 +40,43 @@ function persist() {
 
 const SNAPSHOT_LIMIT = 20;
 
-function blankChapter() {
-  return { id: uid(), title: i18n("Новая глава"), content: "", status: statuses[0]?.key || "draft", authorNotes: "", stickies: [], snapshots: [], folderId: null };
+function blankChapter(folderId = null) {
+  return { id: uid(), title: i18n("Новая глава"), content: "", status: statuses[0]?.key || "draft", authorNotes: "", stickies: [], snapshots: [], folderId };
 }
 
-function blankFolder() {
-  return { id: uid(), name: i18n("Новая папка"), status: null };
+function blankFolder(parentId = null) {
+  return { id: uid(), name: i18n("Новая папка"), status: null, parentId, collapsed: false };
+}
+
+function folderParent(folder) {
+  return folder.parentId || null;
+}
+
+// Все главы папки и вложенных в неё подпапок разом — экспорт папки
+// должен захватывать всё дерево, а не только прямых детей.
+function collectFolderChapters(folderId) {
+  const ids = new Set([folderId]);
+  let grew = true;
+  while (grew) {
+    grew = false;
+    for (const f of manuscript.folders) {
+      if (ids.has(folderParent(f)) && !ids.has(f.id)) {
+        ids.add(f.id);
+        grew = true;
+      }
+    }
+  }
+  return manuscript.chapters.filter((c) => c.folderId && ids.has(c.folderId));
+}
+
+// Короткий id стикера в пределах главы — n1, n2… вместо длинного
+// случайного uid(): маркер [[note:n3]] в сыром тексте короче и не
+// выглядит мусором рядом с остальным текстом (было [[note:m3x9k2a1]]).
+function nextStickyId(chapter) {
+  const used = new Set((chapter.stickies || []).map((s) => s.id));
+  let n = (chapter.stickies || []).length + 1;
+  while (used.has(`n${n}`)) n++;
+  return `n${n}`;
 }
 
 function wordCount(text) {
@@ -92,7 +124,7 @@ document.addEventListener("keydown", (e) => {
 });
 
 function insertSticky(textarea, chapter) {
-  const sticky = { id: uid(), text: "" };
+  const sticky = { id: nextStickyId(chapter), text: "" };
   chapter.stickies = [...(chapter.stickies || []), sticky];
   const pos = textarea.selectionStart;
   const marker = `[[note:${sticky.id}]]`;
@@ -150,7 +182,7 @@ function attachEditorContextMenu(textarea, chapter) {
         items: FONT_SIZE_PRESETS.map((size) => ({
           label: `${size}px`,
           checked: size === editorFontSize,
-          action: () => setFontSize(size).then((v) => syncFontSizeDisplay?.(v)),
+          action: () => setFontSize(size),
         })),
       },
       { separator: true },
@@ -202,6 +234,8 @@ function draw() {
 
   if (!focusMode) view.appendChild(buildChapterList());
   view.appendChild(buildEditor());
+  const activeChapter = manuscript.chapters.find((c) => c.id === manuscript.activeChapterId);
+  if (extrasOpen && activeChapter) view.appendChild(buildExtrasPanel(activeChapter));
 
   container.appendChild(view);
 }
@@ -210,10 +244,11 @@ function draw() {
 // в списке (и на главах, и на заголовках папок).
 let dragId = null;
 
-function buildChapterItem(ch) {
+function buildChapterItem(ch, depth) {
   const item = document.createElement("div");
   item.className = "chapter-item" + (ch.id === manuscript.activeChapterId ? " active" : "");
   item.dataset.chapterId = ch.id;
+  if (depth) item.style.marginLeft = `${depth * 14}px`;
   item.draggable = true;
   item.appendChild(buildStatusDot(statuses.find((s) => s.key === ch.status) || statuses[0]));
   const title = document.createElement("span");
@@ -226,6 +261,7 @@ function buildChapterItem(ch) {
   });
   item.addEventListener("contextmenu", (e) => {
     e.preventDefault();
+    e.stopPropagation();
     openContextMenu(e.clientX, e.clientY, [
       {
         label: i18n("Статус"),
@@ -255,10 +291,11 @@ function buildChapterItem(ch) {
       { label: i18n("Экспорт главы в .docx"), action: () => exportDocx([ch], `${safeFileName(ch.title)}.docx`) },
     ]);
   });
-  item.addEventListener("dragstart", () => { dragId = ch.id; });
-  item.addEventListener("dragover", (e) => e.preventDefault());
+  item.addEventListener("dragstart", (e) => { e.stopPropagation(); dragId = ch.id; });
+  item.addEventListener("dragover", (e) => { e.preventDefault(); e.stopPropagation(); });
   item.addEventListener("drop", (e) => {
     e.preventDefault();
+    e.stopPropagation();
     if (dragId === null || dragId === ch.id) return;
     const moved = manuscript.chapters.find((c) => c.id === dragId);
     if (!moved) return;
@@ -276,70 +313,139 @@ function buildChapterItem(ch) {
   return item;
 }
 
-function buildFolderHeader(folder) {
+function deleteFolder(folder) {
+  // Не трогает содержимое: главы становятся «без папки», вложенные
+  // подпапки поднимаются на уровень выше — удаляется только сама
+  // папка-контейнер, не то, что в ней лежало.
+  for (const c of manuscript.chapters) if (c.folderId === folder.id) c.folderId = null;
+  for (const f of manuscript.folders) if (folderParent(f) === folder.id) f.parentId = folderParent(folder);
+  manuscript.folders = manuscript.folders.filter((f) => f.id !== folder.id);
+  persist();
+  draw();
+}
+
+function folderContextMenuItems(folder, x, y) {
+  const chaptersInFolder = collectFolderChapters(folder.id);
+  return [
+    {
+      label: i18n("Новая глава здесь"),
+      action: () => {
+        const c = blankChapter(folder.id);
+        manuscript.chapters.push(c);
+        manuscript.activeChapterId = c.id;
+        folder.collapsed = false;
+        persist();
+        draw();
+      },
+    },
+    {
+      label: i18n("Новая подпапка"),
+      action: () => {
+        manuscript.folders.push(blankFolder(folder.id));
+        folder.collapsed = false;
+        persist();
+        draw();
+      },
+    },
+    { label: i18n("Переименовать"), action: () => startFolderRename(folder.id) },
+    {
+      label: i18n("Статус папки"),
+      items: [
+        { label: i18n("Без статуса"), checked: !folder.status, action: () => { folder.status = null; persist(); draw(); } },
+        ...statuses.map((s) => ({
+          label: i18n(s.label),
+          checked: folder.status === s.key,
+          action: () => { folder.status = s.key; persist(); draw(); },
+        })),
+      ],
+    },
+    { separator: true },
+    { label: i18n("Экспорт папки в .md"), action: () => exportMarkdown(chaptersInFolder, `${safeFileName(folder.name)}.md`) },
+    { label: i18n("Экспорт папки в .docx"), action: () => exportDocx(chaptersInFolder, `${safeFileName(folder.name)}.docx`) },
+    { separator: true },
+    {
+      label: i18n("Удалить папку"),
+      danger: true,
+      // Как и везде в приложении — не сразу, второй клик поверх нового
+      // меню с одним пунктом-подтверждением (см. board.js/data-panel.js).
+      action: () => {
+        openContextMenu(x, y, [
+          { label: i18n("Точно удалить? Главы и подпапки останутся, без этой папки."), danger: true, action: () => deleteFolder(folder) },
+        ]);
+      },
+    },
+  ];
+}
+
+// Заголовок папки временно переключается в режим переименования (по
+// двойному клику или пункту меню «Переименовать»), не является полем
+// ввода постоянно — обычный клик по строке сворачивает/разворачивает,
+// как в Obsidian, а не намекает на переименование при каждом наведении.
+function startFolderRename(folderId) {
+  const nameSpan = container?.querySelector(`.chapter-folder[data-folder-id="${folderId}"] .chapter-folder-name`);
+  const folder = manuscript.folders.find((f) => f.id === folderId);
+  if (!nameSpan || !folder) return;
+  const input = document.createElement("input");
+  input.className = "chapter-folder-name-input";
+  input.value = folder.name || "";
+  nameSpan.replaceWith(input);
+  input.focus();
+  input.select();
+  const commit = () => {
+    folder.name = input.value.trim() || i18n("Без названия");
+    persist();
+    draw();
+  };
+  input.addEventListener("click", (e) => e.stopPropagation());
+  input.addEventListener("blur", commit);
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") input.blur();
+    else if (e.key === "Escape") { input.value = folder.name || ""; input.blur(); }
+  });
+}
+
+function buildFolderRow(folder, depth) {
   const header = document.createElement("div");
-  header.className = "chapter-folder-header";
+  header.className = "chapter-folder" + (folder.collapsed ? " collapsed" : "");
+  header.dataset.folderId = folder.id;
+  if (depth) header.style.marginLeft = `${depth * 14}px`;
+
+  const chevron = document.createElement("span");
+  chevron.className = "chapter-folder-chevron";
+  chevron.innerHTML = iconSvg("chevron", 13);
+  header.appendChild(chevron);
+
+  const icon = document.createElement("span");
+  icon.className = "chapter-folder-icon";
+  icon.innerHTML = iconSvg("folder", 14);
+  header.appendChild(icon);
+
+  const nameSpan = document.createElement("span");
+  nameSpan.className = "chapter-folder-name";
+  nameSpan.textContent = folder.name || i18n("Без названия");
+  header.appendChild(nameSpan);
 
   const status = folder.status ? statuses.find((s) => s.key === folder.status) : null;
   if (status) header.appendChild(buildStatusDot(status));
 
-  const nameInput = document.createElement("input");
-  nameInput.className = "chapter-folder-name";
-  nameInput.value = folder.name || "";
-  nameInput.placeholder = i18n("Название папки");
-  nameInput.addEventListener("input", () => {
-    folder.name = nameInput.value;
+  header.addEventListener("click", () => {
+    folder.collapsed = !folder.collapsed;
     persist();
+    draw();
   });
-  header.appendChild(nameInput);
-
+  header.addEventListener("dblclick", (e) => {
+    e.preventDefault();
+    startFolderRename(folder.id);
+  });
   header.addEventListener("contextmenu", (e) => {
     e.preventDefault();
-    const chaptersInFolder = manuscript.chapters.filter((c) => c.folderId === folder.id);
-    openContextMenu(e.clientX, e.clientY, [
-      {
-        label: i18n("Статус папки"),
-        items: [
-          { label: i18n("Без статуса"), checked: !folder.status, action: () => { folder.status = null; persist(); draw(); } },
-          ...statuses.map((s) => ({
-            label: i18n(s.label),
-            checked: folder.status === s.key,
-            action: () => { folder.status = s.key; persist(); draw(); },
-          })),
-        ],
-      },
-      { separator: true },
-      { label: i18n("Экспорт папки в .md"), action: () => exportMarkdown(chaptersInFolder, `${safeFileName(folder.name)}.md`) },
-      { label: i18n("Экспорт папки в .docx"), action: () => exportDocx(chaptersInFolder, `${safeFileName(folder.name)}.docx`) },
-      { separator: true },
-      {
-        label: i18n("Удалить папку"),
-        action: () => {
-          if (header.dataset.confirmDelete === "1") {
-            for (const c of chaptersInFolder) c.folderId = null;
-            manuscript.folders = manuscript.folders.filter((f) => f.id !== folder.id);
-            persist();
-            draw();
-            return;
-          }
-          header.dataset.confirmDelete = "1";
-          setTimeout(() => { header.dataset.confirmDelete = ""; }, 4000);
-          openContextMenu(e.clientX, e.clientY, [
-            { label: i18n("Точно удалить? Главы останутся, папка исчезнет."), action: () => {
-              for (const c of chaptersInFolder) c.folderId = null;
-              manuscript.folders = manuscript.folders.filter((f) => f.id !== folder.id);
-              persist();
-              draw();
-            } },
-          ]);
-        },
-      },
-    ]);
+    e.stopPropagation();
+    openContextMenu(e.clientX, e.clientY, folderContextMenuItems(folder, e.clientX, e.clientY));
   });
-
-  header.addEventListener("dragover", (e) => e.preventDefault());
+  header.addEventListener("dragover", (e) => { e.preventDefault(); e.stopPropagation(); });
   header.addEventListener("drop", (e) => {
     e.preventDefault();
+    e.stopPropagation();
     if (dragId === null) return;
     const ch = manuscript.chapters.find((c) => c.id === dragId);
     if (!ch) return;
@@ -351,20 +457,63 @@ function buildFolderHeader(folder) {
   return header;
 }
 
+// Рекурсивно достраивает дерево папок: подпапки и их содержимое сперва,
+// затем главы, лежащие прямо в этой папке (не глубже) — тот же порядок,
+// что и в проводнике файлов.
+function buildFolderTree(list, parentId, depth) {
+  for (const folder of manuscript.folders.filter((f) => folderParent(f) === parentId)) {
+    list.appendChild(buildFolderRow(folder, depth));
+    if (!folder.collapsed) {
+      buildFolderTree(list, folder.id, depth + 1);
+      for (const ch of manuscript.chapters.filter((c) => c.folderId === folder.id)) {
+        list.appendChild(buildChapterItem(ch, depth + 1));
+      }
+    }
+  }
+}
+
+function emptyAreaContextMenuItems() {
+  return [
+    {
+      label: i18n("Новая глава"),
+      action: () => {
+        const c = blankChapter();
+        manuscript.chapters.push(c);
+        manuscript.activeChapterId = c.id;
+        persist();
+        draw();
+      },
+    },
+    {
+      label: i18n("Новая папка"),
+      action: () => {
+        manuscript.folders.push(blankFolder());
+        persist();
+        draw();
+      },
+    },
+    { separator: true },
+    { label: i18n("Экспорт всей рукописи в .md"), action: () => exportMarkdown() },
+    { label: i18n("Экспорт всей рукописи в .docx"), action: () => exportDocx() },
+  ];
+}
+
 function buildChapterList() {
   const list = document.createElement("div");
   list.className = "chapter-list";
 
-  for (const folder of manuscript.folders) {
-    list.appendChild(buildFolderHeader(folder));
-    for (const ch of manuscript.chapters.filter((c) => c.folderId === folder.id)) {
-      list.appendChild(buildChapterItem(ch));
-    }
+  buildFolderTree(list, null, 0);
+  for (const ch of manuscript.chapters.filter((c) => !c.folderId)) {
+    list.appendChild(buildChapterItem(ch, 0));
   }
 
-  for (const ch of manuscript.chapters.filter((c) => !c.folderId)) {
-    list.appendChild(buildChapterItem(ch));
-  }
+  // ПКМ по пустому месту списка (не по конкретной главе/папке — те сами
+  // останавливают всплытие в своих обработчиках) — быстрое «+ Глава»/
+  // «+ Папка» без похода к кнопкам внизу, как в проводнике файлов.
+  list.addEventListener("contextmenu", (e) => {
+    e.preventDefault();
+    openContextMenu(e.clientX, e.clientY, emptyAreaContextMenuItems());
+  });
 
   const addBtn = document.createElement("button");
   addBtn.className = "add-chapter";
@@ -387,22 +536,6 @@ function buildChapterList() {
     draw();
   });
   list.appendChild(addFolderBtn);
-
-  const exportBtn = document.createElement("button");
-  exportBtn.className = "add-chapter";
-  exportBtn.textContent = i18n("Экспорт в .md");
-  // Не exportMarkdown напрямую: addEventListener зовёт обработчик с
-  // самим click-событием первым аргументом — chapters получил бы Event
-  // вместо manuscript.chapters по умолчанию (Event, а не undefined, так
-  // что дефолтное значение параметра не подставилось бы).
-  exportBtn.addEventListener("click", () => exportMarkdown());
-  list.appendChild(exportBtn);
-
-  const exportDocxBtn = document.createElement("button");
-  exportDocxBtn.className = "add-chapter";
-  exportDocxBtn.textContent = i18n("Экспорт в .docx");
-  exportDocxBtn.addEventListener("click", () => exportDocx());
-  list.appendChild(exportDocxBtn);
 
   return list;
 }
@@ -468,38 +601,6 @@ function buildEditor() {
   });
   header.appendChild(focusBtn);
 
-  // Свободный ввод числа — раньше было всего 6 фиксированных размеров
-  // на выбор, теперь любое значение в разумных пределах (FONT_SIZE_MIN/
-  // MAX), плюс те же пресеты доступны через ПКМ в самом тексте (см.
-  // attachEditorContextMenu) — как размер шрифта обычно и предлагают
-  // менять текстовые редакторы.
-  const fontSizeWrap = document.createElement("div");
-  fontSizeWrap.className = "font-size-row";
-  fontSizeWrap.title = i18n("Размер шрифта в тексте главы");
-
-  const sizeMinus = document.createElement("button");
-  sizeMinus.className = "btn font-size-step";
-  sizeMinus.textContent = "−";
-  sizeMinus.addEventListener("click", () => setFontSize(editorFontSize - 1).then((v) => (sizeInput.value = v)));
-
-  const sizeInput = document.createElement("input");
-  sizeInput.type = "number";
-  sizeInput.className = "font-size-input";
-  sizeInput.min = String(FONT_SIZE_MIN);
-  sizeInput.max = String(FONT_SIZE_MAX);
-  sizeInput.value = editorFontSize;
-  sizeInput.addEventListener("change", () => setFontSize(sizeInput.valueAsNumber).then((v) => (sizeInput.value = v)));
-
-  const sizePlus = document.createElement("button");
-  sizePlus.className = "btn font-size-step";
-  sizePlus.textContent = "+";
-  sizePlus.addEventListener("click", () => setFontSize(editorFontSize + 1).then((v) => (sizeInput.value = v)));
-
-  syncFontSizeDisplay = (v) => (sizeInput.value = v);
-
-  fontSizeWrap.append(sizeMinus, sizeInput, sizePlus);
-  header.appendChild(fontSizeWrap);
-
   const snapshotBtn = document.createElement("button");
   snapshotBtn.className = "btn";
   snapshotBtn.textContent = i18n("Снимок");
@@ -511,6 +612,22 @@ function buildEditor() {
     draw();
   });
   header.appendChild(snapshotBtn);
+
+  // Заметки автора/стикеры/снимки версий раньше всегда лежали открытыми
+  // блоками под текстом — во время самого писательства это было лишним
+  // визуальным шумом. Теперь всё три — в отдельной выезжающей панели
+  // (buildExtrasPanel, drag её нет — просто показать/скрыть), а размер
+  // шрифта и вставка стикера полностью переехали в ПКМ по тексту
+  // (attachEditorContextMenu) — кнопки-дубли для них здесь больше не нужны.
+  const extrasBtn = document.createElement("button");
+  extrasBtn.className = "btn" + (extrasOpen ? " accent" : "");
+  extrasBtn.textContent = i18n("Заметки и снимки");
+  extrasBtn.title = i18n("Заметки автора, стикеры, снимки версий — правый клик по тексту вставляет стикер и меняет размер шрифта");
+  extrasBtn.addEventListener("click", () => {
+    extrasOpen = !extrasOpen;
+    draw();
+  });
+  header.appendChild(extrasBtn);
 
   const wc = document.createElement("div");
   wc.className = "word-count";
@@ -547,18 +664,36 @@ function buildEditor() {
     wrap.appendChild(textarea);
     attachMentionAutocomplete(textarea, () => characters);
     attachEditorContextMenu(textarea, chapter);
-
-    const stickyBtn = document.createElement("button");
-    stickyBtn.className = "btn sticky-insert-btn";
-    stickyBtn.textContent = i18n("📌 Стикер");
-    stickyBtn.title = i18n("Вставить инлайн-заметку в текст");
-    stickyBtn.addEventListener("click", () => insertSticky(textarea, chapter));
-    wrap.appendChild(stickyBtn);
     pane.appendChild(wrap);
   }
 
+  return pane;
+}
+
+// Отдельная выезжающая панель (переиспользует .drawer — тот же вид, что
+// у карточек персонажа/локации/т.д.), а не блоки под текстом главы —
+// открывается кнопкой «Заметки и снимки» в шапке редактора (см. выше).
+function buildExtrasPanel(chapter) {
+  const panel = document.createElement("div");
+  panel.className = "drawer";
+
+  const closeRow = document.createElement("div");
+  closeRow.className = "drawer-actions";
+  closeRow.style.marginTop = "0";
+  closeRow.style.marginBottom = "12px";
+  const closeBtn = document.createElement("button");
+  closeBtn.className = "btn";
+  closeBtn.textContent = i18n("Закрыть ×");
+  closeBtn.addEventListener("click", () => {
+    extrasOpen = false;
+    draw();
+  });
+  closeRow.appendChild(closeBtn);
+  panel.appendChild(closeRow);
+
   const notes = document.createElement("details");
   notes.className = "author-notes";
+  notes.open = true;
   const summary = document.createElement("summary");
   summary.textContent = i18n("Заметки");
   notes.appendChild(summary);
@@ -570,26 +705,31 @@ function buildEditor() {
     persist();
   });
   notes.appendChild(notesArea);
-  pane.appendChild(notes);
+  panel.appendChild(notes);
 
-  if (!viewMode && (chapter.stickies || []).length) {
-    pane.appendChild(buildStickyEditor(chapter));
-  }
+  panel.appendChild(buildStickyEditor(chapter));
+  panel.appendChild(buildSnapshots(chapter));
 
-  pane.appendChild(buildSnapshots(chapter));
-
-  return pane;
+  return panel;
 }
 
 function buildStickyEditor(chapter) {
+  const stickies = chapter.stickies || [];
   const details = document.createElement("details");
   details.className = "author-notes";
   details.open = true;
   const summary = document.createElement("summary");
-  summary.textContent = i18n("Стикеры ({n})", { n: chapter.stickies.length });
+  summary.textContent = i18n("Стикеры ({n})", { n: stickies.length });
   details.appendChild(summary);
 
-  for (const sticky of chapter.stickies) {
+  if (!stickies.length) {
+    const empty = document.createElement("div");
+    empty.className = "hint-text";
+    empty.textContent = i18n("Пока нет — правый клик по тексту главы добавит стикер-заметку.");
+    details.appendChild(empty);
+  }
+
+  for (const sticky of stickies) {
     const row = document.createElement("div");
     row.className = "sticky-editor-row";
     const area = document.createElement("textarea");

@@ -14,6 +14,9 @@ const PATHS = {
   flame: '<path d="M12 2c1 4-3 4-3 8a3 3 0 0 0 6 0c0-1-1-2-1-3 2 1 3 4 3 6a5 5 0 0 1-10 0c0-4 3-6 5-11z"/>',
   sword: '<path d="M14 2 4 12l-1 5 5-1L18 6z"/><path d="M17 5l2 2M3 21l4-4"/>',
   coin: '<circle cx="12" cy="12" r="9"/><path d="M12 7v10M9 9.5c0-1.5 1.5-2.5 3-2.5s3 1 3 2.5-1.5 2-3 2.5-3 1-3 2.5 1.5 2.5 3 2.5 3-1 3-2.5"/>',
+  note: '<path d="M6 3h9l4 4v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3v5h5"/><path d="M8 12h7M8 16h5"/>',
+  folder: '<path d="M3 6a1 1 0 0 1 1-1h5l2 2h9a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6z"/>',
+  chevron: '<path d="M9 6l6 6-6 6"/>',
 };
 
 export const LOCATION_TYPES = [

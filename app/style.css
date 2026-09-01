@@ -774,33 +774,9 @@ button.btn.accent {
 button.btn.accent:hover { background: var(--accent-hover); border-color: var(--accent-hover); color: var(--panel); }
 
 /* ── Поиск ─────────────────────────────────── */
-
-.search-trigger {
-  margin: 0 12px 12px;
-  padding: 8px 10px;
-  border-radius: 6px;
-  border: 1px solid var(--border);
-  background: var(--panel-alt);
-  color: var(--text-dim);
-  font-family: inherit;
-  font-size: 0.82rem;
-  text-align: left;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.search-trigger:hover { border-color: var(--accent); color: var(--text); }
-
-.search-trigger-hint {
-  font-family: "JetBrains Mono", monospace;
-  font-size: 0.7rem;
-  color: var(--text-faint);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 0 5px;
-}
+/* Кнопка-триггер в сайдбаре убрана (пункт 10 правок) — тот же поиск
+   открывается клавишей "/" из любого места (см. search.js), кнопка
+   дублировала эту же функцию и просто занимала место. */
 
 .search-overlay {
   position: fixed;
@@ -998,31 +974,45 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
 
 /* ── Редактор ──────────────────────────────── */
 
-.font-size-row { display: flex; align-items: center; gap: 4px; }
-.font-size-step { width: 28px; padding: 0; }
-.font-size-input {
-  width: 48px;
-  text-align: center;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  color: var(--text);
-  font-size: 0.85rem;
-  padding: 4px 2px;
-  font-family: inherit;
-}
-/* Стрелочки number-инпута — своя пара +/- рядом уже есть, системные
-   дублируют её и по-разному выглядят в Chromium/Electron. */
-.font-size-input::-webkit-inner-spin-button,
-.font-size-input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
-.font-size-input { appearance: textfield; }
-
 /* ── Подписи интерфейса ────────────────────── */
 /* Ряд — только глазик (видимость) и само поле ввода (подпись); никакой
    подписи слева нет, само поле и есть подпись раздела. */
 
-.labels-grid { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; max-width: 420px; }
+.labels-grid { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; max-width: 420px; min-height: 10px; }
 .label-row { display: flex; align-items: center; gap: 8px; }
+
+.labels-group-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 420px;
+  margin: 4px 0 6px;
+}
+.labels-group-name {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-faint);
+  cursor: pointer;
+  flex: 1;
+}
+.labels-group-name:hover { color: var(--text-dim); }
+.labels-group-name-input {
+  flex: 1;
+  background: var(--panel-alt);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 0.8rem;
+  padding: 3px 8px;
+}
+.labels-group-del {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  font-size: 0.75rem;
+  line-height: 1;
+}
 
 .label-row-drag {
   flex-shrink: 0;
@@ -1345,33 +1335,56 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
 .status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 .status-emoji { font-size: 0.85rem; line-height: 1; flex-shrink: 0; }
 
-.chapter-folder-header {
+/* Папка — как в Obsidian: строка с шевроном (открыть/закрыть),
+   иконкой и названием, на своём фоне, чтобы не сливаться со списком
+   позади (было — просто текстовое поле без подложки). Переименование —
+   не «поле ввода всегда», а отдельное состояние (двойной клик или пункт
+   меню «Переименовать»): обычный клик по строке только сворачивает/
+   разворачивает, как и положено папке, а не намекает на рен­ейм при
+   каждом наведении. */
+.chapter-folder {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 8px 4px;
-  margin-top: 6px;
+  gap: 6px;
+  padding: 7px 8px;
+  margin-top: 4px;
+  border-radius: 6px;
+  background: var(--panel-alt);
+  cursor: pointer;
+  user-select: none;
 }
+.chapter-folder:first-child { margin-top: 0; }
+.chapter-folder:hover { background: var(--card); }
 
-.chapter-folder-header:first-child { margin-top: 0; }
+.chapter-folder-chevron {
+  flex-shrink: 0;
+  display: flex;
+  color: var(--text-faint);
+  transition: transform 0.15s;
+}
+.chapter-folder.collapsed .chapter-folder-chevron { transform: rotate(-90deg); }
+
+.chapter-folder-icon { flex-shrink: 0; display: flex; color: var(--text-faint); }
 
 .chapter-folder-name {
   flex: 1;
-  background: none;
-  border: none;
-  border-bottom: 1px solid transparent;
-  color: var(--text-faint);
-  font-family: inherit;
-  font-size: 0.78rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  padding: 2px 0;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.chapter-folder-name:hover,
-.chapter-folder-name:focus { border-bottom-color: var(--border); color: var(--text-dim); }
-
-.chapter-list .chapter-item { margin-left: 10px; }
+.chapter-folder-name-input {
+  flex: 1;
+  background: var(--panel);
+  border: 1px solid var(--accent);
+  border-radius: 5px;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.85rem;
+  padding: 2px 6px;
+}
 
 .add-chapter {
   width: 100%;
@@ -1866,16 +1879,14 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
   cursor: text;
 }
 
-.sticky-insert-btn {
-  position: absolute;
-  right: 12px;
-  bottom: 12px;
-}
-
 .sticky-marker {
+  display: inline-flex;
+  vertical-align: -2px;
   cursor: pointer;
-  font-size: 0.9em;
+  color: var(--accent);
+  opacity: 0.85;
 }
+.sticky-marker:hover { opacity: 1; }
 
 .sticky-popover {
   display: none;
