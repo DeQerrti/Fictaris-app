@@ -436,6 +436,17 @@ body.focus-mode .sidebar { display: none; }
   top: -4px;
   left: 100%;
   margin-left: 2px;
+  /* Подменю — та же обёртка .context-menu-list, что и верхний уровень,
+     но верхний уровень получает фон/рамку/тень от родителя .context-menu
+     (openContextMenu в context-menu.js), а подменю рисуется само по
+     себе, без такого родителя — без этого правила оно прозрачное и
+     сливается с тем, что под ним (главы, пресеты размера шрифта и т.д.). */
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  min-width: 190px;
 }
 
 .context-menu-submenu-left {
