@@ -19,6 +19,7 @@ export function initEntityModal(modules) {
 }
 
 let modalEl = null;
+let onCloseCb = null;
 
 function onEscape(e) {
   if (e.key === "Escape") closeEntityModal();
@@ -28,12 +29,20 @@ export function closeEntityModal() {
   modalEl?.remove();
   modalEl = null;
   document.removeEventListener("keydown", onEscape);
+  const cb = onCloseCb;
+  onCloseCb = null;
+  cb?.();
 }
 
-export async function openEntityModal(moduleName, focusId) {
+// options.onClose — зовётся один раз при закрытии модалки (крестик,
+// клик мимо, Esc) — например, чтобы обновить экран, с которого модалку
+// открыли (см. family-tree.js: добавили персонажа, отредактировали в
+// модалке, дерево должно перерисоваться с учётом правки).
+export async function openEntityModal(moduleName, focusId, options = {}) {
   const render = renderers?.[moduleName];
   if (!render) return;
   closeEntityModal();
+  onCloseCb = options.onClose || null;
 
   const backdrop = document.createElement("div");
   backdrop.className = "entity-modal-backdrop";

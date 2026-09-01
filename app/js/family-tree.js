@@ -1,23 +1,41 @@
-import { apiGet } from "./api.js";
+import { apiGet, apiPost, uid } from "./api.js";
 import { i18n } from "./i18n.js";
+import { openEntityModal } from "./entity-modal.js";
 
 // ══════════════════════════════════════════════
-//  ДЕРЕВО РОДСТВА
+//  РОДОСЛОВНАЯ
 //
 //  Отдельно от общего графа связей (graph.js — все сущности разом,
 //  без направления): здесь только персонажи и только связь
 //  «родитель → ребёнок» (character.parentIds, задаётся в карточке
 //  персонажа), уложенная по поколениям сверху вниз, как и положено
-//  генеалогическому дереву. Позиции считаются заранее (поколение × шаг),
-//  а не измеряются через getBoundingClientRect — тот же приём, что у
-//  graph.js с его круговой раскладкой.
+//  генеалогическому дереву.
 //
-//  Персонажи вне семейных связей (нет ни родителей, ни детей) в дерево
-//  не попадают — это не общий список персонажей, а именно родословная.
+//  Раньше это была голая витрина — только чтение, нельзя было ни
+//  добавить, ни отредактировать персонажа прямо тут. Теперь можно:
+//  «+ Добавить персонажа» заводит нового и сразу открывает его
+//  карточку модалкой (entity-modal.js) для имени/родителей, клик по
+//  уже существующему узлу открывает ту же модалку на нём — дерево
+//  перерисовывается сразу после закрытия (см. onClose).
+//
+//  Несколько родов — не отдельная сущность в данных, а отдельные
+//  связные компоненты графа parentIds (два рода, между которыми нет ни
+//  одной связи «родитель-ребёнок», технически и есть два разных рода):
+//  раньше все они рисовались вперемешку в одной координатной сетке,
+//  теперь каждый — отдельная подписанная карточка с собственной
+//  раскладкой.
 // ══════════════════════════════════════════════
 
-function computeDepths(characters) {
-  const byId = new Map(characters.map((c) => [c.id, c]));
+let root = null;
+let characters = [];
+
+const PALETTE = [
+  "#c9944a", "#4f7d74", "#a4483c", "#7d6a9e",
+  "#6a8fae", "#9a9250", "#b5636b", "#5a8a5f",
+];
+
+function computeDepths(list) {
+  const byId = new Map(list.map((c) => [c.id, c]));
   const depth = new Map();
 
   function depthOf(id, stack) {
@@ -32,29 +50,78 @@ function computeDepths(characters) {
     return d;
   }
 
-  for (const c of characters) depthOf(c.id, new Set());
+  for (const c of list) depthOf(c.id, new Set());
   return depth;
 }
 
-export async function renderFamilyTree(root) {
-  root.innerHTML = "";
-  const characters = await apiGet("/api/characters");
-
-  const hasChild = new Set();
-  for (const c of characters) for (const p of c.parentIds || []) hasChild.add(p);
-  const inTree = characters.filter((c) => (c.parentIds || []).length || hasChild.has(c.id));
-
-  if (!inTree.length) {
-    const empty = document.createElement("div");
-    empty.className = "empty-state";
-    empty.textContent = i18n("Пока пусто — укажи родителей в карточке персонажа, чтобы здесь появилось дерево.");
-    root.appendChild(empty);
-    return;
+// Связные компоненты по parentIds — отдельный род, если ни один
+// персонаж одной группы не является родителем/ребёнком персонажа
+// другой (напрямую или через цепочку).
+function connectedComponents(list) {
+  const byId = new Map(list.map((c) => [c.id, c]));
+  const adj = new Map(list.map((c) => [c.id, new Set()]));
+  for (const c of list) {
+    for (const p of c.parentIds || []) {
+      if (!byId.has(p)) continue;
+      adj.get(c.id).add(p);
+      adj.get(p).add(c.id);
+    }
   }
+  const seen = new Set();
+  const groups = [];
+  for (const c of list) {
+    if (seen.has(c.id)) continue;
+    seen.add(c.id);
+    const stack = [c.id];
+    const group = [];
+    while (stack.length) {
+      const id = stack.pop();
+      group.push(byId.get(id));
+      for (const nb of adj.get(id)) {
+        if (!seen.has(nb)) {
+          seen.add(nb);
+          stack.push(nb);
+        }
+      }
+    }
+    groups.push(group);
+  }
+  groups.sort((a, b) => b.length - a.length); // крупные роды сверху
+  return groups;
+}
 
-  const depth = computeDepths(inTree);
+// Модалка (characters.js) правит и сохраняет свой собственный, отдельный
+// от этого модуля список персонажей — после закрытия нужно перечитать
+// его заново с диска, а не просто перерисовать дерево по уже устаревшим
+// characters, иначе правки в модалке (имя, родители) не появятся здесь
+// до следующего полного открытия вкладки.
+async function refresh() {
+  characters = await apiGet("/api/characters");
+  draw();
+}
+
+function openCharacter(id) {
+  openEntityModal("characters", id, { onClose: refresh });
+}
+
+async function addCharacter() {
+  const c = {
+    id: uid(),
+    name: i18n("Новый персонаж"),
+    color: PALETTE[characters.length % PALETTE.length],
+    role: "", age: "", appearance: "", personality: "",
+    motivation: "", goal: "", flaws: "", backstory: "", tags: "",
+    parentIds: [],
+  };
+  characters.push(c);
+  await apiPost("/api/characters", characters);
+  openCharacter(c.id);
+}
+
+function buildTreeCard(list, index) {
+  const depth = computeDepths(list);
   const rows = new Map();
-  for (const c of inTree) {
+  for (const c of list) {
     const d = depth.get(c.id);
     if (!rows.has(d)) rows.set(d, []);
     rows.get(d).push(c);
@@ -70,10 +137,10 @@ export async function renderFamilyTree(root) {
   const centerX = width / 2;
 
   const pos = {};
-  for (const [d, list] of rows) {
-    const rowWidth = list.length * COL_W;
+  for (const [d, rowList] of rows) {
+    const rowWidth = rowList.length * COL_W;
     const startX = centerX - rowWidth / 2 + COL_W / 2;
-    list.forEach((c, i) => {
+    rowList.forEach((c, i) => {
       pos[c.id] = { x: startX + i * COL_W, y: TOP + d * ROW_H };
     });
   }
@@ -84,7 +151,7 @@ export async function renderFamilyTree(root) {
   svg.setAttribute("height", height);
   svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
 
-  for (const c of inTree) {
+  for (const c of list) {
     const to = pos[c.id];
     for (const parentId of c.parentIds || []) {
       const from = pos[parentId];
@@ -99,9 +166,11 @@ export async function renderFamilyTree(root) {
     }
   }
 
-  for (const c of inTree) {
+  for (const c of list) {
     const p = pos[c.id];
     const g = document.createElementNS(svgNS, "g");
+    g.classList.add("ftree-node");
+    g.style.cursor = "pointer";
 
     const circle = document.createElementNS(svgNS, "circle");
     circle.setAttribute("cx", p.x);
@@ -131,15 +200,67 @@ export async function renderFamilyTree(root) {
     text.textContent = c.name || "?";
     g.appendChild(text);
 
+    g.addEventListener("click", () => openCharacter(c.id));
     svg.appendChild(g);
   }
 
   const holder = document.createElement("div");
   holder.className = "graph-holder";
+  holder.style.overflowX = "auto";
   holder.appendChild(svg);
 
+  const card = document.createElement("div");
+  card.className = "ftree-card";
+
+  const roots = (rows.get(0) || []).map((c) => c.name || i18n("Без имени"));
+  const title = document.createElement("div");
+  title.className = "ftree-card-title";
+  title.textContent = list.length > 1 ? roots.join(" · ") : i18n("Род {n}", { n: index + 1 });
+  card.appendChild(title);
+
+  card.appendChild(holder);
+  return card;
+}
+
+function draw() {
+  root.innerHTML = "";
+
   const wrap = document.createElement("div");
-  wrap.className = "graph-view";
-  wrap.appendChild(holder);
+  wrap.className = "ftree-wrap";
+
+  const toolbar = document.createElement("div");
+  toolbar.className = "ftree-toolbar";
+  const addBtn = document.createElement("button");
+  addBtn.className = "btn";
+  addBtn.textContent = i18n("+ Добавить персонажа");
+  addBtn.addEventListener("click", addCharacter);
+  const hint = document.createElement("span");
+  hint.className = "ftree-hint";
+  hint.textContent = i18n("Клик по узлу открывает карточку — родителей назначают там же.");
+  toolbar.append(addBtn, hint);
+  wrap.appendChild(toolbar);
+
+  const hasChild = new Set();
+  for (const c of characters) for (const p of c.parentIds || []) hasChild.add(p);
+  const inTree = characters.filter((c) => (c.parentIds || []).length || hasChild.has(c.id));
+
+  if (!inTree.length) {
+    const empty = document.createElement("div");
+    empty.className = "empty-state";
+    empty.textContent = i18n("Пока пусто — укажи родителей в карточке персонажа (или добавь нового прямо здесь), чтобы здесь появилось дерево.");
+    wrap.appendChild(empty);
+    root.appendChild(wrap);
+    return;
+  }
+
+  const groups = connectedComponents(inTree);
+  groups.forEach((group, i) => wrap.appendChild(buildTreeCard(group, i)));
+
   root.appendChild(wrap);
+}
+
+export async function renderFamilyTree(rootEl) {
+  root = rootEl;
+  characters = await apiGet("/api/characters");
+  draw();
 }

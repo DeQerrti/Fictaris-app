@@ -2005,16 +2005,13 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
 
 /* ── Граф проекта ──────────────────────────── */
 
-.graph-view {
-  flex: 1;
-  overflow: auto;
-  padding: 24px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
-}
-
+/* .graph-holder — используется родословной (app/js/family-tree.js,
+   .ftree-card ниже) для каждой отдельной карточки рода. Граф проекта
+   (app/js/graph.js) — свои классы, не общие с родословной: у него
+   холдер растянут на почти всю вкладку (раньше был зажат в 920×680 и
+   центрирован, вокруг пустовала половина экрана), а свой SVG растянут
+   на 100% холдера через CSS — см. расчёт width/height viewBox и
+   preserveAspectRatio="none" там же. */
 .graph-holder {
   background: var(--card);
   border: 1px solid var(--border);
@@ -2022,13 +2019,6 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
   padding: 16px;
   overflow: hidden;
 }
-
-/* Граф проекта (app/js/graph.js) — свои классы, не общие с родословной
-   (app/js/family-tree.js, .graph-view/.graph-holder выше): у него холдер
-   растянут на почти всю вкладку (раньше был зажат в 920×680 и
-   центрирован, вокруг пустовала половина экрана), а свой SVG растянут
-   на 100% холдера через CSS — см. расчёт width/height viewBox и
-   preserveAspectRatio="none" там же. */
 .pgraph-view {
   flex: 1;
   min-height: 0;
@@ -2102,6 +2092,32 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
   border-radius: 50%;
   margin-right: 6px;
 }
+
+/* ── Родословная (app/js/family-tree.js) ──────
+   Каждый род — отдельная карточка со своей раскладкой (несколько родов
+   на вкладке, если персонажи из разных семей не связаны родителями ни
+   с кем друг у друга — см. connectedComponents). */
+.ftree-wrap {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.ftree-toolbar { display: flex; align-items: center; gap: 12px; }
+.ftree-hint { font-size: 0.78rem; color: var(--text-faint); }
+
+.ftree-card { display: flex; flex-direction: column; gap: 8px; }
+.ftree-card-title {
+  font-family: Fraunces, serif;
+  font-size: 0.95rem;
+  color: var(--text-dim);
+}
+
+.ftree-node circle { transition: opacity 0.15s; }
+.ftree-node:hover circle { opacity: 0.8; }
 
 /* ── Проверка согласованности ─────────────────── */
 

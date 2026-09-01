@@ -66,9 +66,11 @@ export async function buildDemoBundle() {
     goal: "Вывезти Астру из города", flaws: "Продаст кого угодно, если цена достаточно высока",
     backstory: "Знает все контрабандные тропы побережья", tags: "союзница, ненадёжная" };
 
-  // Родители Астры — только для родословной (family-tree.js читает
-  // character.parentIds), сами не появляются больше нигде в сюжете: без
-  // них вкладка «Родословная» у демо-проекта оставалась бы пустой.
+  // Родители Астры (и ниже — отец Варна) — только для родословной
+  // (family-tree.js читает character.parentIds), сами не появляются
+  // больше нигде в сюжете: без них вкладка «Родословная» у демо-проекта
+  // оставалась бы пустой, а без второго, отдельного рода не было бы
+  // видно, что дерево умеет показывать несколько родов разом.
   const father = { id: "demo-c-father", name: "Лорд Эдвин Вирен", color: "#9a9250",
     role: "Прежний глава Дома Вирен", age: "†", appearance: "Известен только по портретам",
     personality: "", motivation: "", goal: "", flaws: "", backstory: "Убит во время переворота Варна", tags: "погиб" };
@@ -77,7 +79,15 @@ export async function buildDemoBundle() {
     personality: "", motivation: "", goal: "", flaws: "", backstory: "Убита во время переворота Варна", tags: "погиб" };
   aster.parentIds = [father.id, mother.id];
 
-  const characters = [aster, kael, varn, nessa, father, mother];
+  // Отец Варна — второй, отдельный род: не связан родителями ни с кем
+  // из Дома Вирен выше, поэтому родословная показывает два разных рода
+  // отдельными карточками, а не один смешанный список.
+  const varnFather = { id: "demo-c-varn-father", name: "Старый Дом Варн", color: "#9a9250",
+    role: "Основатель Дома Варн", age: "†", appearance: "",
+    personality: "", motivation: "", goal: "", flaws: "", backstory: "Заложил притязания Дома Варн на трон", tags: "погиб" };
+  varn.parentIds = [varnFather.id];
+
+  const characters = [aster, kael, varn, nessa, father, mother, varnFather];
 
   const fortress = { id: "demo-l-fortress", name: "Крепость Раскола", type: "dungeon",
     description: "Полуразрушенный орденский замок в горах", notes: "Здесь хранится клинок", tags: "орден, руины" };
