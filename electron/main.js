@@ -552,7 +552,7 @@ function createWindow() {
   // остаться невидимым навсегда — только процесс в диспетчере задач
   // без единого окна, и человеку нечем это исправить, кроме как убить
   // процесс руками.
-  const showTimer = setTimeout(() => win?.show(), 8000);
+  const showTimer = setTimeout(() => win?.show(), 500);
   win.once("ready-to-show", () => {
     clearTimeout(showTimer);
     win.show();
