@@ -208,7 +208,17 @@ function appRoutes() {
 
     "POST /api/app/use-vault": async ({ body }) => {
       if (!body.path) throw new Error("Не указана папка");
+      // Язык выбирают на экране приветствия (electron/ui/welcome.html) до
+      // того, как у проекта появится site-settings.json — если папка
+      // совсем новая (или пустая), сразу пишем туда выбор, чтобы
+      // интерфейс не открылся по умолчанию на русском, пока не зайдёшь
+      // в Настройки. Уже существующий проект (переоткрыли по пути) —
+      // его язык не трогаем, он уже свой.
+      const isFresh = !(await exists(path.join(body.path, "site-settings.json")));
       const entry = await useVaultPath(body.path, body.name);
+      if (isFresh && (body.lang === "en" || body.lang === "ru")) {
+        await vault.writeJson("site-settings.json", { lang: body.lang });
+      }
       openMain();
       return { ok: true, vault: entry };
     },

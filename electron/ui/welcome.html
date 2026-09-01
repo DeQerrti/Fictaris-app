@@ -41,34 +41,85 @@
   }
   button:hover { background: #dba760; }
   .error { color: #b5636b; font-size: 0.85rem; margin-top: 14px; min-height: 1.2em; }
+
+  .lang-switch {
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    margin: 0 0 20px;
+  }
+  .lang-switch button {
+    width: auto;
+    padding: 6px 14px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    background: transparent;
+    color: #a99977;
+    border: 1px solid #3a3020;
+  }
+  .lang-switch button:hover { background: #241d14; }
+  .lang-switch button.active {
+    background: #c9944a;
+    color: #14110d;
+    border-color: #c9944a;
+  }
 </style>
 </head>
 <body>
   <div class="card">
     <h1>Fictaris</h1>
-    <p id="intro">Инструмент для писателей. Выбери папку, где будет жить проект.</p>
-    <button id="pick">Выбрать папку</button>
+    <div class="lang-switch" id="langSwitch">
+      <button type="button" data-lang="ru">Русский</button>
+      <button type="button" data-lang="en">English</button>
+    </div>
+    <p id="intro"></p>
+    <button id="pick"></button>
     <div class="error" id="error"></div>
   </div>
   <script src="/js/electron-bridge.js"></script>
   <script>
     // Языка проекта тут ещё нет (нет ни проекта, ни site-settings.json —
-    // см. app/js/i18n.js) — единственный доступный сигнал до выбора
-    // папки, это язык самой системы.
-    if (!/^ru/i.test(navigator.language || "")) {
-      document.getElementById("intro").textContent =
-        "A tool for writers. Choose the folder where your project will live.";
-      document.getElementById("pick").textContent = "Choose folder";
+    // см. app/js/i18n.js), поэтому выбор явный, а не угаданный по
+    // navigator.language — тот остаётся только подсказкой для
+    // начального состояния переключателя. Выбранный язык уходит вместе
+    // с /api/app/use-vault и, если папка действительно новая (см.
+    // electron/main.js), сразу становится языком проекта — иначе
+    // интерфейс открылся бы на русском по умолчанию, пока не зайдёшь в
+    // Настройки.
+    const TEXT = {
+      ru: { intro: "Инструмент для писателей. Выбери папку, где будет жить проект.", pick: "Выбрать папку" },
+      en: { intro: "A tool for writers. Choose the folder where your project will live.", pick: "Choose folder" },
+    };
+
+    let lang = /^ru/i.test(navigator.language || "") ? "ru" : "en";
+
+    const introEl = document.getElementById("intro");
+    const pickBtn = document.getElementById("pick");
+    const langButtons = document.querySelectorAll("#langSwitch button");
+
+    function render() {
+      introEl.textContent = TEXT[lang].intro;
+      pickBtn.textContent = TEXT[lang].pick;
+      langButtons.forEach((btn) => btn.classList.toggle("active", btn.dataset.lang === lang));
     }
+    render();
+
+    langButtons.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        lang = btn.dataset.lang;
+        render();
+      });
+    });
+
     const errorEl = document.getElementById("error");
-    document.getElementById("pick").addEventListener("click", async () => {
+    pickBtn.addEventListener("click", async () => {
       errorEl.textContent = "";
       const picked = await fetch("/api/app/pick-vault", { method: "POST" }).then((r) => r.json());
       if (!picked.path) return;
       const used = await fetch("/api/app/use-vault", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ path: picked.path }),
+        body: JSON.stringify({ path: picked.path, lang }),
       }).then((r) => r.json());
       if (used.error) { errorEl.textContent = used.error; return; }
       location.href = "/";
