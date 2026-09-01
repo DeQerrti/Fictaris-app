@@ -8,9 +8,17 @@
 //  сюда наружу не протекает ничего опаснее "вызови api с этими тремя
 //  полями". Страница берёт это на входе через window.fictaris —
 //  дальше её подхватывает app/js/electron-bridge.js.
+//
+//  Только CommonJS (require), несмотря на "type": "module" в
+//  package.json и на .mjs-требование для обычных ES-модулей: сэндбокс
+//  сам по себе ES-модули в preload не поддерживает — контекст, в
+//  котором Electron исполняет сэндбоксовый preload, устроен как
+//  синхронный CommonJS, и там нет ни import, ни module.exports с ESM-
+//  семантикой. .cjs — чтобы Node точно не пытался разобрать файл как
+//  ESM ни при какой конфигурации.
 // ══════════════════════════════════════════════
 
-import { contextBridge, ipcRenderer } from "electron";
+const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("fictaris", {
   invoke: (method, path, body) => ipcRenderer.invoke("api", { method, path, body }),

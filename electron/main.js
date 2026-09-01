@@ -531,12 +531,10 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,
-      // Обязательно .mjs: сандбоксовый preload грузится своим лёгким
-      // загрузчиком, который смотрит на расширение файла, а не на
-      // "type": "module" в package.json — с .js модульный import внутри
-      // preload молча не срабатывает (contextBridge ничего не
-      // экспортирует, и страница остаётся без window.fictaris).
-      preload: path.join(HERE, "preload.mjs"),
+      // .cjs, не .js/.mjs: сэндбоксовый preload (sandbox: true) вообще
+      // не поддерживает ES-модули независимо от расширения — только
+      // CommonJS (require), см. комментарий в electron/preload.cjs.
+      preload: path.join(HERE, "preload.cjs"),
     },
   });
   win.once("ready-to-show", () => win.show());
