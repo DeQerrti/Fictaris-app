@@ -565,9 +565,10 @@ app.whenReady().then(async () => {
   const server = createServer({ appDir: APP_DIR, getVault: () => vault, appRoutes: appRoutes() });
   port = await listen(server);
 
-  // Безрамочного окна нет (в отличие от TasteID) — оставляем системную
-  // рамку, чтобы не тащить electron/chrome.js; полоса меню — только
-  // ради зума/F5/девтулов, сама себя не показывает поверх контента.
+  // Полоса меню — только ради зума/F5/девтулов, сама себя не показывает
+  // поверх контента (win.removeMenu() ниже, в createWindow). Рамку окна
+  // рисует electron/chrome.js — своя, в цветах темы, без системного
+  // заголовка и значка приложения.
   buildMenu();
 
   createWindow();
