@@ -547,7 +547,16 @@ function createWindow() {
       preload: path.join(HERE, "preload.cjs"),
     },
   });
-  win.once("ready-to-show", () => win.show());
+  // Подстраховка: если по любой причине "ready-to-show" не придёт
+  // (зависшая загрузка страницы и т.п.), окно всё равно не должно
+  // остаться невидимым навсегда — только процесс в диспетчере задач
+  // без единого окна, и человеку нечем это исправить, кроме как убить
+  // процесс руками.
+  const showTimer = setTimeout(() => win?.show(), 8000);
+  win.once("ready-to-show", () => {
+    clearTimeout(showTimer);
+    win.show();
+  });
   if (process.platform !== "darwin") win.removeMenu();
   win.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);

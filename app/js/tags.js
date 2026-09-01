@@ -73,7 +73,7 @@ export function parseTags(str) {
   return (str || "").split(",").map((t) => t.trim()).filter(Boolean);
 }
 
-function stringifyTags(list) {
+export function stringifyTags(list) {
   return list.join(", ");
 }
 

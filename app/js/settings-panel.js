@@ -5,7 +5,7 @@ import { THEME_PRESETS, saveTheme } from "./theme.js";
 import { defaultLabels, saveLabels, resetLabels } from "./labels.js";
 import { HIDEABLE_TABS, getHiddenTabs, setTabHidden } from "./visibility.js";
 import { captureKey, saveShortcut, clearShortcut } from "./shortcuts.js";
-import { DEFAULT_TAGS_MAP, CATEGORY_LABELS } from "./tags.js";
+import { DEFAULT_TAGS_MAP, CATEGORY_LABELS, parseTags, stringifyTags } from "./tags.js";
 import { defaultMonths, loadCalendar, saveCalendar } from "./calendar.js";
 import {
   getSyncConfig,
@@ -220,17 +220,12 @@ async function buildZoomSection() {
     minusBtn.textContent = "−";
     minusBtn.addEventListener("click", () => setZoom(currentPercent - zoom.step));
 
-    const resetBtn = document.createElement("button");
-    resetBtn.className = "btn";
-    resetBtn.textContent = i18n("100%");
-    resetBtn.addEventListener("click", () => setZoom(100));
-
     const plusBtn = document.createElement("button");
     plusBtn.className = "btn";
     plusBtn.textContent = "+";
     plusBtn.addEventListener("click", () => setZoom(currentPercent + zoom.step));
 
-    zoomRow.append(label, minusBtn, percentLabel, plusBtn, resetBtn);
+    zoomRow.append(label, minusBtn, percentLabel, plusBtn);
     section.appendChild(zoomRow);
   }
 
@@ -415,10 +410,33 @@ async function buildTagsSection() {
   return section;
 }
 
+// Тег хранится на карточках как имя в строке через запятую (см. шапку
+// файла tags.js), а не по id — переименование поэтому не только правит
+// словарь в site-settings.json, но и переписывает это имя везде, где
+// оно уже проставлено (характеры/локации/фракции), иначе старые
+// карточки остались бы с несуществующим тегом.
+async function renameTagEverywhere(oldName, newName) {
+  for (const path of ["/api/characters", "/api/locations", "/api/factions"]) {
+    const list = await apiGet(path).catch(() => null);
+    if (!Array.isArray(list)) continue;
+    let changed = false;
+    const next = list.map((item) => {
+      const tags = parseTags(item.tags);
+      const i = tags.indexOf(oldName);
+      if (i === -1) return item;
+      changed = true;
+      tags[i] = newName;
+      return { ...item, tags: stringifyTags(tags) };
+    });
+    if (changed) await apiPost(path, next);
+  }
+}
+
 function renderTagsManageList(list, merged, hidden, custom) {
   list.innerHTML = "";
   const byCategory = {};
   for (const [name, info] of Object.entries(merged)) {
+    if (hidden.has(name)) continue; // удалено — насовсем, встроенный или свой
     (byCategory[info.cat] ||= []).push(name);
   }
   for (const [cat, names] of Object.entries(byCategory)) {
@@ -430,54 +448,89 @@ function renderTagsManageList(list, merged, hidden, custom) {
     group.appendChild(title);
     for (const name of names) {
       const row = document.createElement("div");
-      row.className = "tags-manage-row" + (hidden.has(name) ? " hidden-tag" : "");
+      row.className = "tags-manage-row";
       const label = document.createElement("span");
       label.textContent = i18n(name) + (custom[name] ? i18n(" (своя)") : "");
-      const toggle = document.createElement("button");
-      toggle.className = "btn shortcut-clear";
-      toggle.textContent = hidden.has(name) ? "↺" : "×";
-      toggle.title = hidden.has(name) ? i18n("Вернуть") : i18n("Спрятать");
-      toggle.addEventListener("click", async () => {
-        const s = (await apiGet("/api/site-settings").catch(() => ({}))) || {};
-        const nextHidden = new Set(s.hiddenTags || []);
-        if (nextHidden.has(name)) nextHidden.delete(name);
-        else nextHidden.add(name);
-        await apiPost("/api/site-settings", { ...s, hiddenTags: [...nextHidden] });
-        renderTagsManageList(list, merged, nextHidden, custom);
-      });
-      row.append(label, toggle);
+      row.appendChild(label);
 
-      // Удалить насовсем можно только свой тег — встроенный словарь
-      // (DEFAULT_TAGS_MAP, tags.js) задан в коде, его можно только
-      // спрятать, а не стереть из приложения. Тот же приём подтверждения
-      // в два клика, что и «Удалить навсегда» в корзине (trash.js) и
-      // удаление проекта (project-switcher.js) — не отдельный диалог, а
-      // требование нажать ещё раз в течение нескольких секунд.
-      if (custom[name]) {
-        const delBtn = document.createElement("button");
-        delBtn.className = "btn danger shortcut-clear";
-        delBtn.textContent = "🗑";
-        delBtn.title = i18n("Удалить тег навсегда");
-        delBtn.addEventListener("click", async () => {
-          if (delBtn.dataset.confirm === "1") {
-            const s = (await apiGet("/api/site-settings").catch(() => ({}))) || {};
-            const nextCustom = { ...s.customTags };
-            delete nextCustom[name];
-            const nextHidden = new Set(s.hiddenTags || []);
-            nextHidden.delete(name);
-            await apiPost("/api/site-settings", { ...s, customTags: nextCustom, hiddenTags: [...nextHidden] });
-            renderTagsManageList(list, { ...DEFAULT_TAGS_MAP, ...nextCustom }, nextHidden, nextCustom);
+      const renameBtn = document.createElement("button");
+      renameBtn.className = "btn shortcut-clear";
+      renameBtn.textContent = "✎";
+      renameBtn.title = i18n("Переименовать");
+      renameBtn.addEventListener("click", () => {
+        const input = document.createElement("input");
+        input.type = "text";
+        input.className = "tags-manage-rename-input";
+        input.value = name;
+        label.replaceWith(input);
+        renameBtn.remove();
+        input.focus();
+        input.select();
+
+        let settled = false;
+        async function commit() {
+          if (settled) return;
+          settled = true;
+          const newName = input.value.trim();
+          if (!newName || newName === name) {
+            renderTagsManageList(list, merged, hidden, custom);
             return;
           }
-          delBtn.dataset.confirm = "1";
-          delBtn.textContent = i18n("Точно?");
-          setTimeout(() => {
-            delBtn.dataset.confirm = "";
-            delBtn.textContent = "🗑";
-          }, 3000);
+          const s = (await apiGet("/api/site-settings").catch(() => ({}))) || {};
+          const nextCustom = { ...s.customTags };
+          delete nextCustom[name];
+          nextCustom[newName] = custom[name] || { cat: merged[name].cat, tip: merged[name].tip };
+          const nextHidden = new Set(s.hiddenTags || []);
+          // Встроенный тег переименовывается через тот же приём, что и
+          // "удалить" ниже: прежнее имя прячется целиком (код словаря
+          // DEFAULT_TAGS_MAP не переписать в рантайме), а новое живёт
+          // дальше как свой тег с теми же категорией и подсказкой.
+          if (!custom[name]) nextHidden.add(name);
+          await apiPost("/api/site-settings", { ...s, customTags: nextCustom, hiddenTags: [...nextHidden] });
+          await renameTagEverywhere(name, newName);
+          const nextMerged = { ...DEFAULT_TAGS_MAP, ...nextCustom };
+          renderTagsManageList(list, nextMerged, nextHidden, nextCustom);
+        }
+
+        input.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") commit();
+          else if (e.key === "Escape") {
+            settled = true;
+            renderTagsManageList(list, merged, hidden, custom);
+          }
         });
-        row.appendChild(delBtn);
-      }
+        input.addEventListener("blur", commit);
+      });
+      row.appendChild(renameBtn);
+
+      // Прежде можно было стереть насовсем только свой тег, встроенный —
+      // только спрятать (см. историю файла). Теперь оба ведут к одному:
+      // имя уходит в hiddenTags (для своего — ещё и из customTags), и
+      // управление тегами больше его не показывает. Подтверждение в два
+      // клика — тот же приём, что и «Удалить навсегда» в корзине.
+      const delBtn = document.createElement("button");
+      delBtn.className = "btn danger shortcut-clear";
+      delBtn.textContent = "🗑";
+      delBtn.title = i18n("Удалить тег навсегда");
+      delBtn.addEventListener("click", async () => {
+        if (delBtn.dataset.confirm === "1") {
+          const s = (await apiGet("/api/site-settings").catch(() => ({}))) || {};
+          const nextCustom = { ...s.customTags };
+          delete nextCustom[name];
+          const nextHidden = new Set(s.hiddenTags || []);
+          nextHidden.add(name);
+          await apiPost("/api/site-settings", { ...s, customTags: nextCustom, hiddenTags: [...nextHidden] });
+          renderTagsManageList(list, { ...DEFAULT_TAGS_MAP, ...nextCustom }, nextHidden, nextCustom);
+          return;
+        }
+        delBtn.dataset.confirm = "1";
+        delBtn.textContent = i18n("Точно?");
+        setTimeout(() => {
+          delBtn.dataset.confirm = "";
+          delBtn.textContent = "🗑";
+        }, 3000);
+      });
+      row.appendChild(delBtn);
 
       group.appendChild(row);
     }

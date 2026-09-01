@@ -195,7 +195,18 @@ body.focus-mode .sidebar { display: none; }
   cursor: pointer;
 }
 
-.sidebar-pin::before { content: "📌"; }
+/* Шеврон вместо эмодзи-булавки — эмодзи выбивался из остальных иконок
+   приложения (все они рисованные SVG/символьные, не системный набор
+   эмодзи). Направление меняется по состоянию: вправо — авто-скрытие
+   включено (сайдбар можно свернуть), развёрнут на 180° — закреплено. */
+.sidebar-pin::before {
+  content: "›";
+  display: inline-block;
+  font-size: 1.15rem;
+  line-height: 1;
+  transition: transform 0.15s ease;
+}
+.sidebar-pin.pinned::before { transform: rotate(180deg); }
 .sidebar-pin:hover { background: var(--panel); color: var(--text); }
 .sidebar-pin.pinned { color: var(--accent); }
 
@@ -458,11 +469,13 @@ body.focus-mode .sidebar { display: none; }
 
 .sidebar-spacer { flex: 1; }
 
+/* Скрыт: сам статус (какие данные записаны на диск, "Сохранение…"/
+   "Сохранено") остаётся полезным сигналом внутри save-badge.js —
+   debounceSave() оттуда используют почти все модули для отложенной
+   записи — но как видимая надпись он оказался непонятен и не нужен, а
+   не спрятан совсем на случай, если понадобится вернуть в другом виде. */
 .save-badge {
-  font-family: "JetBrains Mono", monospace;
-  font-size: 0.72rem;
-  color: var(--text-faint);
-  padding: 6px 10px;
+  display: none;
 }
 
 .save-badge.saving { color: var(--accent); }
@@ -906,7 +919,15 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
 .tags-manage-group-title { color: var(--text-faint); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 4px; }
 .tags-manage-row { display: flex; align-items: center; gap: 8px; padding: 3px 0; }
 .tags-manage-row span { flex: 1; color: var(--text-dim); font-size: 0.85rem; }
-.tags-manage-row.hidden-tag span { text-decoration: line-through; color: var(--text-faint); }
+.tags-manage-rename-input {
+  flex: 1;
+  background: var(--panel);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 0.85rem;
+  padding: 2px 8px;
+}
 .tags-manage-add { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .tags-manage-add select {
   padding: 6px 10px;
