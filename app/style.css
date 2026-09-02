@@ -552,29 +552,49 @@ body.focus-mode .sidebar { display: none; }
   align-content: start;
 }
 
+/* Карточка — раньше маленький кружок-аватарка сверху и подпись снизу,
+   с кучей пустого места вокруг; теперь аватарка — во всю левую сторону
+   карточки (изображение видно куда лучше, крупнее, чем раньше), имя и
+   роль — справа, по вертикали посередине. */
 .char-card {
+  display: flex;
+  align-items: stretch;
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 10px;
-  padding: 14px;
+  padding: 0;
+  overflow: hidden;
   cursor: pointer;
   text-align: left;
+  min-height: 92px;
 }
 
 .char-card:hover { border-color: var(--accent); }
 
 .char-avatar {
-  width: 40px; height: 40px;
-  border-radius: 50%;
+  width: 92px;
+  flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
-  font-family: Fraunces, serif;
+  font-family: Inter, sans-serif;
   font-weight: 600;
+  font-size: 1.5rem;
   color: #14110d;
-  margin-bottom: 10px;
   overflow: hidden;
 }
 
-.char-avatar-img { width: 100%; height: 100%; object-fit: cover; }
+.char-avatar-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.char-card-body {
+  flex: 1;
+  min-width: 0;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+}
+
+.add-card { align-items: center; justify-content: center; text-align: center; padding: 14px; }
 
 /* Галерея изображений в дровере (app/js/avatars.js) — первое становится
    .char-avatar-img на лицевой стороне карточки (см. выше), остальные —
@@ -595,7 +615,57 @@ body.focus-mode .sidebar { display: none; }
   border: 1px solid var(--border);
 }
 
-.avatar-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.avatar-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; cursor: pointer; }
+
+/* Полноэкранная галерея (avatars.js: openGallery) — пролистать все
+   изображения сущности стрелками, не открывая каждое по отдельности. */
+.gallery-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.gallery-image { max-width: 88vw; max-height: 84vh; object-fit: contain; border-radius: 6px; }
+
+button.btn.icon-btn.gallery-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: rgba(0, 0, 0, 0.4);
+  color: #fff;
+  border-color: transparent;
+}
+button.btn.icon-btn.gallery-close:hover { background: rgba(0, 0, 0, 0.6); }
+
+button.btn.icon-btn.gallery-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 44px;
+  height: 44px;
+  background: rgba(0, 0, 0, 0.4);
+  color: #fff;
+  border-color: transparent;
+}
+button.btn.icon-btn.gallery-nav:hover { background: rgba(0, 0, 0, 0.6); }
+.gallery-prev { left: 16px; }
+.gallery-next { right: 16px; }
+
+.gallery-counter {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #fff;
+  font-size: 0.8rem;
+  background: rgba(0, 0, 0, 0.4);
+  padding: 4px 10px;
+  border-radius: 12px;
+}
 
 .avatar-thumb-del {
   position: absolute;
@@ -624,13 +694,26 @@ body.focus-mode .sidebar { display: none; }
 }
 .avatar-thumb-add:hover { color: var(--text); border-color: var(--accent); }
 
+/* Интер, не Fraunces — на мелких карточках жирная декоративная засечка
+   резала глаз (Fraunces хорош в заголовках покрупнее — там и остаётся),
+   здесь нужен просто ровный, спокойный текст. */
 .char-name {
-  font-family: Fraunces, serif;
+  font-family: Inter, sans-serif;
   font-weight: 600;
-  font-size: 1rem;
+  font-size: 0.95rem;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.char-role { color: var(--text-faint); font-size: 0.8rem; margin-top: 2px; }
+.char-role {
+  color: var(--text-faint);
+  font-size: 0.8rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 .add-card {
   border: 1px dashed var(--border);
@@ -1087,7 +1170,14 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
 /* ── Генератор имён ────────────────────────── */
 
 .drawer-name-row { display: flex; align-items: center; gap: 6px; }
-.name-gen-btn { flex-shrink: 0; padding: 6px 10px; }
+.name-gen-btn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  padding: 0;
+}
 
 /* ── Теги ──────────────────────────────────── */
 
@@ -1386,15 +1476,21 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
 .chapter-folder:first-child { margin-top: 0; }
 .chapter-folder:hover { background: var(--card); }
 
+/* Шеврон/иконка/название — один и тот же цвет (text-dim): раньше
+   шеврон и иконка папки были заметно тусклее названия (text-faint),
+   и всё вместе выглядело разномастно. Шеврон смотрит на саму папку,
+   пока она закрыта (её ещё только предстоит открыть), и вниз, когда
+   уже открыта, — как обычно и работает в файловых менеджерах;
+   раньше было ровно наоборот. */
 .chapter-folder-chevron {
   flex-shrink: 0;
   display: flex;
-  color: var(--text-faint);
+  color: var(--text-dim);
   transition: transform 0.15s;
 }
-.chapter-folder.collapsed .chapter-folder-chevron { transform: rotate(-90deg); }
+.chapter-folder:not(.collapsed) .chapter-folder-chevron { transform: rotate(90deg); }
 
-.chapter-folder-icon { flex-shrink: 0; display: flex; color: var(--text-faint); }
+.chapter-folder-icon { flex-shrink: 0; display: flex; color: var(--text-dim); }
 
 .chapter-folder-name {
   flex: 1;
@@ -1675,15 +1771,11 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
   padding: 16px 20px 0;
 }
 
-.board-switcher-bar select {
-  background: var(--panel-alt);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  color: var(--text-dim);
-  padding: 6px 10px;
-  font-family: inherit;
-  font-size: 0.82rem;
+.board-switcher-current {
   max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .board-switcher-rename {

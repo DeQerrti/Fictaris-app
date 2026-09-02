@@ -584,7 +584,7 @@ function createWindow() {
           const cs = getComputedStyle(document.documentElement);
           return {
             skin: document.documentElement.dataset.skin || "dark",
-            bg: cs.getPropertyValue("--panel").trim(),
+            bg: cs.getPropertyValue("--card").trim(),
             symbol: cs.getPropertyValue("--text-dim").trim(),
           };
         })()

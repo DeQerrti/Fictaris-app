@@ -86,16 +86,28 @@ function buildBoardSwitcher() {
   const bar = document.createElement("div");
   bar.className = "board-switcher-bar";
 
-  const select = document.createElement("select");
-  for (const b of data.boards) {
-    const opt = document.createElement("option");
-    opt.value = b.id;
-    opt.textContent = b.name;
-    if (b.id === board.id) opt.selected = true;
-    select.appendChild(opt);
-  }
-  select.addEventListener("change", () => switchBoard(select.value));
-  bar.appendChild(select);
+  // Не нативный <select> — его выпадающий список рисует сама ОС/Chromium
+  // своей собственной подсветкой выбранного пункта (обычно системным
+  // синим), которую не перекрасить в цвета темы. Тот же переиспользуемый
+  // список ПКМ (context-menu.js), что и везде в приложении, — и вид, и
+  // подсветка совпадают с остальным интерфейсом.
+  const switchBtn = document.createElement("button");
+  switchBtn.className = "btn board-switcher-current";
+  switchBtn.textContent = board.name;
+  switchBtn.title = i18n("Переключить доску");
+  switchBtn.addEventListener("click", () => {
+    const r = switchBtn.getBoundingClientRect();
+    openContextMenu(
+      r.left,
+      r.bottom + 4,
+      data.boards.map((b) => ({
+        label: b.name,
+        checked: b.id === board.id,
+        action: () => switchBoard(b.id),
+      }))
+    );
+  });
+  bar.appendChild(switchBtn);
 
   const nameInput = document.createElement("input");
   nameInput.type = "text";
@@ -104,7 +116,7 @@ function buildBoardSwitcher() {
   nameInput.title = i18n("Название доски");
   nameInput.addEventListener("input", () => {
     board.name = nameInput.value;
-    select.selectedOptions[0].textContent = nameInput.value;
+    switchBtn.textContent = nameInput.value;
     persist();
   });
   bar.appendChild(nameInput);

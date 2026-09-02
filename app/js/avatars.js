@@ -1,5 +1,6 @@
 import { apiPost } from "./api.js";
 import { compressImage } from "./image-compress.js";
+import { iconSvg } from "./icons.js";
 import { i18n } from "./i18n.js";
 
 // ══════════════════════════════════════════════
@@ -34,6 +35,77 @@ async function uploadOne(file) {
   return path;
 }
 
+// Полноэкранная галерея — открыть по клику на любую миниатюру и
+// пролистать все изображения сущности стрелками, не открывая их по
+// одному. Один экземпляр на страницу, как context-menu.js/search.js.
+let galleryEl = null;
+
+function closeGallery() {
+  galleryEl?.remove();
+  galleryEl = null;
+  document.removeEventListener("keydown", onGalleryKey);
+}
+
+function onGalleryKey(e) {
+  if (e.key === "Escape") closeGallery();
+  else if (e.key === "ArrowLeft") galleryEl?.querySelector(".gallery-prev")?.click();
+  else if (e.key === "ArrowRight") galleryEl?.querySelector(".gallery-next")?.click();
+}
+
+export function openGallery(images, index) {
+  closeGallery();
+  let i = index;
+  galleryEl = document.createElement("div");
+  galleryEl.className = "gallery-overlay";
+
+  const img = document.createElement("img");
+  img.className = "gallery-image";
+
+  const counter = document.createElement("div");
+  counter.className = "gallery-counter";
+
+  function show() {
+    img.src = `/${images[i]}`;
+    counter.textContent = `${i + 1} / ${images.length}`;
+  }
+
+  const closeBtn = document.createElement("button");
+  closeBtn.className = "btn icon-btn gallery-close";
+  closeBtn.innerHTML = iconSvg("close", 16);
+  closeBtn.title = i18n("Закрыть");
+  closeBtn.addEventListener("click", closeGallery);
+
+  const prevBtn = document.createElement("button");
+  prevBtn.className = "btn icon-btn gallery-nav gallery-prev";
+  prevBtn.innerHTML = iconSvg("chevronLeft", 20);
+  prevBtn.title = i18n("Предыдущее изображение");
+  prevBtn.hidden = images.length < 2;
+  prevBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    i = (i - 1 + images.length) % images.length;
+    show();
+  });
+
+  const nextBtn = document.createElement("button");
+  nextBtn.className = "btn icon-btn gallery-nav gallery-next";
+  nextBtn.innerHTML = iconSvg("chevronRight", 20);
+  nextBtn.title = i18n("Следующее изображение");
+  nextBtn.hidden = images.length < 2;
+  nextBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    i = (i + 1) % images.length;
+    show();
+  });
+
+  galleryEl.addEventListener("click", (e) => {
+    if (e.target === galleryEl) closeGallery();
+  });
+  galleryEl.append(closeBtn, prevBtn, img, nextBtn, counter);
+  document.body.appendChild(galleryEl);
+  document.addEventListener("keydown", onGalleryKey);
+  show();
+}
+
 // onChange зовётся после каждого добавления/удаления — обычно persist()
 // + draw() у вызывающей стороны, как и у остальных полей дровера.
 export function buildAvatarsField(entity, onChange) {
@@ -55,6 +127,8 @@ export function buildAvatarsField(entity, onChange) {
       const img = document.createElement("img");
       img.src = `/${src}`;
       img.alt = "";
+      img.title = i18n("Открыть в полный размер");
+      img.addEventListener("click", () => openGallery(entity.images, i));
       item.appendChild(img);
 
       const del = document.createElement("button");

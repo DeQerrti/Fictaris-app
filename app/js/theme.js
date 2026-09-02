@@ -123,9 +123,10 @@ function applyOverrides(skin, accent, customColors) {
 // вебе/телефоне такого адреса нет — тихий catch, это не ошибка.
 function syncTitleBarColors(skin) {
   const cs = getComputedStyle(document.documentElement);
-  // --panel, не --bg: та же полоса, что и у сайдбара — иначе рамка окна
-  // сливалась бы с однотонным фоном самого содержимого под ней.
-  const bg = cs.getPropertyValue("--panel").trim();
+  // --card — на ступень светлее и --bg (фон содержимого), и --panel
+  // (фон сайдбара), чтобы рамка окна точно не сливалась ни с тем, ни с
+  // другим.
+  const bg = cs.getPropertyValue("--card").trim();
   const symbol = cs.getPropertyValue("--text-dim").trim();
   apiPost("/api/app/set-titlebar-colors", { bg, symbol, skin }).catch(() => {});
 }

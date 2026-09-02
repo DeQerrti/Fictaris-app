@@ -133,8 +133,10 @@ function draw() {
     card.className = "char-card";
     card.innerHTML = `
       <div class="char-avatar" style="background:${c.color}">${avatarInnerHtml(c, initials(c.name))}</div>
-      <div class="char-name">${escapeHtml(c.name || i18n("Без имени"))}</div>
-      <div class="char-role">${escapeHtml(c.role || "")}</div>
+      <div class="char-card-body">
+        <div class="char-name">${escapeHtml(c.name || i18n("Без имени"))}</div>
+        <div class="char-role">${escapeHtml(c.role || "")}</div>
+      </div>
     `;
     card.addEventListener("click", () => {
       activeId = c.id;

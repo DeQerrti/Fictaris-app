@@ -10,6 +10,7 @@
 // ══════════════════════════════════════════════
 
 import { i18n } from "./i18n.js";
+import { iconSvg } from "./icons.js";
 
 const STYLES = {
   human: {
@@ -61,7 +62,7 @@ export function buildNameGeneratorButton(onGenerated, styleId) {
   const btn = document.createElement("button");
   btn.type = "button";
   btn.className = "btn name-gen-btn";
-  btn.textContent = "🎲";
+  btn.innerHTML = iconSvg("shuffle", 14);
   btn.title = i18n("Сгенерировать имя");
   btn.addEventListener("click", () => {
     const style = styleId || pick(Object.keys(STYLES));

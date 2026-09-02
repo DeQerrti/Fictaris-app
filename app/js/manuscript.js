@@ -267,9 +267,11 @@ function draw() {
   container.appendChild(view);
 }
 
-// dragId — id перетаскиваемой главы, общий для всех обработчиков drop
-// в списке (и на главах, и на заголовках папок).
+// dragId/dragFolderId — id перетаскиваемой главы/папки, общие для всех
+// обработчиков drop в списке. Ровно один из двух не null за раз —
+// каждый dragstart явно обнуляет другой.
 let dragId = null;
+let dragFolderId = null;
 
 function buildChapterItem(ch, depth) {
   const item = document.createElement("div");
@@ -313,6 +315,17 @@ function buildChapterItem(ch, depth) {
             checked: ch.folderId === f.id,
             action: () => { ch.folderId = f.id; persist(); draw(); },
           })),
+          { separator: true },
+          {
+            label: i18n("Новая папка с этой главой"),
+            action: () => {
+              const folder = blankFolder();
+              manuscript.folders.push(folder);
+              ch.folderId = folder.id;
+              persist();
+              draw();
+            },
+          },
         ],
       },
       { separator: true },
@@ -332,7 +345,7 @@ function buildChapterItem(ch, depth) {
       },
     ]);
   });
-  item.addEventListener("dragstart", (e) => { e.stopPropagation(); dragId = ch.id; });
+  item.addEventListener("dragstart", (e) => { e.stopPropagation(); dragId = ch.id; dragFolderId = null; });
   item.addEventListener("dragover", (e) => { e.preventDefault(); e.stopPropagation(); });
   item.addEventListener("drop", (e) => {
     e.preventDefault();
@@ -362,6 +375,26 @@ async function deleteChapter(ch) {
   if (manuscript.activeChapterId === ch.id) {
     manuscript.activeChapterId = manuscript.chapters[0]?.id || null;
   }
+  persist();
+  draw();
+}
+
+// Перетаскивание папки на другую — переставляет её рядом с целевой
+// (в массиве manuscript.folders, откуда и берётся порядок отрисовки на
+// каждом уровне) и переносит на тот же уровень вложенности, что и
+// целевая: тащить папку можно и для простой перестановки среди соседей,
+// и чтобы переместить её в другую ветку дерева разом.
+function moveFolderNextTo(draggedId, targetId) {
+  const dragged = manuscript.folders.find((f) => f.id === draggedId);
+  const target = manuscript.folders.find((f) => f.id === targetId);
+  if (!dragged || !target || dragged.id === target.id) return;
+  // Нельзя переносить папку внутрь самой себя или собственного потомка.
+  if (collectFolderIds(dragged.id).has(target.id)) return;
+  dragged.parentId = folderParent(target);
+  const from = manuscript.folders.indexOf(dragged);
+  manuscript.folders.splice(from, 1);
+  const to = manuscript.folders.indexOf(target);
+  manuscript.folders.splice(to, 0, dragged);
   persist();
   draw();
 }
@@ -503,10 +536,16 @@ function buildFolderRow(folder, depth) {
     e.stopPropagation();
     openContextMenu(e.clientX, e.clientY, folderContextMenuItems(folder, e.clientX, e.clientY));
   });
+  header.draggable = true;
+  header.addEventListener("dragstart", (e) => { e.stopPropagation(); dragFolderId = folder.id; dragId = null; });
   header.addEventListener("dragover", (e) => { e.preventDefault(); e.stopPropagation(); });
   header.addEventListener("drop", (e) => {
     e.preventDefault();
     e.stopPropagation();
+    if (dragFolderId !== null) {
+      moveFolderNextTo(dragFolderId, folder.id);
+      return;
+    }
     if (dragId === null) return;
     const ch = manuscript.chapters.find((c) => c.id === dragId);
     if (!ch) return;
@@ -574,6 +613,23 @@ function buildChapterList() {
   list.addEventListener("contextmenu", (e) => {
     e.preventDefault();
     openContextMenu(e.clientX, e.clientY, emptyAreaContextMenuItems());
+  });
+  // Дроп на пустое место (не на конкретную главу/папку) — тоже
+  // «отвязка»: перетащенная папка поднимается на верхний уровень,
+  // перетащенная глава становится «без папки».
+  list.addEventListener("dragover", (e) => e.preventDefault());
+  list.addEventListener("drop", (e) => {
+    if (e.target !== list) return;
+    e.preventDefault();
+    if (dragFolderId !== null) {
+      const dragged = manuscript.folders.find((f) => f.id === dragFolderId);
+      if (dragged) { dragged.parentId = null; persist(); draw(); }
+      return;
+    }
+    if (dragId !== null) {
+      const ch = manuscript.chapters.find((c) => c.id === dragId);
+      if (ch) { ch.folderId = null; persist(); draw(); }
+    }
   });
 
   const addBtn = document.createElement("button");

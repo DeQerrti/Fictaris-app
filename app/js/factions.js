@@ -64,9 +64,11 @@ function draw() {
     const card = document.createElement("button");
     card.className = "char-card";
     card.innerHTML = `
-      <div class="char-avatar" style="background:${color}">${avatarInnerHtml(f, iconSvg(iconName, 20))}</div>
-      <div class="char-name">${escapeHtml(f.name || i18n("Без имени"))}</div>
-      <div class="char-role">${escapeHtml(i18n(typeLabel))}</div>
+      <div class="char-avatar" style="background:${color}">${avatarInnerHtml(f, iconSvg(iconName, 30))}</div>
+      <div class="char-card-body">
+        <div class="char-name">${escapeHtml(f.name || i18n("Без имени"))}</div>
+        <div class="char-role">${escapeHtml(i18n(typeLabel))}</div>
+      </div>
     `;
     card.addEventListener("click", () => {
       activeId = f.id;
