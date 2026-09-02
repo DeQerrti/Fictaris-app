@@ -5,12 +5,16 @@ import { FACTION_TYPES, factionTypeInfo, iconSvg } from "./icons.js";
 import { pushTrash } from "./trash.js";
 import { loadTagsMap, buildTagsField } from "./tags.js";
 import { avatarInnerHtml, buildAvatarsField } from "./avatars.js";
+import { loadTemplates, templateFor } from "./templates.js";
+import { openEntitySheet } from "./entity-sheet.js";
+import { chooseTemplate } from "./template-choice.js";
 import { i18n } from "./i18n.js";
 
 let factions = [];
 let characters = [];
 let locations = [];
 let tagsMap = {};
+let templates = [];
 let activeId = null;
 let container = null;
 const save = debounceSave((list) => apiPost("/api/factions", list));
@@ -19,25 +23,27 @@ function persist() {
   save(factions);
 }
 
-function blank() {
+function blank(templateId) {
   return {
     id: uid(),
     name: i18n("Новая фракция"),
     type: "order",
-    description: "", notes: "", tags: "",
+    tags: "",
     leaderId: null,
     headquartersId: null,
     memberIds: [],
+    templateId: templateId || templates[0]?.id || "default",
   };
 }
 
 export async function renderFactions(root, focusId) {
   container = root;
-  [factions, characters, locations, tagsMap] = await Promise.all([
+  [factions, characters, locations, tagsMap, templates] = await Promise.all([
     apiGet("/api/factions"),
     apiGet("/api/characters"),
     apiGet("/api/locations"),
     loadTagsMap(),
+    loadTemplates("factions"),
   ]);
   if (focusId && factions.some((f) => f.id === focusId)) activeId = focusId;
   draw();
@@ -70,10 +76,7 @@ function draw() {
         <div class="char-role">${escapeHtml(i18n(typeLabel))}</div>
       </div>
     `;
-    card.addEventListener("click", () => {
-      activeId = f.id;
-      draw();
-    });
+    card.addEventListener("click", () => openSheet(f));
     grid.appendChild(card);
   }
 
@@ -81,11 +84,13 @@ function draw() {
   addCard.className = "char-card add-card";
   addCard.textContent = i18n("+ Добавить фракцию");
   addCard.addEventListener("click", () => {
-    const f = blank();
-    factions.push(f);
-    activeId = f.id;
-    persist();
-    draw();
+    chooseTemplate(templates, addCard, (templateId) => {
+      const f = blank(templateId);
+      factions.push(f);
+      activeId = f.id;
+      persist();
+      draw();
+    });
   });
   grid.appendChild(addCard);
 
@@ -95,6 +100,29 @@ function draw() {
   if (active) view.appendChild(buildDrawer(active));
 
   container.appendChild(view);
+}
+
+function openSheet(f) {
+  const [, typeLabel, iconName, color] = factionTypeInfo(f.type);
+  const template = templateFor(templates, f.templateId);
+  const leader = characters.find((c) => c.id === f.leaderId);
+  const hq = locations.find((l) => l.id === f.headquartersId);
+  openEntitySheet({
+    entity: f,
+    avatarColor: color,
+    avatarHtml: avatarInnerHtml(f, iconSvg(iconName, 30)),
+    title: f.name || i18n("Без имени"),
+    subtitle: i18n(typeLabel),
+    fields: [
+      { label: i18n("Глава фракции"), value: leader?.name },
+      { label: i18n("Штаб-квартира"), value: hq?.name },
+      ...(template?.fields || []).map((fl) => ({ label: fl.label, value: f[fl.key] })),
+    ],
+    onEdit: () => {
+      activeId = f.id;
+      draw();
+    },
+  });
 }
 
 function buildDrawer(f) {
@@ -164,15 +192,16 @@ function buildDrawer(f) {
     draw();
   }));
 
-  for (const [key, label] of [["description", i18n("Описание / идеология")], ["notes", i18n("Заметки")]]) {
+  const template = templateFor(templates, f.templateId);
+  for (const fl of template?.fields || []) {
     const field = document.createElement("div");
     field.className = "field";
     const lab = document.createElement("label");
-    lab.textContent = label;
+    lab.textContent = fl.label;
     field.appendChild(lab);
-    const input = document.createElement("textarea");
-    input.value = f[key] || "";
-    input.addEventListener("input", () => { f[key] = input.value; persist(); });
+    const input = document.createElement(fl.type === "textarea" ? "textarea" : "input");
+    input.value = f[fl.key] || "";
+    input.addEventListener("input", () => { f[fl.key] = input.value; persist(); });
     field.appendChild(input);
     drawer.appendChild(field);
   }

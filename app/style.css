@@ -1224,6 +1224,13 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
 }
 
 .tags-manage-add { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+/* ── Шаблоны анкет (Настройки) ────────────────── */
+.template-tabs { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+.template-tab { font-size: 0.82rem; }
+.template-name-row { display: flex; gap: 8px; align-items: center; margin-bottom: 14px; max-width: 420px; }
+.template-fields-list { max-width: 480px; }
+.template-fields-list .tags-manage-row select { max-width: 170px; }
 .tags-manage-add select {
   padding: 6px 10px;
   border-radius: 6px;
@@ -1424,6 +1431,56 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
   cursor: pointer;
 }
 .entity-modal-close:hover { color: var(--text); border-color: var(--accent); }
+
+/* Анкета персонажа/локации/фракции для просмотра — первый уровень
+   модалки карточки (app/js/entity-sheet.js), поверх .entity-modal-*. */
+.sheet-panel { flex-direction: column; }
+
+.sheet-edit-btn {
+  position: absolute;
+  top: 8px;
+  right: 46px;
+  z-index: 1;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+}
+.sheet-edit-btn:hover { color: var(--accent); border-color: var(--accent); }
+
+.sheet-body { padding: 40px; }
+
+.sheet-header { display: flex; align-items: center; gap: 24px; margin-bottom: 28px; }
+
+.sheet-avatar {
+  width: 140px;
+  height: 140px;
+  flex-shrink: 0;
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.4rem;
+  color: #fff;
+}
+.sheet-avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+.sheet-header-text { min-width: 0; }
+.sheet-title { font-size: 1.7rem; font-weight: 600; color: var(--text); }
+.sheet-subtitle { margin-top: 6px; color: var(--text-dim); font-size: 1rem; }
+
+.sheet-fields { display: flex; flex-direction: column; gap: 18px; }
+.sheet-field-label { font-size: 0.8rem; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 4px; }
+.sheet-field-value { color: var(--text); white-space: pre-wrap; line-height: 1.5; }
+
+.readonly-value { color: var(--text-dim); padding: 6px 0; }
+
+/* Мини-редактор связей внутри дровера персонажа (characters.js) — те же
+   ряды/ползунки, что в списке на вкладке "Связи" (rel-row и т.п. в
+   relationships.js), просто без графа и в узкой колонке дровера. */
+.rel-mini-list { display: flex; flex-direction: column; gap: 10px; }
+.rel-mini-row { padding: 10px; background: var(--panel); border-radius: 8px; }
+.rel-mini-add { margin-top: 10px; width: 100%; }
 
 /* ── Рукопись ──────────────────────────────── */
 

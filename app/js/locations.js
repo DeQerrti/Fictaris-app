@@ -7,20 +7,17 @@ import { buildReverseLinks } from "./reverse-links.js";
 import { loadTagsMap, buildTagsField } from "./tags.js";
 import { buildNameGeneratorButton } from "./name-generator.js";
 import { avatarInnerHtml, buildAvatarsField } from "./avatars.js";
+import { loadTemplates, templateFor } from "./templates.js";
+import { openEntitySheet } from "./entity-sheet.js";
+import { chooseTemplate } from "./template-choice.js";
 import { i18n } from "./i18n.js";
-
-function fields() {
-  return [
-    ["description", i18n("Описание"), "textarea"],
-    ["notes", i18n("Заметки"), "textarea"],
-  ];
-}
 
 let locations = [];
 let timeline = [];
 let factions = [];
 let mapData = { maps: {} };
 let tagsMap = {};
+let templates = [];
 let activeId = null;
 let container = null;
 const save = debounceSave((list) => apiPost("/api/locations", list));
@@ -29,23 +26,25 @@ function persist() {
   save(locations);
 }
 
-function blank() {
+function blank(templateId) {
   return {
     id: uid(),
     name: i18n("Новая локация"),
     type: "settlement",
-    description: "", notes: "", tags: "",
+    tags: "",
+    templateId: templateId || templates[0]?.id || "default",
   };
 }
 
 export async function renderLocations(root, focusId) {
   container = root;
-  [locations, timeline, factions, mapData, tagsMap] = await Promise.all([
+  [locations, timeline, factions, mapData, tagsMap, templates] = await Promise.all([
     apiGet("/api/locations"),
     apiGet("/api/timeline"),
     apiGet("/api/factions"),
     apiGet("/api/map"),
     loadTagsMap(),
+    loadTemplates("locations"),
   ]);
   if (focusId && locations.some((l) => l.id === focusId)) activeId = focusId;
   draw();
@@ -101,10 +100,7 @@ function draw() {
         <div class="char-role">${escapeHtml(i18n(locationTypeInfo(loc.type)[1]))}</div>
       </div>
     `;
-    card.addEventListener("click", () => {
-      activeId = loc.id;
-      draw();
-    });
+    card.addEventListener("click", () => openSheet(loc));
     grid.appendChild(card);
   }
 
@@ -112,11 +108,13 @@ function draw() {
   addCard.className = "char-card add-card";
   addCard.textContent = i18n("+ Добавить локацию");
   addCard.addEventListener("click", () => {
-    const loc = blank();
-    locations.push(loc);
-    activeId = loc.id;
-    persist();
-    draw();
+    chooseTemplate(templates, addCard, (templateId) => {
+      const loc = blank(templateId);
+      locations.push(loc);
+      activeId = loc.id;
+      persist();
+      draw();
+    });
   });
   grid.appendChild(addCard);
 
@@ -126,6 +124,24 @@ function draw() {
   if (active) view.appendChild(buildDrawer(active));
 
   container.appendChild(view);
+}
+
+function openSheet(loc) {
+  const [, typeLabel, iconName, color] = locationTypeInfo(loc.type);
+  const template = templateFor(templates, loc.templateId);
+  openEntitySheet({
+    entity: loc,
+    avatarColor: color,
+    avatarHtml: avatarInnerHtml(loc, iconSvg(iconName, 30)),
+    title: loc.name || i18n("Без имени"),
+    subtitle: i18n(typeLabel),
+    fields: (template?.fields || []).map((f) => ({ label: f.label, value: loc[f.key] })),
+    extraSections: [reverseLinksFor(loc)],
+    onEdit: () => {
+      activeId = loc.id;
+      draw();
+    },
+  });
 }
 
 function buildDrawer(loc) {
@@ -175,16 +191,17 @@ function buildDrawer(loc) {
 
   drawer.appendChild(buildAvatarsField(loc, () => { persist(); draw(); }));
 
-  for (const [key, label, kind] of fields()) {
+  const template = templateFor(templates, loc.templateId);
+  for (const f of template?.fields || []) {
     const field = document.createElement("div");
     field.className = "field";
     const lab = document.createElement("label");
-    lab.textContent = label;
+    lab.textContent = f.label;
     field.appendChild(lab);
-    const input = document.createElement(kind === "textarea" ? "textarea" : "input");
-    input.value = loc[key] || "";
+    const input = document.createElement(f.type === "textarea" ? "textarea" : "input");
+    input.value = loc[f.key] || "";
     input.addEventListener("input", () => {
-      loc[key] = input.value;
+      loc[f.key] = input.value;
       persist();
     });
     field.appendChild(input);

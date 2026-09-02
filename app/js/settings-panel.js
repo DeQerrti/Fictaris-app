@@ -18,6 +18,7 @@ import {
 import { captureKey, saveShortcut, clearShortcut } from "./shortcuts.js";
 import { DEFAULT_TAGS_MAP, CATEGORY_LABELS, parseTags, stringifyTags } from "./tags.js";
 import { DEFAULT_STATUSES, loadStatuses, saveStatuses, buildStatusDot } from "./chapter-status.js";
+import { KIND_LABELS, loadTemplates, saveTemplates, blankField } from "./templates.js";
 import { defaultMonths, loadCalendar, saveCalendar } from "./calendar.js";
 import {
   getSyncConfig,
@@ -62,6 +63,7 @@ export async function renderSettings(root) {
     ["shortcuts", () => i18n("Горячие клавиши"), () => buildShortcutsSection()],
     ["tags", () => i18n("Теги"), () => buildTagsSection()],
     ["statuses", () => i18n("Статусы глав"), () => buildStatusesSection()],
+    ["templates", () => i18n("Шаблоны анкет"), () => buildTemplatesSection()],
     ["calendar", () => i18n("Календарь"), () => buildCalendarSection()],
     ["sync", () => i18n("Синхронизация"), () => buildSyncSection()],
     ["data", () => i18n("Данные"), () => buildDataSections()],
@@ -863,6 +865,182 @@ function renderStatusesList(list, statuses) {
 
     list.appendChild(row);
   }
+}
+
+// ── Шаблоны анкет ─────────────────────────────
+// Поля анкеты персонажа/локации/фракции — не зашиты кодом, а список,
+// настраиваемый здесь: можно убрать блок, переименовать его, добавить
+// новый, завести несколько шаблонов сразу (например, «Главный герой» и
+// «Второстепенный» с разным набором полей) — при создании карточки
+// предложат выбрать, по какому из них её завести.
+let activeTemplateKind = "characters";
+let activeTemplateId = null;
+
+async function buildTemplatesSection() {
+  const section = document.createElement("div");
+  section.className = "data-section";
+  section.innerHTML = `<h3>${i18n("Шаблоны анкет")}</h3><p>${i18n("Какие поля показывает карточка персонажа/локации/фракции — убери ненужное, переименуй, добавь своё. Можно завести несколько шаблонов и выбирать нужный при создании.")}</p>`;
+
+  const kindRow = document.createElement("div");
+  kindRow.className = "sync-actions";
+  for (const kind of Object.keys(KIND_LABELS)) {
+    const btn = document.createElement("button");
+    btn.className = "btn" + (kind === activeTemplateKind ? " accent" : "");
+    btn.textContent = KIND_LABELS[kind]();
+    btn.addEventListener("click", () => {
+      activeTemplateKind = kind;
+      activeTemplateId = null;
+      renderTemplatesBody(body, kind);
+      kindRow.querySelectorAll("button").forEach((b) => b.classList.remove("accent"));
+      btn.classList.add("accent");
+    });
+    kindRow.appendChild(btn);
+  }
+  section.appendChild(kindRow);
+
+  const body = document.createElement("div");
+  body.style.marginTop = "14px";
+  section.appendChild(body);
+  await renderTemplatesBody(body, activeTemplateKind);
+
+  return section;
+}
+
+async function renderTemplatesBody(body, kind) {
+  body.innerHTML = "";
+  const list = await loadTemplates(kind);
+  if (!activeTemplateId || !list.some((t) => t.id === activeTemplateId)) {
+    activeTemplateId = list[0].id;
+  }
+  const template = list.find((t) => t.id === activeTemplateId);
+
+  const tabsRow = document.createElement("div");
+  tabsRow.className = "template-tabs";
+  for (const t of list) {
+    const tab = document.createElement("button");
+    tab.className = "btn template-tab" + (t.id === template.id ? " accent" : "");
+    tab.textContent = t.name || i18n("Без названия");
+    tab.addEventListener("click", () => {
+      activeTemplateId = t.id;
+      renderTemplatesBody(body, kind);
+    });
+    tabsRow.appendChild(tab);
+  }
+
+  const addTemplateBtn = document.createElement("button");
+  addTemplateBtn.className = "btn";
+  addTemplateBtn.textContent = i18n("+ Шаблон");
+  addTemplateBtn.title = i18n("Новый шаблон — с полями текущего, дальше можно менять независимо");
+  addTemplateBtn.addEventListener("click", async () => {
+    const fresh = { id: `t_${Date.now().toString(36)}`, name: i18n("Новый шаблон"), fields: template.fields.map((f) => ({ ...f })) };
+    const next = [...list, fresh];
+    await saveTemplates(kind, next);
+    activeTemplateId = fresh.id;
+    renderTemplatesBody(body, kind);
+  });
+  tabsRow.appendChild(addTemplateBtn);
+  body.appendChild(tabsRow);
+
+  const nameRow = document.createElement("div");
+  nameRow.className = "template-name-row";
+  const nameInput = document.createElement("input");
+  nameInput.type = "text";
+  nameInput.className = "tags-manage-rename-input";
+  nameInput.value = template.name || "";
+  let nameTimer;
+  nameInput.addEventListener("input", () => {
+    clearTimeout(nameTimer);
+    nameTimer = setTimeout(async () => {
+      template.name = nameInput.value.trim() || i18n("Без названия");
+      await saveTemplates(kind, list);
+      renderTemplatesBody(body, kind);
+    }, 500);
+  });
+  nameRow.appendChild(nameInput);
+
+  if (list.length > 1) {
+    const delTemplateBtn = document.createElement("button");
+    delTemplateBtn.className = "btn danger";
+    delTemplateBtn.textContent = "🗑";
+    delTemplateBtn.title = i18n("Удалить шаблон (карточки, заведённые по нему, останутся — просто покажут первый оставшийся шаблон)");
+    delTemplateBtn.addEventListener("click", async () => {
+      if (delTemplateBtn.dataset.confirm === "1") {
+        const next = list.filter((t) => t.id !== template.id);
+        await saveTemplates(kind, next);
+        activeTemplateId = next[0].id;
+        renderTemplatesBody(body, kind);
+        return;
+      }
+      delTemplateBtn.dataset.confirm = "1";
+      delTemplateBtn.textContent = i18n("Точно?");
+      setTimeout(() => {
+        delTemplateBtn.dataset.confirm = "";
+        delTemplateBtn.textContent = "🗑";
+      }, 3000);
+    });
+    nameRow.appendChild(delTemplateBtn);
+  }
+  body.appendChild(nameRow);
+
+  const fieldsList = document.createElement("div");
+  fieldsList.className = "tags-manage-list template-fields-list";
+  for (const field of template.fields) {
+    const row = document.createElement("div");
+    row.className = "tags-manage-row";
+
+    const labelInput = document.createElement("input");
+    labelInput.type = "text";
+    labelInput.className = "tags-manage-rename-input";
+    labelInput.value = field.label;
+    let labelTimer;
+    labelInput.addEventListener("input", () => {
+      clearTimeout(labelTimer);
+      labelTimer = setTimeout(async () => {
+        field.label = labelInput.value.trim() || i18n("Поле");
+        await saveTemplates(kind, list);
+      }, 500);
+    });
+    row.appendChild(labelInput);
+
+    const typeSelect = document.createElement("select");
+    typeSelect.className = "field-inline-control";
+    for (const [value, label] of [["input", i18n("Строка")], ["textarea", i18n("Текст в несколько строк")]]) {
+      const opt = document.createElement("option");
+      opt.value = value;
+      opt.textContent = label;
+      if (field.type === value) opt.selected = true;
+      typeSelect.appendChild(opt);
+    }
+    typeSelect.addEventListener("change", async () => {
+      field.type = typeSelect.value;
+      await saveTemplates(kind, list);
+    });
+    row.appendChild(typeSelect);
+
+    const delFieldBtn = document.createElement("button");
+    delFieldBtn.className = "btn danger shortcut-clear";
+    delFieldBtn.textContent = "🗑";
+    delFieldBtn.title = i18n("Убрать поле из этого шаблона (данные, уже введённые в него у существующих карточек, не стираются)");
+    delFieldBtn.addEventListener("click", async () => {
+      template.fields = template.fields.filter((f) => f.key !== field.key);
+      await saveTemplates(kind, list);
+      renderTemplatesBody(body, kind);
+    });
+    row.appendChild(delFieldBtn);
+
+    fieldsList.appendChild(row);
+  }
+  body.appendChild(fieldsList);
+
+  const addFieldBtn = document.createElement("button");
+  addFieldBtn.className = "btn";
+  addFieldBtn.textContent = i18n("+ Поле");
+  addFieldBtn.addEventListener("click", async () => {
+    template.fields = [...template.fields, blankField()];
+    await saveTemplates(kind, list);
+    renderTemplatesBody(body, kind);
+  });
+  body.appendChild(addFieldBtn);
 }
 
 // ── Календарь ─────────────────────────────────
