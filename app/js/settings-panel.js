@@ -939,6 +939,64 @@ async function renderTemplatesBody(body, kind) {
     renderTemplatesBody(body, kind);
   });
   tabsRow.appendChild(addTemplateBtn);
+
+  // Обмен шаблонами между проектами (своими или чужими) — файлом, а не
+  // через один общий site-settings.json: шаблон "Персонаж — Кентавр"
+  // можно отдать другому автору или перенести в другой мир так же
+  // просто, как переслать один JSON. Экспорт — только name/fields, без
+  // id (id — внутренний, у получателя будет свой) и без kind (кому
+  // импортировать решает вкладка, на которой нажали "Импорт").
+  const exportBtn = document.createElement("button");
+  exportBtn.className = "btn";
+  exportBtn.title = i18n("Скачать этот шаблон файлом — переслать или перенести в другой проект");
+  exportBtn.textContent = "⬇";
+  exportBtn.addEventListener("click", () => {
+    const payload = { fictarisTemplate: 1, name: template.name, fields: template.fields };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `fictaris-shablon-${(template.name || "shablon").toLowerCase().replace(/[^a-zа-яё0-9]+/gi, "-")}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+  tabsRow.appendChild(exportBtn);
+
+  const importInput = document.createElement("input");
+  importInput.type = "file";
+  importInput.accept = "application/json";
+  importInput.style.display = "none";
+  importInput.addEventListener("change", async () => {
+    const file = importInput.files[0];
+    importInput.value = "";
+    if (!file) return;
+    let parsed;
+    try {
+      parsed = JSON.parse(await file.text());
+    } catch {
+      alert(i18n("Это не файл шаблона Fictaris."));
+      return;
+    }
+    if (!parsed || typeof parsed.name !== "string" || !Array.isArray(parsed.fields)) {
+      alert(i18n("Это не файл шаблона Fictaris."));
+      return;
+    }
+    const fields = parsed.fields
+      .filter((f) => f && typeof f.key === "string" && typeof f.label === "string")
+      .map((f) => ({ key: f.key, label: f.label, type: ["input", "textarea", "richtext"].includes(f.type) ? f.type : "textarea" }));
+    const fresh = { id: `t_${Date.now().toString(36)}`, name: parsed.name || i18n("Новый шаблон"), fields };
+    const next = [...list, fresh];
+    await saveTemplates(kind, next);
+    activeTemplateId = fresh.id;
+    renderTemplatesBody(body, kind);
+  });
+  const importBtn = document.createElement("button");
+  importBtn.className = "btn";
+  importBtn.title = i18n("Загрузить шаблон из файла — добавится новой вкладкой");
+  importBtn.textContent = "⬆";
+  importBtn.addEventListener("click", () => importInput.click());
+  tabsRow.append(importBtn, importInput);
+
   body.appendChild(tabsRow);
 
   const nameRow = document.createElement("div");

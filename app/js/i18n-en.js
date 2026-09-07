@@ -565,4 +565,8 @@ export const EN_DICT = {
   "Экспортировать PDF": "Export PDF",
   "Готовлю…": "Preparing…",
   "Не получилось создать PDF. Доступно только в десктопной версии Fictaris.": "Couldn't create the PDF. Only available in the desktop version of Fictaris.",
+
+  "Скачать этот шаблон файлом — переслать или перенести в другой проект": "Download this template as a file — send it or move it to another project",
+  "Это не файл шаблона Fictaris.": "This isn't a Fictaris template file.",
+  "Загрузить шаблон из файла — добавится новой вкладкой": "Load a template from a file — it will appear as a new tab",
 };
