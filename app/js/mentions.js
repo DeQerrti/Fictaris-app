@@ -63,6 +63,21 @@ export function mentionsToLinkedHtml(text, characters, hrefFor) {
   return html;
 }
 
+// Просто множество id упомянутых персонажей, без HTML — для мест,
+// которым нужна не разметка, а сам факт связи (graph.js: ребро от
+// сущности с текстом к упомянутому в нём персонажу).
+export function findMentionedIds(text, characters) {
+  const regex = buildMentionRegex(characters);
+  const ids = new Set();
+  if (!regex) return ids;
+  let m;
+  while ((m = regex.exec(text))) {
+    const c = characters.find((ch) => ch.name === m[1]);
+    if (c) ids.add(c.id);
+  }
+  return ids;
+}
+
 // Автодополнение @упоминаний при наборе — список подсказок под полем,
 // без привязки к точным координатам курсора (для этого пришлось бы
 // мерить метрики шрифта символ за символом в plain textarea — не стоит

@@ -2475,6 +2475,16 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
   margin-right: 6px;
 }
 
+.legend-line {
+  display: inline-block;
+  width: 18px;
+  height: 0;
+  border-top: 1.5px solid var(--text-faint);
+  margin-right: 6px;
+  vertical-align: middle;
+}
+.legend-line-dashed { border-top-style: dashed; }
+
 /* ── Родословная (app/js/family-tree.js) ──────
    Каждый род — отдельная карточка со своей раскладкой (несколько родов
    на вкладке, если персонажи из разных семей не связаны родителями ни

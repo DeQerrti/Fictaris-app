@@ -1,5 +1,7 @@
 import { apiGet } from "./api.js";
 import { locationTypeInfo, factionTypeInfo, iconSvg } from "./icons.js";
+import { loadTemplates, templateFor } from "./templates.js";
+import { findMentionedIds } from "./mentions.js";
 import { i18n } from "./i18n.js";
 
 // ══════════════════════════════════════════════
@@ -47,17 +49,37 @@ function buildNodes(characters, locations, factions) {
   return list;
 }
 
-// Рёбра автоматически из связей, состава фракций и совместных упоминаний
-// в событиях таймлайна — как описано в брифе, без ручной расстановки.
-function buildEdges(relationships, factions, timeline) {
+// Текстовые поля анкеты (любого типа — input/textarea/richtext, набор
+// свой у каждого шаблона, см. templates.js) могут упоминать персонажа
+// через "@Имя" — mentions.js уже умеет находить такие упоминания для
+// автодополнения и подсветки в самой карточке; здесь та же находка
+// превращается в ребро графа, которое никто не заводил руками ни в
+// relationships.json, ни через leaderId/parentId. kind: "mention" —
+// чтобы отличить такое ребро от явной связи визуально (пунктир, см. draw).
+function mentionEdgesFor(entity, template, characters, add) {
+  for (const f of template?.fields || []) {
+    const value = entity[f.key];
+    if (typeof value !== "string" || !value) continue;
+    for (const id of findMentionedIds(value, characters)) add(entity.id, id, "mention");
+  }
+}
+
+// Рёбра автоматически из связей, состава фракций, совместных упоминаний
+// в событиях таймлайна, вложенности локаций (parentId, locations.js) и
+// @упоминаний в тексте анкет — без ручной расстановки. Явные связи
+// добавляются первыми: seen ниже не даёт одной и той же паре узлов
+// получить второе ребро, так что если персонаж и так упомянут в
+// relationships.json, найденное в тексте @упоминание не понижает эту
+// связь до пунктирной — seen её просто не пропустит повторно.
+function buildEdges({ relationships, factions, timeline, locations, characters, charTemplates, locTemplates, factionTemplates }) {
   const seen = new Set();
   const list = [];
-  const add = (a, b) => {
+  const add = (a, b, kind = "explicit") => {
     if (!a || !b || a === b) return;
     const key = [a, b].sort().join("|");
     if (seen.has(key)) return;
     seen.add(key);
-    list.push({ a, b });
+    list.push({ a, b, kind });
   };
 
   for (const r of relationships) add(r.charA, r.charB);
@@ -74,21 +96,32 @@ function buildEdges(relationships, factions, timeline) {
     }
   }
 
+  for (const l of locations) {
+    if (l.parentId) add(l.id, l.parentId);
+  }
+
+  for (const c of characters) mentionEdgesFor(c, templateFor(charTemplates, c.templateId), characters, add);
+  for (const l of locations) mentionEdgesFor(l, templateFor(locTemplates, l.templateId), characters, add);
+  for (const f of factions) mentionEdgesFor(f, templateFor(factionTemplates, f.templateId), characters, add);
+
   return list;
 }
 
 export async function renderGraph(root) {
   container = root;
   if (raf) cancelAnimationFrame(raf);
-  const [characters, locations, factions, relationships, timeline] = await Promise.all([
+  const [characters, locations, factions, relationships, timeline, charTemplates, locTemplates, factionTemplates] = await Promise.all([
     apiGet("/api/characters"),
     apiGet("/api/locations"),
     apiGet("/api/factions"),
     apiGet("/api/relationships"),
     apiGet("/api/timeline"),
+    loadTemplates("characters"),
+    loadTemplates("locations"),
+    loadTemplates("factions"),
   ]);
   nodes = buildNodes(characters, locations, factions);
-  edges = buildEdges(relationships, factions, timeline);
+  edges = buildEdges({ relationships, factions, timeline, locations, characters, charTemplates, locTemplates, factionTemplates });
   draw();
 }
 
@@ -156,6 +189,7 @@ function draw() {
     const line = document.createElementNS(svgNS, "line");
     line.setAttribute("stroke", "var(--border)");
     line.setAttribute("stroke-width", "1.5");
+    if (e.kind === "mention") line.setAttribute("stroke-dasharray", "4 3");
     line.dataset.a = e.a;
     line.dataset.b = e.b;
     viewport.appendChild(line);
@@ -452,6 +486,7 @@ function buildLegend() {
   legend.innerHTML = `
     <span><span class="legend-dot" style="background:#c9944a"></span>${i18n("Персонажи")}</span>
     <span><span class="legend-dot" style="background:#6a8fae"></span>${i18n("Локации/фракции — цвет по типу")}</span>
+    <span><span class="legend-line legend-line-dashed"></span>${i18n("пунктир — найдено по «@упоминанию» в тексте, не задано вручную")}</span>
   `;
   return legend;
 }
