@@ -558,4 +558,11 @@ export const EN_DICT = {
   "дней подряд с целью": "days in a row hitting goal",
   "слов сегодня": "words today",
   "Дневная цель, слов (0 — выключить)": "Daily goal, words (0 to turn off)",
+
+  "Экспорт мира в PDF": "Export world as PDF",
+  "Тот же материал, что и в экспорте сайта, — одним печатным документом: обложка, персонажи, локации, фракции, таймлайн, со ссылками внутри файла. Доступно в десктопной версии.":
+    "The same material as the site export — as one printable document: cover, characters, locations, factions, timeline, with links inside the file. Available in the desktop version.",
+  "Экспортировать PDF": "Export PDF",
+  "Готовлю…": "Preparing…",
+  "Не получилось создать PDF. Доступно только в десктопной версии Fictaris.": "Couldn't create the PDF. Only available in the desktop version of Fictaris.",
 };

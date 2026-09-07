@@ -96,6 +96,35 @@ async function useVault(root) {
   await vault.ensure();
 }
 
+// ── Экспорт мира в PDF (app/js/export-pdf.js) ────
+// Свой PDF-писатель с нуля означал бы либо латиницу-only базовые
+// шрифты (Helvetica и т.п. не знают кириллицы), либо встраивание и
+// разбор шрифта самим — на порядок больше работы, чем оправдано ради
+// одной кнопки. printToPDF у Electron/Chromium уже умеет то же самое
+// через собственный движок вёрстки: та же страница, что видна в
+// браузере (со всеми шрифтами, включая кириллицу), просто сохранённая
+// как PDF — то, как и сам Obsidian реализует "Export to PDF". Скрытое
+// окно нужно затем, что printToPDF — метод webContents, а не общая
+// утилита уровня приложения; data:-URL вместо временного файла — по
+// тому же принципу, что и картинки в export-site.js: не плодить
+// лишние файлы на диске ради того, что можно передать прямо в память.
+async function renderHtmlToPdf(html) {
+  const pdfWin = new BrowserWindow({
+    show: false,
+    webPreferences: { sandbox: true, contextIsolation: true },
+  });
+  try {
+    await pdfWin.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+    return await pdfWin.webContents.printToPDF({
+      printBackground: true,
+      pageSize: "A4",
+      margins: { top: 0, bottom: 0, left: 0, right: 0 },
+    });
+  } finally {
+    pdfWin.destroy();
+  }
+}
+
 // ── Несколько проектов ─────────────────────────
 // Раньше был только vaultPath — при первом запуске после обновления он
 // переезжает сюда единственной записью и дальше не используется.
@@ -261,6 +290,24 @@ function appRoutes() {
         if (skin !== config.skin) await saveConfig({ skin });
       }
       return { ok: true };
+    },
+
+    // Готовый HTML целиком приходит от app/js/export-pdf.js — там же
+    // вёрстка (та же, что у экспорта сайта, entity-export.js), здесь
+    // только печать в PDF и диалог сохранения. Отмена диалога — не
+    // ошибка, просто { ok: false } без исключения.
+    "POST /api/app/export-pdf": async ({ body }) => {
+      if (!body.html) throw new Error("Нет содержимого для экспорта");
+      const buffer = await renderHtmlToPdf(body.html);
+      const { canceled, filePath } = await dialog.showSaveDialog(win ?? undefined, {
+        title: "Сохранить PDF",
+        defaultPath: path.join(app.getPath("documents"), `fictaris-mir-${new Date().toISOString().slice(0, 10)}.pdf`),
+        filters: [{ name: "PDF", extensions: ["pdf"] }],
+      });
+      if (canceled || !filePath) return { ok: false };
+      await fs.writeFile(filePath, buffer);
+      shell.showItemInFolder(filePath);
+      return { ok: true, path: filePath };
     },
   };
 }

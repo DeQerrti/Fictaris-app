@@ -1,6 +1,7 @@
 import { apiGet, apiPost } from "./api.js";
 import { buildDemoBundle } from "./demo-data.js";
 import { exportSiteZip } from "./export-site.js";
+import { exportWorldPdf } from "./export-pdf.js";
 import { diffLines, collapseContext, DIFF_LINE_LIMIT } from "./diff.js";
 import { i18n } from "./i18n.js";
 
@@ -76,7 +77,7 @@ function showConfirmBar(bar, message, onConfirm) {
 // (settings-panel.js), а не отдельный пункт сайдбара, и вкладке нужны
 // именно секции, чтобы вписать их в общий контейнер вкладки самой.
 export function buildDataSections() {
-  return [buildExportSection(), buildSiteExportSection(), buildImportSection(), buildDemoSection(), buildHistorySection()];
+  return [buildExportSection(), buildSiteExportSection(), buildPdfExportSection(), buildImportSection(), buildDemoSection(), buildHistorySection()];
 }
 
 function historyFiles() {
@@ -354,6 +355,35 @@ function buildSiteExportSection() {
     btn.textContent = i18n("Собираю…");
     try {
       await exportSiteZip();
+    } finally {
+      btn.disabled = false;
+      btn.textContent = original;
+    }
+  });
+  section.appendChild(btn);
+  return section;
+}
+
+// Только десктоп: печатает через Electron/Chromium (см. комментарий в
+// electron/main.js о том, почему не свой PDF-писатель) — на телефоне/
+// в браузере POST /api/app/export-pdf отвечать некому, и клик честно
+// говорит об этом, а не зависает молча.
+function buildPdfExportSection() {
+  const section = document.createElement("div");
+  section.className = "data-section";
+  section.innerHTML = `<h3>${i18n("Экспорт мира в PDF")}</h3><p>${i18n("Тот же материал, что и в экспорте сайта, — одним печатным документом: обложка, персонажи, локации, фракции, таймлайн, со ссылками внутри файла. Доступно в десктопной версии.")}</p>`;
+  const btn = document.createElement("button");
+  btn.className = "btn";
+  btn.textContent = i18n("Экспортировать PDF");
+  btn.addEventListener("click", async () => {
+    btn.disabled = true;
+    const original = btn.textContent;
+    btn.textContent = i18n("Готовлю…");
+    try {
+      const res = await exportWorldPdf();
+      if (res && res.ok === false) return; // диалог сохранения отменили — не ошибка
+    } catch (e) {
+      alert(e.message || i18n("Не получилось создать PDF. Доступно только в десктопной версии Fictaris."));
     } finally {
       btn.disabled = false;
       btn.textContent = original;
