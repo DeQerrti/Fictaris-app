@@ -38,6 +38,31 @@ export function mentionsToHtml(text, characters) {
   return html;
 }
 
+// То же самое, но для статического экспорта сайта (export-site.js):
+// @упоминание становится настоящей ссылкой <a href>, а не span'ом,
+// который в приложении раскрывает карточку через JS-обработчик клика
+// (никакого JS на статических страницах нет). hrefFor получает
+// найденного персонажа и решает, куда вести ссылку — знает про
+// структуру экспортированных файлов export-site.js, эта функция нет.
+export function mentionsToLinkedHtml(text, characters, hrefFor) {
+  const regex = buildMentionRegex(characters);
+  if (!regex) return escapeHtml(text);
+
+  let html = "";
+  let last = 0;
+  let m;
+  while ((m = regex.exec(text))) {
+    html += escapeHtml(text.slice(last, m.index));
+    const name = m[1];
+    const c = characters.find((ch) => ch.name === name);
+    const href = hrefFor(c);
+    html += href ? `<a href="${href}">@${escapeHtml(name)}</a>` : `@${escapeHtml(name)}`;
+    last = m.index + m[0].length;
+  }
+  html += escapeHtml(text.slice(last));
+  return html;
+}
+
 // Автодополнение @упоминаний при наборе — список подсказок под полем,
 // без привязки к точным координатам курсора (для этого пришлось бы
 // мерить метрики шрифта символ за символом в plain textarea — не стоит

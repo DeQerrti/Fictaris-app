@@ -1,5 +1,6 @@
 import { apiGet, apiPost } from "./api.js";
 import { buildDemoBundle } from "./demo-data.js";
+import { exportSiteZip } from "./export-site.js";
 import { i18n } from "./i18n.js";
 
 const SCHEMA_VERSION = 1;
@@ -74,7 +75,7 @@ function showConfirmBar(bar, message, onConfirm) {
 // (settings-panel.js), а не отдельный пункт сайдбара, и вкладке нужны
 // именно секции, чтобы вписать их в общий контейнер вкладки самой.
 export function buildDataSections() {
-  return [buildExportSection(), buildImportSection(), buildDemoSection(), buildHistorySection()];
+  return [buildExportSection(), buildSiteExportSection(), buildImportSection(), buildDemoSection(), buildHistorySection()];
 }
 
 function historyFiles() {
@@ -250,6 +251,33 @@ function buildExportSection() {
     a.download = `fictaris-export-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
+  });
+  section.appendChild(btn);
+  return section;
+}
+
+// Отдельно от JSON-экспорта выше — тот для переноса данных обратно в
+// Fictaris (импорт/резервная копия), этот для показа мира кому-то
+// постороннему: набор HTML-страниц с рабочими ссылками между
+// персонажами/локациями/фракциями/таймлайном, который открывается в
+// любом браузере без самого приложения. См. export-site.js.
+function buildSiteExportSection() {
+  const section = document.createElement("div");
+  section.className = "data-section";
+  section.innerHTML = `<h3>${i18n("Экспорт мира как сайта")}</h3><p>${i18n("Персонажи, локации, фракции и таймлайн — набором связанных HTML-страниц в архиве. Открывается в браузере у кого угодно, без интернета и без Fictaris — чтобы показать мир бета-ридеру или просто сохранить читаемый снимок.")}</p>`;
+  const btn = document.createElement("button");
+  btn.className = "btn";
+  btn.textContent = i18n("Экспортировать сайт");
+  btn.addEventListener("click", async () => {
+    btn.disabled = true;
+    const original = btn.textContent;
+    btn.textContent = i18n("Собираю…");
+    try {
+      await exportSiteZip();
+    } finally {
+      btn.disabled = false;
+      btn.textContent = original;
+    }
   });
   section.appendChild(btn);
   return section;

@@ -525,4 +525,13 @@ export const EN_DICT = {
   "— нет (верхний уровень) —": "— none (top level) —",
   "в составе: {name}": "part of: {name}",
   "Локации внутри": "Locations inside",
+
+  "Экспорт мира как сайта": "Export world as a site",
+  "Персонажи, локации, фракции и таймлайн — набором связанных HTML-страниц в архиве. Открывается в браузере у кого угодно, без интернета и без Fictaris — чтобы показать мир бета-ридеру или просто сохранить читаемый снимок.":
+    "Characters, locations, factions and the timeline — as a set of linked HTML pages in an archive. Opens in anyone's browser, no internet and no Fictaris needed — to show the world to a beta reader, or just keep a readable snapshot.",
+  "Экспортировать сайт": "Export site",
+  "Собираю…": "Building…",
+  "Мир Fictaris": "Fictaris World",
+  "Обзор": "Overview",
+  "Экспортировано из Fictaris": "Exported from Fictaris",
 };
