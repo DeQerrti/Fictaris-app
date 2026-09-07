@@ -1,8 +1,9 @@
 import { apiGet } from "./api.js";
 import { escapeHtml } from "./chips.js";
 import { locationTypeInfo, factionTypeInfo } from "./icons.js";
-import { parseRichSections, loadTemplates, templateFor } from "./templates.js";
+import { loadTemplates, templateFor } from "./templates.js";
 import { mentionsToLinkedHtml } from "./mentions.js";
+import { imageDataUri, safeName, renderFieldsHtml } from "./entity-export.js";
 import { i18n } from "./i18n.js";
 import { buildZip } from "./zip-writer.js";
 
@@ -35,15 +36,6 @@ function downloadBlob(blob, filename) {
   a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
-}
-
-const EXT_MIME = { png: "image/png", webp: "image/webp", jpg: "image/jpeg", jpeg: "image/jpeg" };
-
-function imageDataUri(images, relPath) {
-  const base64 = relPath && images[relPath];
-  if (!base64) return null;
-  const ext = (relPath.split(".").pop() || "jpg").toLowerCase();
-  return `data:${EXT_MIME[ext] || "image/jpeg"};base64,${base64}`;
 }
 
 // ── HTML-обвязка страницы ────────────────────────
@@ -91,38 +83,6 @@ section.section { margin-bottom: 32px; }
 section.section h2 { border-bottom: 1px solid #3a3020; padding-bottom: 6px; }
 `;
 
-// ── Поля анкеты (общая часть для персонажей/локаций/фракций) ────
-function renderFields(template, entity, characters, hrefForChar) {
-  let html = "";
-  for (const f of template?.fields || []) {
-    const value = entity[f.key];
-    if (!value) continue;
-    if (f.type === "richtext") {
-      const sections = parseRichSections(value);
-      const heads = sections.filter((s) => s.level > 0);
-      html += `<div class="field-block"><div class="field-label">${escapeHtml(f.label)}</div>`;
-      if (heads.length > 1) {
-        html += `<nav class="toc">`;
-        for (const s of heads) html += `<a class="${s.level === 3 ? "sub" : ""}" href="#${s.id}">${escapeHtml(s.title)}</a>`;
-        html += `</nav>`;
-      }
-      for (const s of sections) {
-        if (s.level === 2) html += `<h3 id="${s.id}">${escapeHtml(s.title)}</h3>`;
-        else if (s.level === 3) html += `<h4 id="${s.id}">${escapeHtml(s.title)}</h4>`;
-        if (s.text) html += `<p>${mentionsToLinkedHtml(s.text, characters, hrefForChar)}</p>`;
-      }
-      html += `</div>`;
-    } else {
-      html += `<div class="field-block"><div class="field-label">${escapeHtml(f.label)}</div><p>${mentionsToLinkedHtml(String(value), characters, hrefForChar)}</p></div>`;
-    }
-  }
-  return html;
-}
-
-function safeName(id) {
-  return String(id).replace(/[^\w-]/g, "_");
-}
-
 export async function exportSiteZip() {
   const [characters, locations, factions, timeline, relationships, charTemplates, locTemplates, factionTemplates, backupRes] =
     await Promise.all([
@@ -155,7 +115,7 @@ export async function exportSiteZip() {
     let body = `<h1>${escapeHtml(c.name || i18n("Без имени"))}</h1>`;
     if (c.role) body += `<p class="subtitle">${escapeHtml(c.role)}</p>`;
     if (avatar) body += `<img class="avatar" src="${avatar}" alt="">`;
-    body += renderFields(templateFor(charTemplates, c.templateId), c, characters, hrefForChar);
+    body += renderFieldsHtml(templateFor(charTemplates, c.templateId), c, characters, hrefForChar);
 
     const relRows = relationships.filter((r) => r.charA === c.id || r.charB === c.id);
     if (relRows.length) {
@@ -183,7 +143,7 @@ export async function exportSiteZip() {
       body += `<div class="field-block"><div class="field-label">${escapeHtml(i18n("Родительская локация"))}</div><p><a href="${safeName(parent.id)}.html">${escapeHtml(parent.name || i18n("Без имени"))}</a></p></div>`;
     }
 
-    body += renderFields(templateFor(locTemplates, loc.templateId), loc, characters, hrefForChar);
+    body += renderFieldsHtml(templateFor(locTemplates, loc.templateId), loc, characters, hrefForChar);
 
     const kids = locations.filter((l) => l.parentId === loc.id);
     if (kids.length) {
@@ -205,7 +165,7 @@ export async function exportSiteZip() {
     if (avatar) body += `<img class="avatar" src="${avatar}" alt="">`;
     if (leader) body += `<div class="field-block"><div class="field-label">${escapeHtml(i18n("Глава фракции"))}</div><p><a href="${charHref(leader.id)}">${escapeHtml(leader.name || i18n("Без имени"))}</a></p></div>`;
     if (hq) body += `<div class="field-block"><div class="field-label">${escapeHtml(i18n("Штаб-квартира"))}</div><p><a href="${locHref(hq.id)}">${escapeHtml(hq.name || i18n("Без имени"))}</a></p></div>`;
-    body += renderFields(templateFor(factionTemplates, f.templateId), f, characters, hrefForChar);
+    body += renderFieldsHtml(templateFor(factionTemplates, f.templateId), f, characters, hrefForChar);
 
     files.push({ name: `factions/${safeName(f.id)}.html`, text: pageShell("../", siteTitle, f.name || i18n("Без имени"), body) });
   }
