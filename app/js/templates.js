@@ -77,3 +77,65 @@ export function templateFor(list, templateId) {
 export function blankField() {
   return { key: `f_${uid()}`, label: i18n("Новое поле"), type: "textarea" };
 }
+
+// ══════════════════════════════════════════════
+//  РАЗДЕЛЫ ВНУТРИ ПОЛЯ (тип "richtext")
+//
+//  Вместо полноценного WYSIWYG-редактора (риск разметки, которая потом
+//  не проэкранируется как надо) — простой построчный синтаксис поверх
+//  обычной textarea: строка "## Заголовок" начинает раздел, "###
+//  Подзаголовок" — вложенный. Всё остальное — обычный текст абзаца.
+//  Разбор идёт только на чтение (openEntitySheet, экспорт сайта) —
+//  сама textarea в редакторе (characters.js/locations.js/factions.js)
+//  правит эти строки как есть, ничего не подсвечивая.
+// ══════════════════════════════════════════════
+
+function sectionSlug(title, index) {
+  const base = String(title)
+    .toLowerCase()
+    .replace(/[^a-z0-9а-яё]+/gi, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40);
+  return `sec-${index}-${base || "s"}`;
+}
+
+// Возвращает [{ level: 0|2|3, title, text, id }] — level 0 это текст до
+// первого заголовка (title пустой). Секции без заголовка и без текста
+// не возвращаются.
+export function parseRichSections(value) {
+  const lines = String(value || "").split(/\r?\n/);
+  const raw = [];
+  let current = null;
+  for (const line of lines) {
+    const h2 = /^##\s+(.+)/.exec(line);
+    const h3 = !h2 && /^###\s+(.+)/.exec(line);
+    if (h2 || h3) {
+      current = { level: h2 ? 2 : 3, title: (h2 || h3)[1].trim(), lines: [] };
+      raw.push(current);
+    } else if (current) {
+      current.lines.push(line);
+    } else {
+      current = { level: 0, title: "", lines: [line] };
+      raw.push(current);
+    }
+  }
+  return raw
+    .map((s, i) => ({ level: s.level, title: s.title, text: s.lines.join("\n").trim(), id: sectionSlug(s.title, i) }))
+    .filter((s) => s.title || s.text);
+}
+
+// Есть ли смысл показывать оглавление — хотя бы один заголовок в тексте.
+export function hasRichHeadings(value) {
+  return parseRichSections(value).some((s) => s.level > 0);
+}
+
+// Подсказка под полем "richtext" в редакторе (drawer) — один и тот же
+// текст в трёх модулях (characters/locations/factions), поэтому общей
+// функцией, а не копией разметки в каждом.
+export function buildFieldHint(type) {
+  if (type !== "richtext") return null;
+  const hint = document.createElement("div");
+  hint.className = "field-hint";
+  hint.textContent = i18n('Строка с "## " — новый раздел, с "### " — подраздел. Соберётся оглавление.');
+  return hint;
+}

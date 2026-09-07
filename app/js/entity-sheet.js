@@ -1,5 +1,6 @@
 import { iconSvg } from "./icons.js";
 import { openGallery } from "./avatars.js";
+import { parseRichSections } from "./templates.js";
 import { i18n } from "./i18n.js";
 
 // ══════════════════════════════════════════════
@@ -92,6 +93,10 @@ export function openEntitySheet({ entity, avatarColor, avatarHtml, title, subtit
   fieldsWrap.className = "sheet-fields";
   for (const f of fields || []) {
     if (!f.value) continue;
+    if (f.type === "richtext") {
+      fieldsWrap.appendChild(buildRichtextField(f.label, f.value));
+      continue;
+    }
     const row = document.createElement("div");
     row.className = "sheet-field";
     const lab = document.createElement("div");
@@ -113,4 +118,66 @@ export function openEntitySheet({ entity, avatarColor, avatarHtml, title, subtit
   backdropEl.appendChild(panel);
   document.body.appendChild(backdropEl);
   document.addEventListener("keydown", onKey);
+}
+
+// Поле типа "richtext" — если в тексте нет ни одного "## "/"### ", это
+// просто такое же поле, как textarea (совместимость с уже введённым
+// текстом без разметки). Если заголовки есть — оглавление сверху
+// (ссылки прокручивают саму панель, не всю страницу — модалка скроллится
+// сама, см. .entity-modal-panel в style.css) и разделы с h4/h5 внутри.
+function buildRichtextField(label, value) {
+  const sections = parseRichSections(value);
+  const wrap = document.createElement("div");
+  wrap.className = "sheet-field sheet-richtext";
+
+  const lab = document.createElement("div");
+  lab.className = "sheet-field-label";
+  lab.textContent = label;
+  wrap.appendChild(lab);
+
+  if (!sections.some((s) => s.level > 0)) {
+    const val = document.createElement("div");
+    val.className = "sheet-field-value";
+    val.textContent = value;
+    wrap.appendChild(val);
+    return wrap;
+  }
+
+  const body = document.createElement("div");
+  body.className = "sheet-richtext-body";
+
+  const headings = sections.filter((s) => s.level > 0);
+  if (headings.length > 1) {
+    const toc = document.createElement("nav");
+    toc.className = "sheet-richtext-toc";
+    for (const s of headings) {
+      const a = document.createElement("a");
+      a.href = `#${s.id}`;
+      a.textContent = s.title;
+      if (s.level === 3) a.className = "sheet-toc-sub";
+      a.addEventListener("click", (e) => {
+        e.preventDefault();
+        body.querySelector(`[data-anchor="${s.id}"]`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+      toc.appendChild(a);
+    }
+    wrap.appendChild(toc);
+  }
+
+  for (const s of sections) {
+    if (s.level > 0) {
+      const h = document.createElement(s.level === 2 ? "h4" : "h5");
+      h.textContent = s.title;
+      h.dataset.anchor = s.id;
+      body.appendChild(h);
+    }
+    if (s.text) {
+      const p = document.createElement("div");
+      p.className = "sheet-field-value";
+      p.textContent = s.text;
+      body.appendChild(p);
+    }
+  }
+  wrap.appendChild(body);
+  return wrap;
 }

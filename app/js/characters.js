@@ -6,7 +6,7 @@ import { buildReverseLinks } from "./reverse-links.js";
 import { loadTagsMap, buildTagsField } from "./tags.js";
 import { buildNameGeneratorButton } from "./name-generator.js";
 import { avatarInnerHtml, buildAvatarsField } from "./avatars.js";
-import { loadTemplates, templateFor } from "./templates.js";
+import { loadTemplates, templateFor, buildFieldHint } from "./templates.js";
 import { openEntitySheet } from "./entity-sheet.js";
 import { chooseTemplate } from "./template-choice.js";
 import { i18n } from "./i18n.js";
@@ -187,7 +187,7 @@ function openSheet(c) {
     avatarHtml: avatarInnerHtml(c, initials(c.name)),
     title: c.name || i18n("Без имени"),
     subtitle: c.role || "",
-    fields: (template?.fields || []).map((f) => ({ label: f.label, value: c[f.key] })),
+    fields: (template?.fields || []).map((f) => ({ label: f.label, value: c[f.key], type: f.type })),
     extraSections: [buildFamilySection(c), reverseLinksFor(c)],
     onEdit: () => {
       activeId = c.id;
@@ -364,7 +364,9 @@ function buildDrawer(c) {
     const lab = document.createElement("label");
     lab.textContent = f.label;
     field.appendChild(lab);
-    const input = document.createElement(f.type === "textarea" ? "textarea" : "input");
+    const hint = buildFieldHint(f.type);
+    if (hint) field.appendChild(hint);
+    const input = document.createElement(f.type === "input" ? "input" : "textarea");
     input.value = c[f.key] || "";
     input.addEventListener("input", () => {
       c[f.key] = input.value;

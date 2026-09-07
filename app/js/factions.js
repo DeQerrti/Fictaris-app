@@ -5,7 +5,7 @@ import { FACTION_TYPES, factionTypeInfo, iconSvg } from "./icons.js";
 import { pushTrash } from "./trash.js";
 import { loadTagsMap, buildTagsField } from "./tags.js";
 import { avatarInnerHtml, buildAvatarsField } from "./avatars.js";
-import { loadTemplates, templateFor } from "./templates.js";
+import { loadTemplates, templateFor, buildFieldHint } from "./templates.js";
 import { openEntitySheet } from "./entity-sheet.js";
 import { chooseTemplate } from "./template-choice.js";
 import { i18n } from "./i18n.js";
@@ -116,7 +116,7 @@ function openSheet(f) {
     fields: [
       { label: i18n("Глава фракции"), value: leader?.name },
       { label: i18n("Штаб-квартира"), value: hq?.name },
-      ...(template?.fields || []).map((fl) => ({ label: fl.label, value: f[fl.key] })),
+      ...(template?.fields || []).map((fl) => ({ label: fl.label, value: f[fl.key], type: fl.type })),
     ],
     onEdit: () => {
       activeId = f.id;
@@ -199,7 +199,9 @@ function buildDrawer(f) {
     const lab = document.createElement("label");
     lab.textContent = fl.label;
     field.appendChild(lab);
-    const input = document.createElement(fl.type === "textarea" ? "textarea" : "input");
+    const hint = buildFieldHint(fl.type);
+    if (hint) field.appendChild(hint);
+    const input = document.createElement(fl.type === "input" ? "input" : "textarea");
     input.value = f[fl.key] || "";
     input.addEventListener("input", () => { f[fl.key] = input.value; persist(); });
     field.appendChild(input);

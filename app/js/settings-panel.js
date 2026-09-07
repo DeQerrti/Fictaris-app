@@ -879,7 +879,7 @@ let activeTemplateId = null;
 async function buildTemplatesSection() {
   const section = document.createElement("div");
   section.className = "data-section";
-  section.innerHTML = `<h3>${i18n("Шаблоны анкет")}</h3><p>${i18n("Какие поля показывает карточка персонажа/локации/фракции — убери ненужное, переименуй, добавь своё. Можно завести несколько шаблонов и выбирать нужный при создании.")}</p>`;
+  section.innerHTML = `<h3>${i18n("Шаблоны анкет")}</h3><p>${i18n("Какие поля показывает карточка персонажа/локации/фракции — убери ненужное, переименуй, добавь своё. Можно завести несколько шаблонов и выбирать нужный при создании.")}</p><p>${i18n('Поле «Текст с разделами» — начни строку с "## " для раздела и с "### " для подраздела, и в карточке появится кликабельное оглавление.')}</p>`;
 
   const kindRow = document.createElement("div");
   kindRow.className = "sync-actions";
@@ -1004,7 +1004,11 @@ async function renderTemplatesBody(body, kind) {
 
     const typeSelect = document.createElement("select");
     typeSelect.className = "field-inline-control";
-    for (const [value, label] of [["input", i18n("Строка")], ["textarea", i18n("Текст в несколько строк")]]) {
+    for (const [value, label] of [
+      ["input", i18n("Строка")],
+      ["textarea", i18n("Текст в несколько строк")],
+      ["richtext", i18n("Текст с разделами (оглавление)")],
+    ]) {
       const opt = document.createElement("option");
       opt.value = value;
       opt.textContent = label;

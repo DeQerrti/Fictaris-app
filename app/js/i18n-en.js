@@ -514,4 +514,10 @@ export const EN_DICT = {
   "Восстановить": "Restore",
   "Заменит текущую версию. Точно?": "This will replace the current version. Sure?",
   "Заполнить примером…": "Fill with example…",
+
+  "Текст с разделами (оглавление)": "Text with sections (table of contents)",
+  'Поле «Текст с разделами» — начни строку с "## " для раздела и с "### " для подраздела, и в карточке появится кликабельное оглавление.':
+    'The "Text with sections" field — start a line with "## " for a section and "### " for a subsection, and the card will get a clickable table of contents.',
+  'Строка с "## " — новый раздел, с "### " — подраздел. Соберётся оглавление.':
+    'A line starting with "## " is a new section, "### " a subsection. The table of contents builds itself.',
 };
