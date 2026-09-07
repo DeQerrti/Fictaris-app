@@ -7,6 +7,7 @@ import { openContextMenu } from "./context-menu.js";
 import { loadStatuses, buildStatusDot } from "./chapter-status.js";
 import { pushTrash } from "./trash.js";
 import { iconSvg } from "./icons.js";
+import { recordToday } from "./writing-goal.js";
 import { i18n } from "./i18n.js";
 
 // Список статусов — настраиваемый (Настройки → Статусы глав, см.
@@ -37,6 +38,10 @@ const save = debounceSave((data) => apiPost("/api/manuscript", data));
 
 function persist() {
   save(manuscript);
+  // Серия дней (Статистика → Писательская серия) — снимок суммарной
+  // длины рукописи на сегодня, своей debounce-очередью внутри
+  // writing-goal.js, отдельной от сохранения самой рукописи выше.
+  recordToday(manuscript);
 }
 
 const SNAPSHOT_LIMIT = 20;

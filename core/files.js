@@ -18,6 +18,7 @@ const KNOWN_FILES = new Set([
   "canvas.json",
   "trash.json",
   "site-settings.json",
+  "writing-log.json",
 ]);
 
 export function isAllowedFile(name) {

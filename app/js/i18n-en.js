@@ -549,4 +549,13 @@ export const EN_DICT = {
     "This file is too large to diff line by line — use \"Restore\" if you need to bring back exactly this version.",
   "Между этой версией и текущим состоянием нет отличий.": "There's no difference between this version and the current state.",
   "… ещё {count} неизменных строк …": "… {count} more unchanged lines …",
+
+  "пунктир — найдено по «@упоминанию» в тексте, не задано вручную": "dashed — found via an \"@mention\" in text, not set by hand",
+
+  "Писательская серия": "Writing streak",
+  "Дневная цель по словам — считается по автосохранениям рукописи, не нужно отмечать вручную.":
+    "Daily word goal — tracked from manuscript autosaves, nothing to mark by hand.",
+  "дней подряд с целью": "days in a row hitting goal",
+  "слов сегодня": "words today",
+  "Дневная цель, слов (0 — выключить)": "Daily goal, words (0 to turn off)",
 };

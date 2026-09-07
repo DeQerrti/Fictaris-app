@@ -20,6 +20,7 @@ const EMPTY_MANUSCRIPT = { chapters: [], activeChapterId: null };
 const EMPTY_BOARD = { columns: [], cards: {}, cardOrder: {} };
 const EMPTY_MAP = { rootIds: [], maps: {} };
 const EMPTY_CANVAS = { order: [], canvases: {} };
+const EMPTY_WRITING_LOG = { dailyGoal: 300, days: {} };
 const IMAGE_EXT = /^(jpg|jpeg|png|webp)$/i;
 
 // Резервная копия/синхронизация (app/js/sync.js) — весь проект одним
@@ -38,6 +39,7 @@ const BACKUP_FILES = [
   "factions.json",
   "map.json",
   "canvas.json",
+  "writing-log.json",
 ];
 
 async function exportBackup({ vault }) {
@@ -53,6 +55,8 @@ async function exportBackup({ vault }) {
         ? EMPTY_MAP
         : name === "canvas.json"
         ? EMPTY_CANVAS
+        : name === "writing-log.json"
+        ? EMPTY_WRITING_LOG
         : []
     );
   }
@@ -199,6 +203,17 @@ export const ROUTES = {
   "POST /api/site-settings": async ({ vault, body }) => {
     if (!body || typeof body !== "object") throw new ApiError("Некорректные настройки");
     return vault.writeJson("site-settings.json", body);
+  },
+
+  // Дневная цель по словам и снимок суммарной длины рукописи по датам
+  // (app/js/writing-goal.js) — часть мира, не устройства (в отличие от
+  // site-settings.json), поэтому синхронизируется между устройствами
+  // так же, как персонажи или таймлайн: серия дней общая на проект, а
+  // не начинается заново на каждом компьютере отдельно.
+  "GET /api/writing-log": async ({ vault }) => vault.readJson("writing-log.json", EMPTY_WRITING_LOG),
+  "POST /api/writing-log": async ({ vault, body }) => {
+    if (!body || typeof body.days !== "object") throw new ApiError("Некорректный дневник письма");
+    return vault.writeJson("writing-log.json", body);
   },
 
   "GET /api/export-backup": exportBackup,

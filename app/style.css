@@ -1006,6 +1006,33 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
 .stat-bar-label { color: var(--text-dim); font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .stat-bar-track { height: 8px; border-radius: 999px; background: var(--panel-alt); overflow: hidden; }
 .stat-bar-fill { display: block; height: 100%; border-radius: 999px; }
+
+/* Мини-график серии (stats.js, buildWritingStreakSection) — 14
+   столбиков, высота по доле от дневной цели, зелёный акцент у дней,
+   где цель выполнена. */
+.streak-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 5px;
+  height: 64px;
+  max-width: 420px;
+  margin-top: 14px;
+  padding: 6px 0 0;
+  border-bottom: 1px solid var(--border);
+}
+.streak-bar {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  background: transparent;
+}
+.streak-bar-fill {
+  width: 100%;
+  border-radius: 3px 3px 0 0;
+  background: var(--text-faint);
+}
+.streak-bar.hit .streak-bar-fill { background: #5a8a5f; }
 .stat-bar-value { font-family: "JetBrains Mono", monospace; font-size: 0.8rem; color: var(--text-faint); text-align: right; }
 
 /* ── Первый запуск ─────────────────────────── */

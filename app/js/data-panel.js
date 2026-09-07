@@ -90,6 +90,7 @@ function historyFiles() {
     ["map.json", i18n("Карта")],
     ["canvas.json", i18n("Холст")],
     ["manuscript.json", i18n("Рукопись")],
+    ["writing-log.json", i18n("Писательская серия")],
   ];
 }
 

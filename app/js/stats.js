@@ -2,6 +2,7 @@ import { apiGet } from "./api.js";
 import { escapeHtml } from "./chips.js";
 import { factionTypeInfo, locationTypeInfo } from "./icons.js";
 import { loadStatuses } from "./chapter-status.js";
+import { loadWritingLog, saveDailyGoal, computeStats } from "./writing-goal.js";
 import { i18n, currentLang } from "./i18n.js";
 
 // ══════════════════════════════════════════════
@@ -17,7 +18,7 @@ import { i18n, currentLang } from "./i18n.js";
 //  один инструмент воркбилдинга без обзорной панели).
 // ══════════════════════════════════════════════
 
-function wordCount(text) {
+export function wordCount(text) {
   const m = (text || "").trim().match(/\S+/g);
   return m ? m.length : 0;
 }
@@ -52,6 +53,63 @@ function buildBarList(rows, max) {
   return list;
 }
 
+// ── Писательская серия ───────────────────────────
+// Дневная цель по словам, сколько написано сегодня и серия дней подряд
+// с выполненной целью (writing-goal.js) — то, что дают Scrivener/
+// NovelPad/4TheWords и подобные трекеры привычки писать, а Fictaris
+// раньше показывал только "сколько всего слов" без истории по дням.
+function buildWritingStreakSection(log) {
+  const stats = computeStats(log);
+  const section = buildSection(
+    i18n("Писательская серия"),
+    i18n("Дневная цель по словам — считается по автосохранениям рукописи, не нужно отмечать вручную.")
+  );
+
+  const tiles = document.createElement("div");
+  tiles.className = "stat-tiles";
+  tiles.append(
+    buildTile(stats.streak, i18n("дней подряд с целью")),
+    buildTile(stats.goal ? `${stats.todayWords} / ${stats.goal}` : stats.todayWords, i18n("слов сегодня"))
+  );
+  section.appendChild(tiles);
+
+  const goalRow = document.createElement("div");
+  goalRow.className = "field";
+  goalRow.style.maxWidth = "240px";
+  const goalLabel = document.createElement("label");
+  goalLabel.textContent = i18n("Дневная цель, слов (0 — выключить)");
+  goalRow.appendChild(goalLabel);
+  const goalInput = document.createElement("input");
+  goalInput.type = "number";
+  goalInput.min = "0";
+  goalInput.step = "50";
+  goalInput.value = stats.goal || 0;
+  let goalTimer;
+  goalInput.addEventListener("input", () => {
+    clearTimeout(goalTimer);
+    goalTimer = setTimeout(() => saveDailyGoal(goalInput.value), 500);
+  });
+  goalRow.appendChild(goalInput);
+  section.appendChild(goalRow);
+
+  const bars = document.createElement("div");
+  bars.className = "streak-bars";
+  for (const day of stats.last14) {
+    const bar = document.createElement("div");
+    bar.className = "streak-bar" + (day.hit ? " hit" : "");
+    bar.title = `${day.date}: ${day.words} ${i18n("слов")}`;
+    const pct = stats.goal > 0 ? Math.round((day.words / stats.goal) * 100) : day.words > 0 ? 100 : 0;
+    const fill = document.createElement("div");
+    fill.className = "streak-bar-fill";
+    fill.style.height = `${Math.max(day.words > 0 ? 6 : 0, Math.min(100, pct))}%`;
+    bar.appendChild(fill);
+    bars.appendChild(bar);
+  }
+  section.appendChild(bars);
+
+  return section;
+}
+
 function buildSection(title, hint) {
   const section = document.createElement("div");
   section.className = "data-section";
@@ -64,7 +122,7 @@ export async function renderStats(root) {
   const wrap = document.createElement("div");
   wrap.className = "data-panel";
 
-  const [characters, locations, factions, timeline, board, manuscript, relationships, statuses] = await Promise.all([
+  const [characters, locations, factions, timeline, board, manuscript, relationships, statuses, writingLog] = await Promise.all([
     apiGet("/api/characters"),
     apiGet("/api/locations"),
     apiGet("/api/factions"),
@@ -73,10 +131,13 @@ export async function renderStats(root) {
     apiGet("/api/manuscript"),
     apiGet("/api/relationships"),
     loadStatuses(),
+    loadWritingLog(),
   ]);
 
   const totalWords = manuscript.chapters.reduce((sum, c) => sum + wordCount(c.content), 0);
   const cardCount = Object.keys(board.cards || {}).length;
+
+  wrap.appendChild(buildWritingStreakSection(writingLog));
 
   const overview = buildSection(i18n("Обзор"));
   const tiles = document.createElement("div");
