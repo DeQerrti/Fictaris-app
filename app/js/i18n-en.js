@@ -534,4 +534,10 @@ export const EN_DICT = {
   "Мир Fictaris": "Fictaris World",
   "Обзор": "Overview",
   "Экспортировано из Fictaris": "Exported from Fictaris",
+
+  "Правая кнопка — выбрать шаблон анкеты или завести новый": "Right-click to pick a template or create a new one",
+  "+ Новый шаблон…": "+ New template…",
+  "Новый шаблон анкеты": "New form template",
+  "Название шаблона": "Template name",
+  "Создать и завести карточку": "Create and add a card",
 };

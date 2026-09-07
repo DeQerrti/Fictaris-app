@@ -7,9 +7,10 @@ import { buildReverseLinks } from "./reverse-links.js";
 import { loadTagsMap, buildTagsField } from "./tags.js";
 import { buildNameGeneratorButton } from "./name-generator.js";
 import { avatarInnerHtml, buildAvatarsField } from "./avatars.js";
-import { loadTemplates, templateFor, buildFieldHint } from "./templates.js";
+import { loadTemplates, saveTemplates, templateFor, buildFieldHint } from "./templates.js";
 import { openEntitySheet } from "./entity-sheet.js";
 import { chooseTemplate } from "./template-choice.js";
+import { openTemplateEditorModal } from "./template-editor-modal.js";
 import { i18n } from "./i18n.js";
 
 let locations = [];
@@ -24,6 +25,27 @@ const save = debounceSave((list) => apiPost("/api/locations", list));
 
 function persist() {
   save(locations);
+}
+
+function addWithTemplate(templateId) {
+  const loc = blank(templateId);
+  locations.push(loc);
+  activeId = loc.id;
+  persist();
+  draw();
+}
+
+// "+ Новый шаблон…" в меню выбора — см. тот же приём в characters.js.
+function addWithNewTemplate() {
+  openTemplateEditorModal({
+    initialFields: (templates[0]?.fields || []).map((f) => ({ ...f })),
+    onSave: async ({ name, fields }) => {
+      const fresh = { id: `t_${Date.now().toString(36)}`, name, fields };
+      templates = [...templates, fresh];
+      await saveTemplates("locations", templates);
+      addWithTemplate(fresh.id);
+    },
+  });
 }
 
 function blank(templateId) {
@@ -159,14 +181,13 @@ function draw() {
   const addCard = document.createElement("button");
   addCard.className = "char-card add-card";
   addCard.textContent = i18n("+ Добавить локацию");
+  addCard.title = i18n("Правая кнопка — выбрать шаблон анкеты или завести новый");
   addCard.addEventListener("click", () => {
-    chooseTemplate(templates, addCard, (templateId) => {
-      const loc = blank(templateId);
-      locations.push(loc);
-      activeId = loc.id;
-      persist();
-      draw();
-    });
+    chooseTemplate(templates, addCard, addWithTemplate, { onCreateNew: addWithNewTemplate });
+  });
+  addCard.addEventListener("contextmenu", (e) => {
+    e.preventDefault();
+    chooseTemplate(templates, addCard, addWithTemplate, { forceMenu: true, onCreateNew: addWithNewTemplate });
   });
   grid.appendChild(addCard);
 

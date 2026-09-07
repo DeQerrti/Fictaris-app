@@ -9,20 +9,27 @@ import { i18n } from "./i18n.js";
 //  (текущее поведение "один клик — карточка создана" не меняется).
 //  Если шаблонов несколько — показываем список через тот же
 //  context-menu.js, что и остальные всплывающие меню в приложении.
+//
+//  opts.onCreateNew — пункт "+ Новый шаблон…" в конце списка (см.
+//  template-editor-modal.js): даёт завести шаблон на лету, не уходя в
+//  Настройки. opts.forceMenu — показать меню, даже если шаблон всего
+//  один: обычный клик по "+Добавить" остаётся одношаговым, а вот
+//  правая кнопка (contextmenu) на той же кнопке форсирует меню именно
+//  затем, чтобы "+ Новый шаблон…" был достижим и когда шаблон пока один.
 // ══════════════════════════════════════════════
 
-export function chooseTemplate(templates, anchorEl, onChosen) {
-  if (templates.length <= 1) {
+export function chooseTemplate(templates, anchorEl, onChosen, opts = {}) {
+  if (templates.length <= 1 && !opts.forceMenu) {
     onChosen(templates[0]?.id || "default");
     return;
   }
   const rect = anchorEl.getBoundingClientRect();
-  openContextMenu(
-    rect.left,
-    rect.bottom + 4,
-    templates.map((t) => ({
-      label: t.name,
-      action: () => onChosen(t.id),
-    }))
-  );
+  const items = templates.map((t) => ({
+    label: t.name,
+    action: () => onChosen(t.id),
+  }));
+  if (opts.onCreateNew) {
+    items.push({ label: i18n("+ Новый шаблон…"), action: opts.onCreateNew });
+  }
+  openContextMenu(rect.left, rect.bottom + 4, items);
 }

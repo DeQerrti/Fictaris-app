@@ -6,9 +6,10 @@ import { buildReverseLinks } from "./reverse-links.js";
 import { loadTagsMap, buildTagsField } from "./tags.js";
 import { buildNameGeneratorButton } from "./name-generator.js";
 import { avatarInnerHtml, buildAvatarsField } from "./avatars.js";
-import { loadTemplates, templateFor, buildFieldHint } from "./templates.js";
+import { loadTemplates, saveTemplates, templateFor, buildFieldHint } from "./templates.js";
 import { openEntitySheet } from "./entity-sheet.js";
 import { chooseTemplate } from "./template-choice.js";
+import { openTemplateEditorModal } from "./template-editor-modal.js";
 import { i18n } from "./i18n.js";
 
 const PALETTE = [
@@ -35,6 +36,31 @@ function persist() {
 
 function persistRelationships() {
   saveRelationships(relationships);
+}
+
+function addWithTemplate(templateId) {
+  const c = blank(templateId);
+  characters.push(c);
+  activeId = c.id;
+  persist();
+  draw();
+}
+
+// "+ Новый шаблон…" в меню выбора (template-choice.js) — заводит
+// шаблон на лету, не уходя в Настройки → Шаблоны анкет, и сразу же
+// создаёт карточку по нему. С полей первого имеющегося шаблона (или
+// пустого списка, если шаблонов ещё вовсе нет) — та же отправная
+// точка, что у кнопки "+ Шаблон" в самих Настройках.
+function addWithNewTemplate() {
+  openTemplateEditorModal({
+    initialFields: (templates[0]?.fields || []).map((f) => ({ ...f })),
+    onSave: async ({ name, fields }) => {
+      const fresh = { id: `t_${Date.now().toString(36)}`, name, fields };
+      templates = [...templates, fresh];
+      await saveTemplates("characters", templates);
+      addWithTemplate(fresh.id);
+    },
+  });
 }
 
 function blank(templateId) {
@@ -142,14 +168,16 @@ function draw() {
   const addCard = document.createElement("button");
   addCard.className = "char-card add-card";
   addCard.textContent = i18n("+ Добавить персонажа");
+  addCard.title = i18n("Правая кнопка — выбрать шаблон анкеты или завести новый");
   addCard.addEventListener("click", () => {
-    chooseTemplate(templates, addCard, (templateId) => {
-      const c = blank(templateId);
-      characters.push(c);
-      activeId = c.id;
-      persist();
-      draw();
-    });
+    chooseTemplate(templates, addCard, addWithTemplate, { onCreateNew: addWithNewTemplate });
+  });
+  // Правая кнопка форсирует меню выбора шаблона, даже если он пока один —
+  // иначе "+ Новый шаблон…" был бы недостижим, пока не заведён хотя бы
+  // второй шаблон (см. комментарий в template-choice.js).
+  addCard.addEventListener("contextmenu", (e) => {
+    e.preventDefault();
+    chooseTemplate(templates, addCard, addWithTemplate, { forceMenu: true, onCreateNew: addWithNewTemplate });
   });
   grid.appendChild(addCard);
 
