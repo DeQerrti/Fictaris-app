@@ -32,8 +32,57 @@ function blank(templateId) {
     name: i18n("Новая локация"),
     type: "settlement",
     tags: "",
+    parentId: null,
     templateId: templateId || templates[0]?.id || "default",
   };
+}
+
+// ── Вложенность (королевство → область → город и т.п.) ─────────
+// parentId — обычная ссылка на другую локацию, как headquartersId у
+// фракции. Проверка циклов — только на выбор родителя в дровере
+// (descendantIds ниже); сам обход дерева ещё и защищён на случай
+// испорченных данных (импорт, ручная правка JSON) — see orderedTree.
+
+// Все потомки локации (рекурсивно) — чтобы нельзя было выбрать своего
+// же потомка родителем и завести цикл.
+function descendantIds(id) {
+  const ids = new Set();
+  function walk(pid) {
+    for (const l of locations) {
+      if (l.parentId === pid && !ids.has(l.id)) {
+        ids.add(l.id);
+        walk(l.id);
+      }
+    }
+  }
+  walk(id);
+  return ids;
+}
+
+// Порядок обхода для сетки: сначала локация, сразу за ней — все её
+// потомки (глубина в depth, красится отступом в CSS) — вместо плоского
+// списка, где город и содержащее его королевство могли оказаться в
+// разных концах сетки. parentId, ссылающийся на несуществующую или
+// удалённую локацию, трактуется как "нет родителя" — не теряем
+// локацию из вида, а поднимаем её на верхний уровень.
+function orderedTree() {
+  const byId = new Set(locations.map((l) => l.id));
+  const byParent = new Map();
+  for (const loc of locations) {
+    const key = loc.parentId && byId.has(loc.parentId) ? loc.parentId : null;
+    if (!byParent.has(key)) byParent.set(key, []);
+    byParent.get(key).push(loc);
+  }
+  const out = [];
+  function walk(parentId, depth, path) {
+    for (const loc of byParent.get(parentId) || []) {
+      if (path.has(loc.id)) continue; // страховка от цикла в испорченных данных
+      out.push({ loc, depth });
+      walk(loc.id, depth + 1, new Set(path).add(loc.id));
+    }
+  }
+  walk(null, 0, new Set());
+  return out;
 }
 
 export async function renderLocations(root, focusId) {
@@ -89,15 +138,18 @@ function draw() {
     grid.appendChild(empty);
   }
 
-  for (const loc of locations) {
+  for (const { loc, depth } of orderedTree()) {
     const [, , iconName, color] = locationTypeInfo(loc.type);
+    const parent = loc.parentId && locations.find((l) => l.id === loc.parentId);
     const card = document.createElement("button");
-    card.className = "char-card";
+    card.className = "char-card loc-card" + (depth ? " loc-child" : "");
+    if (depth) card.style.setProperty("--loc-depth", depth);
     card.innerHTML = `
       <div class="char-avatar" style="background:${color}">${avatarInnerHtml(loc, iconSvg(iconName, 30))}</div>
       <div class="char-card-body">
         <div class="char-name">${escapeHtml(loc.name || i18n("Без имени"))}</div>
         <div class="char-role">${escapeHtml(i18n(locationTypeInfo(loc.type)[1]))}</div>
+        ${parent ? `<div class="loc-parent-badge">${escapeHtml(i18n("в составе: {name}", { name: parent.name || i18n("Без имени") }))}</div>` : ""}
       </div>
     `;
     card.addEventListener("click", () => openSheet(loc));
@@ -126,17 +178,43 @@ function draw() {
   container.appendChild(view);
 }
 
+// Дочерние локации — тем же приёмом, что buildFamilySection у детей
+// персонажа (characters.js): просто список имён, без отдельной кнопки
+// перехода — щёлкнуть по нужной проще прямо в сетке (она уже стоит
+// рядом, отступом ниже).
+function childrenSection(loc) {
+  const kids = locations.filter((l) => l.parentId === loc.id);
+  if (!kids.length) return null;
+  const wrap = document.createElement("div");
+  wrap.className = "sheet-fields";
+  const row = document.createElement("div");
+  row.className = "sheet-field";
+  const lab = document.createElement("div");
+  lab.className = "sheet-field-label";
+  lab.textContent = i18n("Локации внутри");
+  const val = document.createElement("div");
+  val.className = "sheet-field-value";
+  val.textContent = kids.map((k) => k.name || i18n("Без имени")).join(", ");
+  row.append(lab, val);
+  wrap.appendChild(row);
+  return wrap;
+}
+
 function openSheet(loc) {
   const [, typeLabel, iconName, color] = locationTypeInfo(loc.type);
   const template = templateFor(templates, loc.templateId);
+  const parent = loc.parentId && locations.find((l) => l.id === loc.parentId);
   openEntitySheet({
     entity: loc,
     avatarColor: color,
     avatarHtml: avatarInnerHtml(loc, iconSvg(iconName, 30)),
     title: loc.name || i18n("Без имени"),
     subtitle: i18n(typeLabel),
-    fields: (template?.fields || []).map((f) => ({ label: f.label, value: loc[f.key], type: f.type })),
-    extraSections: [reverseLinksFor(loc)],
+    fields: [
+      ...(parent ? [{ label: i18n("Родительская локация"), value: parent.name }] : []),
+      ...(template?.fields || []).map((f) => ({ label: f.label, value: loc[f.key], type: f.type })),
+    ],
+    extraSections: [childrenSection(loc), reverseLinksFor(loc)],
     onEdit: () => {
       activeId = loc.id;
       draw();
@@ -189,6 +267,34 @@ function buildDrawer(loc) {
   typeField.appendChild(typeSelect);
   drawer.appendChild(typeField);
 
+  const parentField = document.createElement("div");
+  parentField.className = "field";
+  const parentLabel = document.createElement("label");
+  parentLabel.textContent = i18n("Родительская локация");
+  parentField.appendChild(parentLabel);
+  const parentSelect = document.createElement("select");
+  const noneOpt = document.createElement("option");
+  noneOpt.value = "";
+  noneOpt.textContent = i18n("— нет (верхний уровень) —");
+  parentSelect.appendChild(noneOpt);
+  const excluded = descendantIds(loc.id);
+  excluded.add(loc.id);
+  for (const other of locations) {
+    if (excluded.has(other.id)) continue;
+    const opt = document.createElement("option");
+    opt.value = other.id;
+    opt.textContent = other.name || i18n("Без имени");
+    if (loc.parentId === other.id) opt.selected = true;
+    parentSelect.appendChild(opt);
+  }
+  parentSelect.addEventListener("change", () => {
+    loc.parentId = parentSelect.value || null;
+    persist();
+    draw();
+  });
+  parentField.appendChild(parentSelect);
+  drawer.appendChild(parentField);
+
   drawer.appendChild(buildAvatarsField(loc, () => { persist(); draw(); }));
 
   const template = templateFor(templates, loc.templateId);
@@ -235,6 +341,9 @@ function buildDrawer(loc) {
   delBtn.addEventListener("click", async () => {
     await pushTrash("location", loc);
     locations = locations.filter((x) => x.id !== loc.id);
+    // Дети удалённой локации не исчезают вместе с ней — поднимаются на
+    // верхний уровень, а не остаются висеть на несуществующем parentId.
+    for (const l of locations) if (l.parentId === loc.id) l.parentId = null;
     activeId = null;
     persist();
     draw();

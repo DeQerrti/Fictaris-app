@@ -715,6 +715,23 @@ button.btn.icon-btn.gallery-nav:hover { background: rgba(0, 0, 0, 0.6); }
   white-space: nowrap;
 }
 
+/* Вложенность локаций (locations.js, orderedTree) — карточка-потомок
+   получает цветную полосу и отступ слева, пропорциональный глубине,
+   вместо честного дерева со связями: сама сетка карточек (.characters-grid)
+   остаётся как есть, отступ — единственное, что показывает вложенность. */
+.loc-child {
+  border-left: 3px solid var(--accent);
+  padding-left: calc(10px + (var(--loc-depth, 1) - 1) * 10px);
+}
+.loc-parent-badge {
+  margin-top: 2px;
+  font-size: 0.72rem;
+  color: var(--text-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .add-card {
   border: 1px dashed var(--border);
   background: none;

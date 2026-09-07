@@ -520,4 +520,9 @@ export const EN_DICT = {
     'The "Text with sections" field — start a line with "## " for a section and "### " for a subsection, and the card will get a clickable table of contents.',
   'Строка с "## " — новый раздел, с "### " — подраздел. Соберётся оглавление.':
     'A line starting with "## " is a new section, "### " a subsection. The table of contents builds itself.',
+
+  "Родительская локация": "Parent location",
+  "— нет (верхний уровень) —": "— none (top level) —",
+  "в составе: {name}": "part of: {name}",
+  "Локации внутри": "Locations inside",
 };
