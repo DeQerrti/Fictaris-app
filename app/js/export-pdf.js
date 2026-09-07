@@ -185,5 +185,16 @@ export async function exportWorldPdf() {
   const html = pageHtml(siteTitle, body);
   const res = await apiPost("/api/app/export-pdf", { html });
   if (res?.error) throw new Error(res.error);
+  // На телефоне/в браузере этого маршрута не существует — мобильный
+  // мост (mobile/src/main.js) отвечает на любой нераспознанный
+  // /api/app/* просто {ok:true}, без ошибки и без пути к файлу. Не
+  // отличить такой ответ от настоящего успеха — значит показать, что
+  // PDF сохранён, хотя ничего не произошло. Настоящий успех и настоящая
+  // отмена диалога сохранения (electron/main.js) всегда несут path
+  // либо ok:false — только "ok:true без path" бывает исключительно от
+  // такой подмены.
+  if (res?.ok === true && !res.path) {
+    throw new Error(i18n("Экспорт в PDF доступен только в десктопной версии Fictaris."));
+  }
   return res;
 }
