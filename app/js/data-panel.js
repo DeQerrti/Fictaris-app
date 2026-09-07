@@ -1,6 +1,7 @@
 import { apiGet, apiPost } from "./api.js";
 import { buildDemoBundle } from "./demo-data.js";
 import { exportSiteZip } from "./export-site.js";
+import { diffLines, collapseContext, DIFF_LINE_LIMIT } from "./diff.js";
 import { i18n } from "./i18n.js";
 
 const SCHEMA_VERSION = 1;
@@ -184,14 +185,92 @@ function buildHistorySection() {
   return section;
 }
 
+// Та же строка "characters.json" и так же выглядит как путь к её
+// собственному REST-маршруту без ".json" — /api/characters,
+// /api/manuscript и т.д. — совпадение не случайное (см. core/api.js),
+// поэтому отдельной таблицы соответствий не заводим.
+function currentDataApi(file) {
+  return `/api/${file.replace(/\.json$/, "")}`;
+}
+
+// Показывает построчный diff между версией из истории и текущим
+// содержимым файла — обе стороны через JSON.stringify(..., null, 2),
+// см. app/js/diff.js о том, почему построчно по всему файлу, а не по
+// одной карточке. Слишком большой файл (DIFF_LINE_LIMIT) — вместо
+// зависшей вкладки честно говорим, что не считаем, а не тихо виснем.
+async function buildDiffPanel(file, version) {
+  const panel = document.createElement("div");
+  panel.className = "history-diff";
+  panel.textContent = i18n("Считаю разницу…");
+
+  let current, past;
+  try {
+    [current, past] = await Promise.all([apiGet(currentDataApi(file)), apiGet(`/api/history/version?file=${encodeURIComponent(file)}&id=${encodeURIComponent(version.id)}`)]);
+  } catch {
+    panel.textContent = i18n("Не получилось загрузить это сравнение.");
+    return panel;
+  }
+
+  const oldLines = JSON.stringify(past, null, 2).split("\n");
+  const newLines = JSON.stringify(current, null, 2).split("\n");
+
+  if (oldLines.length > DIFF_LINE_LIMIT || newLines.length > DIFF_LINE_LIMIT) {
+    panel.textContent = i18n("Файл слишком большой для построчного сравнения — воспользуйся «Восстановить», если нужно вернуть именно эту версию.");
+    return panel;
+  }
+
+  const rows = diffLines(oldLines, newLines);
+  if (rows.every((r) => r.type === "equal")) {
+    panel.textContent = i18n("Между этой версией и текущим состоянием нет отличий.");
+    return panel;
+  }
+
+  panel.textContent = "";
+  const pre = document.createElement("pre");
+  pre.className = "history-diff-pre";
+  for (const r of collapseContext(rows)) {
+    const line = document.createElement("div");
+    if (r.type === "gap") {
+      line.className = "diff-line diff-gap";
+      line.textContent = i18n("… ещё {count} неизменных строк …", { count: r.count });
+    } else {
+      line.className = "diff-line diff-" + r.type;
+      line.textContent = (r.type === "add" ? "+ " : r.type === "del" ? "- " : "  ") + r.text;
+    }
+    pre.appendChild(line);
+  }
+  panel.appendChild(pre);
+  return panel;
+}
+
 function buildHistoryRow(file, version) {
+  const wrap = document.createElement("div");
+  wrap.className = "history-row-wrap";
+
   const row = document.createElement("div");
   row.className = "history-row";
+  wrap.appendChild(row);
 
   const date = document.createElement("span");
   const parsed = new Date(version.date);
   date.textContent = Number.isNaN(parsed.getTime()) ? version.date : parsed.toLocaleString();
   row.appendChild(date);
+
+  const diffBtn = document.createElement("button");
+  diffBtn.className = "btn";
+  diffBtn.textContent = i18n("Сравнить с текущей");
+  let diffPanel = null;
+  diffBtn.addEventListener("click", async () => {
+    if (diffPanel) {
+      diffPanel.remove();
+      diffPanel = null;
+      diffBtn.textContent = i18n("Сравнить с текущей");
+      return;
+    }
+    diffBtn.textContent = i18n("Скрыть сравнение");
+    diffPanel = await buildDiffPanel(file, version);
+    wrap.appendChild(diffPanel);
+  });
 
   const btn = document.createElement("button");
   btn.className = "btn";
@@ -210,7 +289,7 @@ function buildHistoryRow(file, version) {
   });
   const actions = document.createElement("div");
   actions.className = "history-row-actions";
-  actions.appendChild(btn);
+  actions.append(diffBtn, btn);
 
   const delBtn = document.createElement("button");
   delBtn.className = "btn danger";
@@ -218,7 +297,7 @@ function buildHistoryRow(file, version) {
   delBtn.title = i18n("Удалить этот снимок навсегда");
   delBtn.addEventListener("click", () => {
     if (delBtn.dataset.confirm === "1") {
-      apiPost("/api/history/delete", { file, id: version.id }).then(() => row.remove());
+      apiPost("/api/history/delete", { file, id: version.id }).then(() => wrap.remove());
       return;
     }
     delBtn.dataset.confirm = "1";
@@ -231,7 +310,7 @@ function buildHistoryRow(file, version) {
   actions.appendChild(delBtn);
   row.appendChild(actions);
 
-  return row;
+  return wrap;
 }
 
 function buildExportSection() {

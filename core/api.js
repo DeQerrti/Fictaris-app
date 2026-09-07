@@ -205,6 +205,16 @@ export const ROUTES = {
   "POST /api/restore-backup": restoreBackup,
 
   "GET /api/history": async ({ vault, query }) => vault.history(query.get("file") || ""),
+  // Читает содержимое старой версии, ничего не меняя на диске — в
+  // отличие от history/restore ниже. Нужен для сравнения "тогда/сейчас"
+  // (app/js/data-panel.js, buildHistoryRow → diffLines) до того, как
+  // человек решит восстанавливать или нет.
+  "GET /api/history/version": async ({ vault, query }) => {
+    const file = query.get("file");
+    const id = query.get("id");
+    if (!file || !id) throw new ApiError("Не указан файл или версия");
+    return vault.versionAt(file, id);
+  },
   "POST /api/history/restore": async ({ vault, body }) => {
     if (!body.file || !body.id) throw new ApiError("Не указан файл или версия");
     const data = await vault.versionAt(body.file, body.id);

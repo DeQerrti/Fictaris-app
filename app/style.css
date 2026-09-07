@@ -2337,6 +2337,33 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
   color: var(--text-dim);
 }
 
+/* Панель сравнения версий (data-panel.js, buildDiffPanel) — под своей
+   строкой в history-list, а не в отдельном модальном окне: список
+   версий и так уже вертикальный, сравнение читается как продолжение. */
+.history-diff {
+  margin: 2px 0 4px;
+  padding: 8px 10px;
+  background: var(--panel-alt);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-dim);
+  font-size: 0.8rem;
+}
+.history-diff-pre {
+  margin: 0;
+  max-height: 360px;
+  overflow: auto;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.76rem;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.diff-line { padding: 0 4px; }
+.diff-line.diff-add { background: rgba(90, 138, 95, 0.25); color: var(--text); }
+.diff-line.diff-del { background: rgba(180, 80, 70, 0.25); color: var(--text); text-decoration: line-through; text-decoration-color: rgba(180, 80, 70, 0.6); }
+.diff-line.diff-equal { color: var(--text-faint); }
+.diff-line.diff-gap { color: var(--text-faint); font-style: italic; text-align: center; padding: 2px 0; }
+
 /* ── Граф проекта ──────────────────────────── */
 
 /* .graph-holder — используется родословной (app/js/family-tree.js,

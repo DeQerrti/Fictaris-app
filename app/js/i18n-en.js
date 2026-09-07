@@ -540,4 +540,13 @@ export const EN_DICT = {
   "Новый шаблон анкеты": "New form template",
   "Название шаблона": "Template name",
   "Создать и завести карточку": "Create and add a card",
+
+  "Сравнить с текущей": "Compare with current",
+  "Скрыть сравнение": "Hide comparison",
+  "Считаю разницу…": "Computing the difference…",
+  "Не получилось загрузить это сравнение.": "Couldn't load this comparison.",
+  "Файл слишком большой для построчного сравнения — воспользуйся «Восстановить», если нужно вернуть именно эту версию.":
+    "This file is too large to diff line by line — use \"Restore\" if you need to bring back exactly this version.",
+  "Между этой версией и текущим состоянием нет отличий.": "There's no difference between this version and the current state.",
+  "… ещё {count} неизменных строк …": "… {count} more unchanged lines …",
 };
