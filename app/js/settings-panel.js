@@ -52,7 +52,11 @@ import {
 // такими же настройками, только над данными, а не над видом приложения.
 let activeSettingsTab = "appearance";
 
-export async function renderSettings(root) {
+// focusTab — тот же приём, что и focusId у остальных renderX(root, id)
+// (характеры/локации/таймлайн и т.д.): необязательный второй аргумент,
+// которым командная палитра (search.js) просит открыть конкретную
+// вкладку Настроек, а не всегда ту, что была открыта в прошлый раз.
+export async function renderSettings(root, focusTab) {
   root.innerHTML = "";
   const info = await apiGet("/api/app/info").catch(() => ({}));
 
@@ -68,7 +72,8 @@ export async function renderSettings(root) {
     ["sync", () => i18n("Синхронизация"), () => buildSyncSection()],
     ["data", () => i18n("Данные"), () => buildDataSections()],
   ];
-  if (!TABS.some(([key]) => key === activeSettingsTab)) activeSettingsTab = "appearance";
+  if (focusTab && TABS.some(([key]) => key === focusTab)) activeSettingsTab = focusTab;
+  else if (!TABS.some(([key]) => key === activeSettingsTab)) activeSettingsTab = "appearance";
 
   const shell = document.createElement("div");
   shell.className = "settings-shell";

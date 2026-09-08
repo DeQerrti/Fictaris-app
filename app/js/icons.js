@@ -47,6 +47,12 @@ const PATHS = {
   barChart: '<path d="M4 20V10M12 20V4M20 20v-7"/>',
   checkShield: '<path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/><path d="M9 12l2 2 4-4"/>',
   trash: '<path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13"/><path d="M10 11v6M14 11v6"/>',
+
+  // Для командной палитры (search.js) — экспорт сайта и горячие клавиши,
+  // остальные её действия переиспользуют иконки выше (book — PDF, eye —
+  // оформление, note — шаблоны анкет).
+  globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/>',
+  keyboard: '<rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M6 14h12"/>',
 };
 
 // Пункт сайдбара → ключ иконки выше. locations/factions переиспользуют

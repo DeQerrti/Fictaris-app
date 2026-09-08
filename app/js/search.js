@@ -1,20 +1,74 @@
 import { apiGet } from "./api.js";
 import { escapeHtml } from "./chips.js";
-import { locationTypeInfo, factionTypeInfo } from "./icons.js";
+import { locationTypeInfo, factionTypeInfo, iconSvg } from "./icons.js";
+import { exportWorldPdf } from "./export-pdf.js";
+import { exportSiteZip } from "./export-site.js";
 import { i18n } from "./i18n.js";
 
 // ══════════════════════════════════════════════
-//  ГЛОБАЛЬНЫЙ ПОИСК
+//  ГЛОБАЛЬНЫЙ ПОИСК И КОМАНДНАЯ ПАЛИТРА
 //
 //  Ни у Fictaris, ни у TasteID раньше не было поиска, который смотрит
 //  сразу во все модули — у TasteID это фильтр внутри одной вкладки
-//  (отзывы), а здесь модулей восемь и искать в них по одному не годится.
+//  (отзывы), а здесь модулей больше десятка и искать в них по одному
+//  не годится.
 //
 //  Индекс строится один раз на открытие (кэш на 5 секунд — не бегать в
 //  сеть при каждом нажатии "/"), сам поиск — простая подстрока по
 //  названию и подписи, без библиотек: справочник вряд ли настолько
 //  велик, чтобы это стало узким местом.
+//
+//  Действия (COMMANDS ниже) — то же самое окно, тот же ввод, просто
+//  вторая группа результатов под найденными сущностями: не отдельный
+//  режим с своим сочетанием клавиш, а естественное расширение того
+//  же поиска, раз он и так уже открыт на Ctrl+/. Список нарочно
+//  короткий и без разрушительных действий (ничего похожего на
+//  "Заполнить примером" или импорт, которые стирают текущие данные и
+//  в основном интерфейсе защищены отдельным подтверждением) — только
+//  то, что безопасно вызвать одним кликом не глядя.
 // ══════════════════════════════════════════════
+
+function commandList() {
+  return [
+    {
+      id: "cmd-export-pdf",
+      label: i18n("Экспортировать мир в PDF"),
+      icon: "book",
+      run: async () => {
+        try {
+          const res = await exportWorldPdf();
+          if (res && res.ok === false) return; // диалог сохранения отменили — не ошибка
+        } catch (e) {
+          alert(e.message || i18n("Не получилось создать PDF. Доступно только в десктопной версии Fictaris."));
+        }
+      },
+    },
+    {
+      id: "cmd-export-site",
+      label: i18n("Экспортировать мир как сайт"),
+      icon: "globe",
+      run: () => exportSiteZip(),
+    },
+    {
+      id: "cmd-settings-appearance",
+      label: i18n("Настройки → Оформление"),
+      icon: "eye",
+      run: (navigate) => navigate("settings", "appearance"),
+    },
+    {
+      id: "cmd-settings-templates",
+      label: i18n("Настройки → Шаблоны анкет"),
+      icon: "note",
+      run: (navigate) => navigate("settings", "templates"),
+    },
+    {
+      id: "cmd-settings-shortcuts",
+      label: i18n("Настройки → Горячие клавиши"),
+      icon: "keyboard",
+      run: (navigate) => navigate("settings", "shortcuts"),
+    },
+  ];
+}
 
 function moduleLabels() {
   return {
@@ -143,31 +197,65 @@ function ensureOverlay() {
   });
 }
 
+function appendGroupLabel(text) {
+  const label = document.createElement("div");
+  label.className = "search-group-label";
+  label.textContent = text;
+  list.appendChild(label);
+}
+
+function appendContentRow(m, labels) {
+  const row = document.createElement("button");
+  row.className = "search-result";
+  row.style.setProperty("--result-color", m.color);
+  row.innerHTML =
+    `<span class="search-result-type">${labels[m.module] || m.module}</span>` +
+    `<span class="search-result-title">${escapeHtml(m.title || i18n("Без названия"))}</span>` +
+    (m.subtitle ? `<span class="search-result-sub">${escapeHtml(m.subtitle)}</span>` : "");
+  row.addEventListener("click", () => {
+    close();
+    onNavigate?.(m.module, m.id);
+  });
+  list.appendChild(row);
+}
+
+function appendCommandRow(cmd) {
+  const row = document.createElement("button");
+  row.className = "search-result search-result-command";
+  row.innerHTML =
+    `<span class="search-result-icon">${iconSvg(cmd.icon, 16)}</span>` +
+    `<span class="search-result-title">${escapeHtml(cmd.label)}</span>`;
+  row.addEventListener("click", () => {
+    close();
+    cmd.run(onNavigate);
+  });
+  list.appendChild(row);
+}
+
 function renderResults(query) {
   const q = query.trim().toLowerCase();
   list.innerHTML = "";
   if (!q) return;
-  const matches = index
+  const contentMatches = index
     .filter((e) => (e.title || "").toLowerCase().includes(q) || (e.subtitle || "").toLowerCase().includes(q))
-    .slice(0, 30);
-  if (!matches.length) {
+    .slice(0, 20);
+  const commandMatches = commandList()
+    .filter((c) => c.label.toLowerCase().includes(q))
+    .slice(0, 6);
+
+  if (!contentMatches.length && !commandMatches.length) {
     list.innerHTML = `<div class="search-empty">${i18n("Ничего не найдено")}</div>`;
     return;
   }
-  const labels = moduleLabels();
-  for (const m of matches) {
-    const row = document.createElement("button");
-    row.className = "search-result";
-    row.style.setProperty("--result-color", m.color);
-    row.innerHTML =
-      `<span class="search-result-type">${labels[m.module] || m.module}</span>` +
-      `<span class="search-result-title">${escapeHtml(m.title || i18n("Без названия"))}</span>` +
-      (m.subtitle ? `<span class="search-result-sub">${escapeHtml(m.subtitle)}</span>` : "");
-    row.addEventListener("click", () => {
-      close();
-      onNavigate?.(m.module, m.id);
-    });
-    list.appendChild(row);
+
+  if (contentMatches.length) {
+    const labels = moduleLabels();
+    appendGroupLabel(i18n("Найдено"));
+    for (const m of contentMatches) appendContentRow(m, labels);
+  }
+  if (commandMatches.length) {
+    appendGroupLabel(i18n("Действия"));
+    for (const c of commandMatches) appendCommandRow(c);
   }
 }
 
