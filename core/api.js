@@ -21,6 +21,7 @@ const EMPTY_BOARD = { columns: [], cards: {}, cardOrder: {} };
 const EMPTY_MAP = { rootIds: [], maps: {} };
 const EMPTY_CANVAS = { order: [], canvases: {} };
 const EMPTY_WRITING_LOG = { dailyGoal: 300, days: {} };
+const EMPTY_PLOT = { nodes: [], edges: [] };
 const IMAGE_EXT = /^(jpg|jpeg|png|webp)$/i;
 
 // Резервная копия/синхронизация (app/js/sync.js) — весь проект одним
@@ -40,6 +41,7 @@ const BACKUP_FILES = [
   "map.json",
   "canvas.json",
   "writing-log.json",
+  "plot.json",
 ];
 
 async function exportBackup({ vault }) {
@@ -57,6 +59,8 @@ async function exportBackup({ vault }) {
         ? EMPTY_CANVAS
         : name === "writing-log.json"
         ? EMPTY_WRITING_LOG
+        : name === "plot.json"
+        ? EMPTY_PLOT
         : []
     );
   }
@@ -180,6 +184,16 @@ export const ROUTES = {
     if (body.data.length > 28 * 1024 * 1024) throw new ApiError("Изображение слишком большое", 413);
     const relPath = await vault.saveImage(name, body.data);
     return { path: relPath };
+  },
+
+  // Карта сюжета (app/js/plot.js) — узлы-точки сюжета со свободным
+  // расположением на холсте (x/y выставляет сам человек, никакой
+  // физики/автораскладки, в отличие от графа персонажей) и
+  // направленные связи между ними (from/to/label).
+  "GET /api/plot": async ({ vault }) => vault.readJson("plot.json", EMPTY_PLOT),
+  "POST /api/plot": async ({ vault, body }) => {
+    if (!body || !Array.isArray(body.nodes) || !Array.isArray(body.edges)) throw new ApiError("Некорректная карта сюжета");
+    return vault.writeJson("plot.json", body);
   },
 
   "GET /api/canvas": async ({ vault }) => vault.readJson("canvas.json", EMPTY_CANVAS),

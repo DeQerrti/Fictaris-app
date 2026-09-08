@@ -573,6 +573,22 @@ export const EN_DICT = {
   "Добавить упоминание «{name}»": "Add mention \"{name}\"",
   "Добавить упоминание": "Add mention",
 
+  "Карта сюжета": "Story map",
+  "Новая точка": "New point",
+  "Пока нет ни одной точки сюжета — добавь первую.": "No plot points yet — add the first one.",
+  "+ Точка": "+ Point",
+  "Соединить": "Connect",
+  "Сбросить вид": "Reset view",
+  "Выбери вторую точку, чтобы связать «{name}» с ней": "Pick a second point to connect it with \"{name}\"",
+  "Выбери первую точку связи (Esc — отмена)": "Pick the first point for a connection (Esc to cancel)",
+  "Тащи точки мышью, клик открывает редактирование, ПКМ по точке или связи — удалить":
+    "Drag points with the mouse, click to edit, right-click a point or connection to delete it",
+  "Подпись связи (необязательно):": "Connection label (optional):",
+  "Удалить связь": "Delete connection",
+  "Удалить точку": "Delete point",
+  "Глава / место в рукописи (необязательно)": "Chapter / place in the manuscript (optional)",
+  "например: Глава 7": "e.g. Chapter 7",
+
   "Скачать этот шаблон файлом — переслать или перенести в другой проект": "Download this template as a file — send it or move it to another project",
   "Это не файл шаблона Fictaris.": "This isn't a Fictaris template file.",
   "Загрузить шаблон из файла — добавится новой вкладкой": "Load a template from a file — it will appear as a new tab",

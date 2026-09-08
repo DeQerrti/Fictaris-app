@@ -12,6 +12,7 @@ import { renderGraph } from "./graph.js";
 import { renderStats } from "./stats.js";
 import { renderFamilyTree } from "./family-tree.js";
 import { renderCanvas } from "./canvas.js";
+import { renderPlot } from "./plot.js";
 import { renderContinuity } from "./continuity.js";
 import { fillWithDemoData, maybeRunHistoryCleanup } from "./data-panel.js";
 import { renderSettings } from "./settings-panel.js";
@@ -40,6 +41,7 @@ const MODULES = {
   graph: renderGraph,
   familytree: renderFamilyTree,
   canvas: renderCanvas,
+  plotgraph: renderPlot,
   stats: renderStats,
   continuity: renderContinuity,
   trash: renderTrash,

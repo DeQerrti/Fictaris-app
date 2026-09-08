@@ -32,6 +32,7 @@ export const HIDEABLE_TABS = [
   "graph",
   "familytree",
   "canvas",
+  "plotgraph",
   "stats",
 ];
 
@@ -64,6 +65,7 @@ const DEFAULT_TAB_GROUP = {
   graph: "tools",
   familytree: "tools",
   canvas: "tools",
+  plotgraph: "tools",
   stats: "overview",
 };
 

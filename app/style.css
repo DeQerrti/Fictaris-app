@@ -2494,6 +2494,14 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
   color: var(--text-faint);
 }
 
+/* Карта сюжета (app/js/plot.js) — прямоугольные узлы вместо кружков
+   графа персонажей (graph.js): у точки сюжета есть заголовок и
+   опциональная подпись главы, кружок под текст не годится. */
+.plot-node rect { fill: var(--card); stroke: var(--border); stroke-width: 1.5; transition: stroke 0.15s; }
+.plot-node:hover rect { stroke: var(--accent); }
+.plot-node-pending rect { stroke: var(--accent); stroke-width: 2.5; }
+.plot-edge text { pointer-events: none; }
+
 .legend-dot {
   display: inline-block;
   width: 9px;

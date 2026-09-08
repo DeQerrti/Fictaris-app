@@ -31,6 +31,7 @@ export function defaultLabels() {
       graph: i18n("Граф"),
       familytree: i18n("Родословная"),
       canvas: i18n("Холст"),
+      plotgraph: i18n("Карта сюжета"),
       stats: i18n("Статистика"),
       continuity: i18n("Проверка"),
       trash: i18n("Корзина"),
