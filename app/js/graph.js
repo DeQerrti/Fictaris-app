@@ -64,14 +64,17 @@ function mentionEdgesFor(entity, template, characters, add) {
   }
 }
 
-// Рёбра автоматически из связей, состава фракций, совместных упоминаний
-// в событиях таймлайна, вложенности локаций (parentId, locations.js) и
-// @упоминаний в тексте анкет — без ручной расстановки. Явные связи
-// добавляются первыми: seen ниже не даёт одной и той же паре узлов
-// получить второе ребро, так что если персонаж и так упомянут в
-// relationships.json, найденное в тексте @упоминание не понижает эту
-// связь до пунктирной — seen её просто не пропустит повторно.
-function buildEdges({ relationships, factions, timeline, locations, characters, charTemplates, locTemplates, factionTemplates }) {
+// Рёбра автоматически из связей, состава фракций, отмеченных галочкой
+// участников таймлайна, вложенности локаций (parentId, locations.js),
+// @упоминаний в тексте анкет, в описании события таймлайна (даже если
+// персонаж не отмечен в списке участников явно) и совместных
+// упоминаний в тексте одной главы рукописи — без ручной расстановки.
+// Явные связи добавляются первыми: seen ниже не даёт одной и той же
+// паре узлов получить второе ребро, так что если персонаж и так
+// упомянут в relationships.json, найденное в тексте @упоминание не
+// понижает эту связь до пунктирной — seen её просто не пропустит
+// повторно.
+function buildEdges({ relationships, factions, timeline, locations, characters, manuscript, charTemplates, locTemplates, factionTemplates }) {
   const seen = new Set();
   const list = [];
   const add = (a, b, kind = "explicit") => {
@@ -90,9 +93,20 @@ function buildEdges({ relationships, factions, timeline, locations, characters, 
     for (const m of f.memberIds || []) add(f.id, m);
   }
 
+  // Персонаж × локация из события — раньше только те, что отмечены
+  // явно (characterIds/locationIds). Персонажи, упомянутые в свободном
+  // тексте description ("@Надя добралась туда"), но не отмеченные
+  // галочкой в списке участников, событием не связывались вовсе —
+  // теперь связываются тоже, пунктиром.
   for (const ev of timeline) {
-    for (const c of ev.characterIds || []) {
-      for (const l of ev.locationIds || []) add(c, l);
+    const locIds = ev.locationIds || [];
+    const taggedChars = ev.characterIds || [];
+    for (const c of taggedChars) {
+      for (const l of locIds) add(c, l, "explicit");
+    }
+    for (const c of findMentionedIds(ev.description || "", characters)) {
+      if (taggedChars.includes(c)) continue;
+      for (const l of locIds) add(c, l, "mention");
     }
   }
 
@@ -104,24 +118,35 @@ function buildEdges({ relationships, factions, timeline, locations, characters, 
   for (const l of locations) mentionEdgesFor(l, templateFor(locTemplates, l.templateId), characters, add);
   for (const f of factions) mentionEdgesFor(f, templateFor(factionTemplates, f.templateId), characters, add);
 
+  // Персонажи, совместно упомянутые в тексте одной главы рукописи, —
+  // у главы нет полей "участники" вроде события таймлайна, только сам
+  // текст, поэтому раньше рукопись графом не учитывалась вообще.
+  for (const ch of manuscript?.chapters || []) {
+    const mentioned = [...findMentionedIds(ch.content || "", characters)];
+    for (let i = 0; i < mentioned.length; i++) {
+      for (let j = i + 1; j < mentioned.length; j++) add(mentioned[i], mentioned[j], "mention");
+    }
+  }
+
   return list;
 }
 
 export async function renderGraph(root) {
   container = root;
   if (raf) cancelAnimationFrame(raf);
-  const [characters, locations, factions, relationships, timeline, charTemplates, locTemplates, factionTemplates] = await Promise.all([
+  const [characters, locations, factions, relationships, timeline, manuscript, charTemplates, locTemplates, factionTemplates] = await Promise.all([
     apiGet("/api/characters"),
     apiGet("/api/locations"),
     apiGet("/api/factions"),
     apiGet("/api/relationships"),
     apiGet("/api/timeline"),
+    apiGet("/api/manuscript"),
     loadTemplates("characters"),
     loadTemplates("locations"),
     loadTemplates("factions"),
   ]);
   nodes = buildNodes(characters, locations, factions);
-  edges = buildEdges({ relationships, factions, timeline, locations, characters, charTemplates, locTemplates, factionTemplates });
+  edges = buildEdges({ relationships, factions, timeline, locations, characters, manuscript, charTemplates, locTemplates, factionTemplates });
   draw();
 }
 
