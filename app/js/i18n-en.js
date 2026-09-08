@@ -622,4 +622,11 @@ export const EN_DICT = {
   "Скачать этот шаблон файлом — переслать или перенести в другой проект": "Download this template as a file — send it or move it to another project",
   "Это не файл шаблона Fictaris.": "This isn't a Fictaris template file.",
   "Загрузить шаблон из файла — добавится новой вкладкой": "Load a template from a file — it will appear as a new tab",
+
+  "Недавнее": "Recent",
+  "Назад": "Back",
+  "Вперёд": "Forward",
+  "Открыть родительскую локацию": "Open parent location",
+  "Свернуть список разделов до одних иконок": "Collapse the section list to icons only",
+  "Список свёрнут до иконок — нажми, чтобы вернуть подписи": "List collapsed to icons — click to bring back labels",
 };

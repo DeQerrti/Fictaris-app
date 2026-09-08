@@ -4,6 +4,7 @@ import { locationTypeInfo, factionTypeInfo, iconSvg } from "./icons.js";
 import { exportWorldPdf } from "./export-pdf.js";
 import { exportSiteZip } from "./export-site.js";
 import { i18n } from "./i18n.js";
+import { readRecent } from "./recent-nav.js";
 
 // ══════════════════════════════════════════════
 //  ГЛОБАЛЬНЫЙ ПОИСК И КОМАНДНАЯ ПАЛИТРА
@@ -81,6 +82,18 @@ function moduleLabels() {
     relationships: i18n("Связь"),
     plotgraph: i18n("Точка сюжета"),
     knowledge: i18n("Факт"),
+  };
+}
+
+// Разделы без своей карточки по id (buildIndex ниже кладёт их записи с
+// id: null) — у "недавнего" им нечего резолвить через index, показываем
+// сам раздел по имени, как ярлык.
+function sectionLabels() {
+  return {
+    board: i18n("Доска"),
+    relationships: i18n("Связи"),
+    plotgraph: i18n("Карта сюжета"),
+    knowledge: i18n("Знания"),
   };
 }
 
@@ -209,7 +222,11 @@ function appendContentRow(m, labels) {
   row.className = "search-result";
   row.style.setProperty("--result-color", m.color);
   row.innerHTML =
-    `<span class="search-result-type">${labels[m.module] || m.module}</span>` +
+    // ?? а не || — renderRecent намеренно передаёт "" для разделов без
+    // карточек по id (Доска/Связи/Карта сюжета/Знания), чтобы не дублировать
+    // название раздела ещё и типом рядом ("Доска" + бейдж "Доска"); || бы
+    // счёл пустую строку отсутствующим значением и откатился к m.module.
+    `<span class="search-result-type">${labels[m.module] ?? m.module}</span>` +
     `<span class="search-result-title">${escapeHtml(m.title || i18n("Без названия"))}</span>` +
     (m.subtitle ? `<span class="search-result-sub">${escapeHtml(m.subtitle)}</span>` : "");
   row.addEventListener("click", () => {
@@ -232,10 +249,39 @@ function appendCommandRow(cmd) {
   list.appendChild(row);
 }
 
+// Пустой запрос — не "ничего не найдено", а список недавно открытого
+// (recent-nav.js), тем же приёмом MRU, что и в палитре VS Code/Obsidian:
+// на пустой ввод есть что показать сразу, не заставляя вспоминать
+// заголовок или набирать хоть одну букву.
+function renderRecent() {
+  const recents = readRecent();
+  if (!recents.length) return;
+  const sections = sectionLabels();
+  // Бейдж типа скрываем только у разделов без карточек по id — иначе
+  // "Доска" в заголовке ещё и подписана "Карточка" рядом, что путает
+  // больше, чем помогает.
+  const labels = { ...moduleLabels(), ...Object.fromEntries(Object.keys(sections).map((k) => [k, ""])) };
+  const rows = [];
+  for (const r of recents) {
+    if (r.id != null) {
+      const match = index.find((e) => e.module === r.module && e.id === r.id);
+      if (match) rows.push(match);
+    } else if (sections[r.module]) {
+      rows.push({ module: r.module, id: null, title: sections[r.module], subtitle: "", color: "#7c7157" });
+    }
+  }
+  if (!rows.length) return;
+  appendGroupLabel(i18n("Недавнее"));
+  for (const m of rows.slice(0, 6)) appendContentRow(m, labels);
+}
+
 function renderResults(query) {
   const q = query.trim().toLowerCase();
   list.innerHTML = "";
-  if (!q) return;
+  if (!q) {
+    renderRecent();
+    return;
+  }
   const contentMatches = index
     .filter((e) => (e.title || "").toLowerCase().includes(q) || (e.subtitle || "").toLowerCase().includes(q))
     .slice(0, 20);
@@ -267,9 +313,9 @@ export async function openSearch() {
   ensureOverlay();
   overlay.classList.remove("hidden");
   input.value = "";
-  list.innerHTML = "";
   input.focus();
   if (Date.now() - indexLoadedAt > 5000) await refreshIndex();
+  renderResults(""); // индекс (для резолва недавнего) уже свежий на этот момент
 }
 
 // navigate(module, focusId) — вызывающая сторона (main.js) решает, как

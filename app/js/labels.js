@@ -76,13 +76,17 @@ export async function applyLabels() {
   document.querySelectorAll(".nav-item[data-module]").forEach((btn) => {
     const text = labels.nav[btn.dataset.module];
     if (!text) return;
-    // У «Корзины» внутри лежит <span class="trash-badge"> со счётчиком,
-    // у любого пункта теперь ещё и <span class="nav-icon"> перед
-    // подписью (applyNavIcons, icons.js) — ищем именно текстовый узел
-    // среди детей, а не полагаемся на его позицию (childNodes[0] это
-    // уже не текст, а иконка), и трогаем только его, не весь innerHTML.
-    const textNode = Array.from(btn.childNodes).find((n) => n.nodeType === Node.TEXT_NODE);
-    if (textNode) textNode.textContent = `${text} `;
+    // Подпись теперь в своём <span class="nav-label"> (applyNavIcons,
+    // icons.js, вызывается раньше в boot()) — а не голым текстовым
+    // узлом, чтобы её можно было спрятать отдельно от иконки в режиме
+    // сайдбара "только иконки".
+    const label = btn.querySelector(".nav-label");
+    if (label) label.textContent = `${text} `;
+    // Подсказка при наведении — нужна тому же режиму "только иконки":
+    // без подписи единственный способ узнать, что за иконка, это
+    // навести курсор. У «Знаний»/«Проверки»/«Корзины» уже есть свой,
+    // более подробный title в разметке — не перетираем его.
+    if (!btn.title) btn.title = text.trim();
   });
 
   return labels;

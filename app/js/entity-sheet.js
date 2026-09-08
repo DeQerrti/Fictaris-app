@@ -27,7 +27,12 @@ function onKey(e) {
 // fields: [{label, value}] — пустые (value falsy) пропускаются.
 // extraSections: HTMLElement[] — произвольные доп.блоки (обратные связи,
 // родители/дети и т.п.), вставляются после полей как есть.
-export function openEntitySheet({ entity, avatarColor, avatarHtml, title, subtitle, fields, extraSections, onEdit }) {
+// breadcrumb — необязательный готовый HTMLElement (цепочка кликабельных
+// предков, для сейчас единственного случая — вложенных локаций, см.
+// locations.js) — вставляется над заголовком, а не готовой строкой:
+// у ссылок в цепочке свои обработчики клика (открыть анкету предка), и
+// собрать их можно только вызывающей стороне, которая знает про entity.
+export function openEntitySheet({ entity, avatarColor, avatarHtml, title, subtitle, fields, extraSections, breadcrumb, onEdit }) {
   close();
   backdropEl = document.createElement("div");
   backdropEl.className = "entity-modal-backdrop";
@@ -76,6 +81,7 @@ export function openEntitySheet({ entity, avatarColor, avatarHtml, title, subtit
 
   const headerText = document.createElement("div");
   headerText.className = "sheet-header-text";
+  if (breadcrumb) headerText.appendChild(breadcrumb);
   const titleEl = document.createElement("div");
   titleEl.className = "sheet-title";
   titleEl.textContent = title || "";

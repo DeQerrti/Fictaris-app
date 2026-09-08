@@ -81,6 +81,47 @@ function descendantIds(id) {
   return ids;
 }
 
+// Цепочка предков от корня до непосредственного родителя (не включая
+// саму локацию) — для хлебных крошек в анкете (buildBreadcrumb ниже).
+// Защита от цикла та же, что и в orderedTree: испорченный parentId
+// (ручная правка JSON, гонка удаления) не должен уйти в бесконечный
+// цикл, просто обрывает цепочку на этом месте.
+function ancestorChain(loc) {
+  const chain = [];
+  const seen = new Set([loc.id]);
+  let current = loc.parentId && locations.find((l) => l.id === loc.parentId);
+  while (current && !seen.has(current.id)) {
+    chain.unshift(current);
+    seen.add(current.id);
+    current = current.parentId && locations.find((l) => l.id === current.parentId);
+  }
+  return chain;
+}
+
+function buildBreadcrumb(loc) {
+  const chain = ancestorChain(loc);
+  if (!chain.length) return null;
+  const wrap = document.createElement("div");
+  wrap.className = "sheet-breadcrumb";
+  chain.forEach((anc, i) => {
+    const link = document.createElement("button");
+    link.className = "sheet-breadcrumb-link";
+    link.textContent = anc.name || i18n("Без имени");
+    link.addEventListener("click", (e) => {
+      e.stopPropagation();
+      openSheet(anc);
+    });
+    wrap.appendChild(link);
+    if (i < chain.length - 1) {
+      const sep = document.createElement("span");
+      sep.className = "sheet-breadcrumb-sep";
+      sep.textContent = "/";
+      wrap.appendChild(sep);
+    }
+  });
+  return wrap;
+}
+
 // Порядок обхода для сетки: сначала локация, сразу за ней — все её
 // потомки (глубина в depth, красится отступом в CSS) — вместо плоского
 // списка, где город и содержащее его королевство могли оказаться в
@@ -169,10 +210,16 @@ function draw() {
       <div class="char-card-body">
         <div class="char-name">${escapeHtml(loc.name || i18n("Без имени"))}</div>
         <div class="char-role">${escapeHtml(i18n(locationTypeInfo(loc.type)[1]))}</div>
-        ${parent ? `<div class="loc-parent-badge">${escapeHtml(i18n("в составе: {name}", { name: parent.name || i18n("Без имени") }))}</div>` : ""}
+        ${parent ? `<div class="loc-parent-badge" title="${escapeHtml(i18n("Открыть родительскую локацию"))}">${escapeHtml(i18n("в составе: {name}", { name: parent.name || i18n("Без имени") }))}</div>` : ""}
       </div>
     `;
-    card.addEventListener("click", () => openSheet(loc));
+    // Бейдж родителя — часть той же кликабельной карточки (вложенный
+    // <button> внутри <button> — не валидный HTML), поэтому переход к
+    // предку решается здесь же, по цели клика, а не отдельным элементом.
+    card.addEventListener("click", (e) => {
+      if (parent && e.target.closest(".loc-parent-badge")) { openSheet(parent); return; }
+      openSheet(loc);
+    });
     grid.appendChild(card);
   }
 
@@ -223,17 +270,17 @@ function childrenSection(loc) {
 function openSheet(loc) {
   const [, typeLabel, iconName, color] = locationTypeInfo(loc.type);
   const template = templateFor(templates, loc.templateId);
-  const parent = loc.parentId && locations.find((l) => l.id === loc.parentId);
   openEntitySheet({
     entity: loc,
     avatarColor: color,
     avatarHtml: avatarInnerHtml(loc, iconSvg(iconName, 30)),
     title: loc.name || i18n("Без имени"),
     subtitle: i18n(typeLabel),
-    fields: [
-      ...(parent ? [{ label: i18n("Родительская локация"), value: parent.name }] : []),
-      ...(template?.fields || []).map((f) => ({ label: f.label, value: loc[f.key], type: f.type })),
-    ],
+    // Полная цепочка предков (breadcrumb) заменяет собой прежнее плоское
+    // поле "Родительская локация" — при вложенности глубже одного уровня
+    // оно всё равно показывало только ближайшего родителя.
+    breadcrumb: buildBreadcrumb(loc),
+    fields: (template?.fields || []).map((f) => ({ label: f.label, value: loc[f.key], type: f.type })),
     extraSections: [childrenSection(loc), reverseLinksFor(loc)],
     onEdit: () => {
       activeId = loc.id;

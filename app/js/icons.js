@@ -85,11 +85,25 @@ const NAV_ICONS = {
 export function applyNavIcons() {
   document.querySelectorAll(".nav-item[data-module]").forEach((btn) => {
     const key = NAV_ICONS[btn.dataset.module];
-    if (!key || btn.querySelector(".nav-icon")) return;
-    const icon = document.createElement("span");
-    icon.className = "nav-icon";
-    icon.innerHTML = iconSvg(key, 16);
-    btn.prepend(icon);
+    if (key && !btn.querySelector(".nav-icon")) {
+      const icon = document.createElement("span");
+      icon.className = "nav-icon";
+      icon.innerHTML = iconSvg(key, 16);
+      btn.prepend(icon);
+    }
+    // Оборачиваем текстовый узел подписи в свой <span> — нужно режиму
+    // сайдбара "только иконки" (sidebar.js, style.css): спрятать нужно
+    // именно подпись, отдельно от иконки и .trash-badge у «Корзины»,
+    // а у голого текстового узла такой избирательности нет.
+    if (!btn.querySelector(".nav-label")) {
+      const textNode = Array.from(btn.childNodes).find((n) => n.nodeType === Node.TEXT_NODE);
+      if (textNode) {
+        const label = document.createElement("span");
+        label.className = "nav-label";
+        label.textContent = textNode.textContent;
+        textNode.replaceWith(label);
+      }
+    }
   });
 }
 

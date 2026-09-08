@@ -30,6 +30,8 @@ import { initSidebar } from "./sidebar.js";
 import { maybeShowOnboarding } from "./onboarding.js";
 import { loadLang, i18n } from "./i18n.js";
 import { initEntityModal, openEntityModal } from "./entity-modal.js";
+import { iconSvg } from "./icons.js";
+import { recordRecent } from "./recent-nav.js";
 
 const MODULES = {
   manuscript: renderManuscript,
@@ -71,7 +73,33 @@ const settingsBtn = document.getElementById("settingsBtn");
 let openRequestId = 0;
 let currentModuleName = null;
 
-async function openModule(name, arg) {
+// ── История переходов (назад/вперёд) ──────────────────────────────
+// До этого openModule() просто подменял контент без следа — уйти со
+// страницы по клику на @упоминание/узел графа/связанную карту можно
+// было, а вернуться назад — только вручную искать нужный раздел в
+// сайдбаре заново. navHistory — стек {name, arg}, navPos — текущая
+// позиция в нём; переход через goBack/goForward не пишет новую запись
+// (opts.fromHistory), а как в браузере, обрезает "будущее" при обычном
+// переходе после отката назад.
+const navBackBtn = document.getElementById("navBack");
+const navForwardBtn = document.getElementById("navForward");
+if (navBackBtn) {
+  navBackBtn.innerHTML = iconSvg("chevronLeft", 15);
+  navBackBtn.title = i18n("Назад");
+}
+if (navForwardBtn) {
+  navForwardBtn.innerHTML = iconSvg("chevronRight", 15);
+  navForwardBtn.title = i18n("Вперёд");
+}
+let navHistory = [];
+let navPos = -1;
+
+function updateNavHistoryButtons() {
+  if (navBackBtn) navBackBtn.disabled = navPos <= 0;
+  if (navForwardBtn) navForwardBtn.disabled = navPos >= navHistory.length - 1;
+}
+
+async function openModule(name, arg, opts = {}) {
   const requestId = ++openRequestId;
   currentModuleName = name;
   // Фокус-режим рукописи прячет сайдбар классом на body (manuscript.js) —
@@ -94,7 +122,43 @@ async function openModule(name, arg) {
   await MODULES[name](content, arg);
   if (requestId !== openRequestId) return; // за это время выбрали другой модуль — не перетираем его
   appEl.classList.remove("sidebar-open"); // на телефоне — сайдбар выезжающий, после выбора закрываем
+
+  if (!opts.fromHistory) {
+    navHistory = navHistory.slice(0, navPos + 1);
+    const last = navHistory[navHistory.length - 1];
+    if (!last || last.name !== name || last.arg !== arg) navHistory.push({ name, arg });
+    navPos = navHistory.length - 1;
+  }
+  updateNavHistoryButtons();
+  if (name !== "settings") recordRecent(name, typeof arg === "string" ? arg : null);
 }
+
+function goBack() {
+  if (navPos <= 0) return;
+  navPos--;
+  const entry = navHistory[navPos];
+  openModule(entry.name, entry.arg, { fromHistory: true });
+}
+
+function goForward() {
+  if (navPos >= navHistory.length - 1) return;
+  navPos++;
+  const entry = navHistory[navPos];
+  openModule(entry.name, entry.arg, { fromHistory: true });
+}
+
+navBackBtn?.addEventListener("click", goBack);
+navForwardBtn?.addEventListener("click", goForward);
+// Alt+←/→ — тот же жест, что "назад"/"вперёд" в браузере и в
+// большинстве десктопных приложений с похожей историей переходов.
+// initShortcuts (shortcuts.js) сам игнорирует нажатия с Alt, так что
+// конфликтовать с цифровыми/пользовательскими горячими клавишами не с
+// чем — отдельный слушатель здесь никого не перебивает.
+document.addEventListener("keydown", (e) => {
+  if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+  if (e.key === "ArrowLeft") { e.preventDefault(); goBack(); }
+  else if (e.key === "ArrowRight") { e.preventDefault(); goForward(); }
+});
 
 navItems.forEach((btn) => {
   btn.addEventListener("click", () => openModule(btn.dataset.module));

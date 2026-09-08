@@ -230,6 +230,48 @@ body.focus-mode .sidebar { display: none; }
 .sidebar-pin:hover { background: var(--panel); color: var(--text); }
 .sidebar-pin.pinned { color: var(--accent); }
 
+/* Тумблер режима "только иконки" (sidebar.js, #app.sidebar-collapsed
+   ниже) — рядом с булавкой авто-скрытия, тот же размер и поведение. */
+.sidebar-collapse-btn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  color: var(--text-faint);
+  cursor: pointer;
+}
+.sidebar-collapse-btn:hover { background: var(--panel); color: var(--text); }
+.sidebar-collapse-btn.active { color: var(--accent); }
+.sidebar-collapse-btn svg { transition: transform 0.15s ease; }
+
+/* Кнопки "назад"/"вперёд" по истории переходов (main.js) — сразу под
+   шапкой сайдбара, до списка разделов, чтобы быть на виду независимо
+   от прокрутки .sidebar-nav и от того, свёрнут ли сайдбар до иконок. */
+.nav-history-row {
+  display: flex;
+  gap: 2px;
+  padding: 2px 4px 8px;
+}
+.nav-history-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 26px;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.nav-history-btn:hover:not(:disabled) { background: var(--panel); color: var(--text); }
+.nav-history-btn:disabled { color: var(--text-faint); opacity: 0.4; cursor: default; }
+
 @media (min-width: 861px) {
   .sidebar-resize-handle {
     position: absolute;
@@ -280,10 +322,29 @@ body.focus-mode .sidebar { display: none; }
   /* Растягивать есть смысл только закреплённый сайдбар — открепленный и
      так разворачивается по наведению на всю сохранённую ширину. */
   #app.sidebar-autohide .sidebar-resize-handle { display: none; }
+
+  /* Режим "только иконки" — независимое от закрепления/авто-скрытия
+     третье состояние (см. комментарий в sidebar.js): постоянно узкая
+     полоса вместо auto-hide-по-наведению. Переключатель проекта в 56px
+     не помещается без обрезки — прячем, вернуть можно тем же тумблером. */
+  #app.sidebar-collapsed .sidebar { width: 56px; min-width: 56px; }
+  #app.sidebar-collapsed .brand-row { justify-content: center; }
+  #app.sidebar-collapsed .brand { display: none; }
+  #app.sidebar-collapsed .nav-item { text-align: center; padding: 9px 4px; }
+  #app.sidebar-collapsed .nav-icon { margin-right: 0; }
+  #app.sidebar-collapsed .nav-label,
+  #app.sidebar-collapsed .trash-badge,
+  #app.sidebar-collapsed .nav-group-label,
+  #app.sidebar-collapsed .project-current { display: none; }
+  #app.sidebar-collapsed .project-switcher-row { justify-content: center; }
+  #app.sidebar-collapsed .sidebar-pin,
+  #app.sidebar-collapsed .sidebar-resize-handle { display: none; }
+  #app.sidebar-collapsed .sidebar-collapse-btn svg { transform: rotate(180deg); }
+  #app.sidebar-collapsed .nav-history-row { justify-content: center; }
 }
 
 @media (max-width: 860px) {
-  .sidebar-pin, .sidebar-resize-handle { display: none; }
+  .sidebar-pin, .sidebar-resize-handle, .sidebar-collapse-btn, .nav-history-row { display: none; }
 }
 
 /* Переключатель проекта теперь в самом низу сайдбара, под «Корзиной» —
@@ -777,6 +838,30 @@ button.btn.icon-btn.gallery-nav:hover { background: rgba(0, 0, 0, 0.6); }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.loc-parent-badge:hover { color: var(--accent-hover); text-decoration: underline; }
+
+/* Хлебные крошки предков в анкете локации (entity-sheet.js, breadcrumb) —
+   над заголовком, тем же по духу приёмом, что и путь к файлу в Обсидиане:
+   вся цепочка сразу, а не только ближайший родитель. */
+.sheet-breadcrumb {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 4px;
+  font-size: 0.78rem;
+}
+.sheet-breadcrumb-link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--text-faint);
+  font-family: inherit;
+  font-size: inherit;
+  cursor: pointer;
+}
+.sheet-breadcrumb-link:hover { color: var(--accent-hover); text-decoration: underline; }
+.sheet-breadcrumb-sep { color: var(--text-faint); opacity: 0.6; }
 
 .add-card {
   border: 1px dashed var(--border);
