@@ -342,7 +342,9 @@ export const EN_DICT = {
 
   // ── Поиск (search.js) ──
   "Поиск": "Search",
-  "Персонажи, локации, фракции, таймлайн, рукопись…": "Characters, locations, factions, timeline, manuscript…",
+  "Персонажи, локации, фракции, таймлайн, рукопись, связи, сюжет, знания…": "Characters, locations, factions, timeline, manuscript, relationships, plot, knowledge…",
+  "Точка сюжета": "Plot point",
+  "Факт": "Fact",
   "Ничего не найдено": "Nothing found",
   "Без названия": "Untitled",
   "Персонаж": "Character",

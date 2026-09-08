@@ -24,6 +24,9 @@ function moduleLabels() {
     timeline: i18n("Событие"),
     manuscript: i18n("Глава"),
     board: i18n("Карточка"),
+    relationships: i18n("Связь"),
+    plotgraph: i18n("Точка сюжета"),
+    knowledge: i18n("Факт"),
   };
 }
 
@@ -40,13 +43,16 @@ function snippet(text, max = 90) {
 }
 
 async function buildIndex() {
-  const [characters, locations, factions, timeline, manuscript, board] = await Promise.all([
+  const [characters, locations, factions, timeline, manuscript, board, relationships, plot, knowledge] = await Promise.all([
     apiGet("/api/characters"),
     apiGet("/api/locations"),
     apiGet("/api/factions"),
     apiGet("/api/timeline"),
     apiGet("/api/manuscript"),
     apiGet("/api/board"),
+    apiGet("/api/relationships"),
+    apiGet("/api/plot"),
+    apiGet("/api/knowledge"),
   ]);
 
   const entries = [];
@@ -82,6 +88,34 @@ async function buildIndex() {
       if (card) entries.push({ module: "board", id: null, title: card.title, subtitle: col.title, color: "#9a9250" });
     }
   }
+
+  // Связи, Карта сюжета и Знания — как и Доска, без своего экрана с
+  // фокусом по id (renderRelationships/renderPlot/renderKnowledge
+  // принимают только root, без второго аргумента) — переход просто
+  // открывает раздел целиком, найти нужную запись в нём — уже глазами.
+  const charName = (id) => characters.find((c) => c.id === id)?.name || i18n("?");
+  for (const r of relationships) {
+    entries.push({
+      module: "relationships",
+      id: null,
+      title: `${charName(r.charA)} ↔ ${charName(r.charB)}`,
+      subtitle: snippet(r.label || r.note),
+      color: "#5a8a5f",
+    });
+  }
+  for (const n of plot.nodes || []) {
+    entries.push({
+      module: "plotgraph",
+      id: null,
+      title: n.title || i18n("Без названия"),
+      subtitle: snippet(n.chapterLabel || n.note),
+      color: "#4f7d74",
+    });
+  }
+  for (const f of knowledge.facts || []) {
+    entries.push({ module: "knowledge", id: null, title: f.label || i18n("Без названия"), subtitle: snippet(f.note), color: "#b5636b" });
+  }
+
   return entries;
 }
 
@@ -94,7 +128,7 @@ function ensureOverlay() {
   if (overlay) return;
   overlay = document.createElement("div");
   overlay.className = "search-overlay hidden";
-  overlay.innerHTML = `<div class="search-modal"><input type="text" class="search-input" placeholder="${i18n("Персонажи, локации, фракции, таймлайн, рукопись…")}" /><div class="search-results"></div></div>`;
+  overlay.innerHTML = `<div class="search-modal"><input type="text" class="search-input" placeholder="${i18n("Персонажи, локации, фракции, таймлайн, рукопись, связи, сюжет, знания…")}" /><div class="search-results"></div></div>`;
   document.body.appendChild(overlay);
   input = overlay.querySelector(".search-input");
   list = overlay.querySelector(".search-results");
