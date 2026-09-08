@@ -14,15 +14,19 @@
 //  истории, а не отдельная логика под схему каждого модуля.
 // ══════════════════════════════════════════════
 
-// Классический DP через таблицу длин LCS — O(n·m) по времени и памяти.
-// На истории Fictaris (JSON конкретных карточек/модулей, не мегабайтные
-// логи) более чем достаточно, но не бесконечно — вызывающая сторона
-// обязана проверить размер сама (см. DIFF_LINE_LIMIT) и не звать
-// diffLines на файлах за разумным пределом: n·m растёт квадратично, и
-// без проверки вкладка может надолго зависнуть или вылететь по памяти.
+// Классический DP через таблицу длин LCS — O(n·m) по времени и памяти
+// на САМ вызов diffCore. На типичный случай истории Fictaris (одна
+// правка внутри большого файла — двадцать персонажей, поменялось имя
+// у одного) diffCore никогда не видит файл целиком: diffLines ниже
+// сперва отрезает одинаковые начало и конец за один дешёвый проход
+// (O(n+m)) — если правка одна, на дорогой алгоритм остаётся всего
+// несколько строк вокруг нею, а не весь файл. DIFF_LINE_LIMIT поэтому
+// проверяет размер уже ПОСЛЕ обрезки — предел бьёт только по
+// по-настоящему большим различиям (файл переписан заново), а не по
+// большим файлам как таковым.
 export const DIFF_LINE_LIMIT = 4000;
 
-export function diffLines(a, b) {
+function diffCore(a, b) {
   const n = a.length;
   const m = b.length;
   const dp = new Array(n + 1);
@@ -52,6 +56,30 @@ export function diffLines(a, b) {
   while (i < n) out.push({ type: "del", text: a[i++] });
   while (j < m) out.push({ type: "add", text: b[j++] });
   return out;
+}
+
+// null — различие слишком большое даже после обрезки одинаковых краёв
+// (см. DIFF_LINE_LIMIT выше); вызывающая сторона (data-panel.js) сама
+// решает, что показать вместо диффа.
+export function diffLines(a, b) {
+  let start = 0;
+  const maxStart = Math.min(a.length, b.length);
+  while (start < maxStart && a[start] === b[start]) start++;
+
+  let endA = a.length;
+  let endB = b.length;
+  while (endA > start && endB > start && a[endA - 1] === b[endB - 1]) {
+    endA--;
+    endB--;
+  }
+
+  const middleA = a.slice(start, endA);
+  const middleB = b.slice(start, endB);
+  if (middleA.length > DIFF_LINE_LIMIT || middleB.length > DIFF_LINE_LIMIT) return null;
+
+  const prefix = a.slice(0, start).map((text) => ({ type: "equal", text }));
+  const suffix = a.slice(endA).map((text) => ({ type: "equal", text }));
+  return [...prefix, ...diffCore(middleA, middleB), ...suffix];
 }
 
 // Схлопывает длинные пробеги неизменных строк до contextLines с каждой

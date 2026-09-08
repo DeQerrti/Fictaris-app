@@ -2,7 +2,7 @@ import { apiGet, apiPost } from "./api.js";
 import { buildDemoBundle } from "./demo-data.js";
 import { exportSiteZip } from "./export-site.js";
 import { exportWorldPdf } from "./export-pdf.js";
-import { diffLines, collapseContext, DIFF_LINE_LIMIT } from "./diff.js";
+import { diffLines, collapseContext } from "./diff.js";
 import { i18n } from "./i18n.js";
 
 const SCHEMA_VERSION = 1;
@@ -198,8 +198,10 @@ function currentDataApi(file) {
 // Показывает построчный diff между версией из истории и текущим
 // содержимым файла — обе стороны через JSON.stringify(..., null, 2),
 // см. app/js/diff.js о том, почему построчно по всему файлу, а не по
-// одной карточке. Слишком большой файл (DIFF_LINE_LIMIT) — вместо
-// зависшей вкладки честно говорим, что не считаем, а не тихо виснем.
+// одной карточке. diffLines сама обрезает одинаковые края перед
+// сравнением и возвращает null, если оставшееся различие всё равно
+// больше DIFF_LINE_LIMIT — тогда вместо зависшей вкладки честно
+// говорим, что не считаем, а не тихо виснем.
 async function buildDiffPanel(file, version) {
   const panel = document.createElement("div");
   panel.className = "history-diff";
@@ -216,12 +218,11 @@ async function buildDiffPanel(file, version) {
   const oldLines = JSON.stringify(past, null, 2).split("\n");
   const newLines = JSON.stringify(current, null, 2).split("\n");
 
-  if (oldLines.length > DIFF_LINE_LIMIT || newLines.length > DIFF_LINE_LIMIT) {
+  const rows = diffLines(oldLines, newLines);
+  if (!rows) {
     panel.textContent = i18n("Файл слишком большой для построчного сравнения — воспользуйся «Восстановить», если нужно вернуть именно эту версию.");
     return panel;
   }
-
-  const rows = diffLines(oldLines, newLines);
   if (rows.every((r) => r.type === "equal")) {
     panel.textContent = i18n("Между этой версией и текущим состоянием нет отличий.");
     return panel;
