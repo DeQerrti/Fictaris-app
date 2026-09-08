@@ -3,7 +3,7 @@ import { escapeHtml } from "./chips.js";
 import { locationTypeInfo, factionTypeInfo } from "./icons.js";
 import { loadTemplates, templateFor } from "./templates.js";
 import { mentionsToLinkedHtml } from "./mentions.js";
-import { imageDataUri, safeName, renderFieldsHtml } from "./entity-export.js";
+import { imageDataUri, safeName, renderFieldsHtml, galleryHtml } from "./entity-export.js";
 import { i18n } from "./i18n.js";
 
 // ══════════════════════════════════════════════
@@ -42,6 +42,8 @@ section.kind > h1 { border-bottom: 2px solid #999; padding-bottom: 6px; margin-b
 .entity { page-break-inside: avoid; margin-bottom: 22px; padding-bottom: 14px; border-bottom: 1px solid #ddd; }
 .entity-subtitle { color: #666; margin: 0 0 8px; font-style: italic; }
 .avatar { width: 70px; height: 70px; object-fit: cover; border-radius: 6px; float: right; margin: 0 0 8px 12px; }
+.gallery { display: flex; flex-wrap: wrap; gap: 5px; clear: both; margin: 0 0 10px; }
+.gallery img { width: 50px; height: 50px; object-fit: cover; border-radius: 4px; }
 .field-block { margin: 0 0 10px; clear: both; }
 .field-label { font-size: 8.5pt; color: #777; text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 2px; }
 .field-block p { white-space: pre-wrap; margin: 0 0 6px; }
@@ -98,6 +100,7 @@ export async function exportWorldPdf() {
       body += `<h2>${escapeHtml(c.name || i18n("Без имени"))}</h2>`;
       if (c.role) body += `<p class="entity-subtitle">${escapeHtml(c.role)}</p>`;
       if (avatar) body += `<img class="avatar" src="${avatar}" alt="">`;
+      body += galleryHtml(images, (c.images || []).slice(1));
       body += renderFieldsHtml(templateFor(charTemplates, c.templateId), c, characters, hrefForChar, idPrefix);
 
       const relRows = relationships.filter((r) => r.charA === c.id || r.charB === c.id);
@@ -127,6 +130,7 @@ export async function exportWorldPdf() {
       body += `<div class="entity" id="loc-${safeName(loc.id)}">`;
       body += `<h2>${escapeHtml(loc.name || i18n("Без имени"))}</h2><p class="entity-subtitle">${escapeHtml(i18n(typeLabel))}</p>`;
       if (avatar) body += `<img class="avatar" src="${avatar}" alt="">`;
+      body += galleryHtml(images, (loc.images || []).slice(1));
       if (parent) {
         body += `<div class="field-block"><div class="field-label">${escapeHtml(i18n("Родительская локация"))}</div><p><a href="${anchor("loc", parent.id)}">${escapeHtml(parent.name || i18n("Без имени"))}</a></p></div>`;
       }
@@ -153,6 +157,7 @@ export async function exportWorldPdf() {
       body += `<div class="entity" id="faction-${safeName(f.id)}">`;
       body += `<h2>${escapeHtml(f.name || i18n("Без имени"))}</h2><p class="entity-subtitle">${escapeHtml(i18n(typeLabel))}</p>`;
       if (avatar) body += `<img class="avatar" src="${avatar}" alt="">`;
+      body += galleryHtml(images, (f.images || []).slice(1));
       if (leader) body += `<div class="field-block"><div class="field-label">${escapeHtml(i18n("Глава фракции"))}</div><p><a href="${anchor("char", leader.id)}">${escapeHtml(leader.name || i18n("Без имени"))}</a></p></div>`;
       if (hq) body += `<div class="field-block"><div class="field-label">${escapeHtml(i18n("Штаб-квартира"))}</div><p><a href="${anchor("loc", hq.id)}">${escapeHtml(hq.name || i18n("Без имени"))}</a></p></div>`;
       body += renderFieldsHtml(templateFor(factionTemplates, f.templateId), f, characters, hrefForChar, idPrefix);

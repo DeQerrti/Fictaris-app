@@ -27,6 +27,16 @@ export function safeName(id) {
   return String(id).replace(/[^\w-]/g, "_");
 }
 
+// Первая картинка сущности идёт крупной "обложкой" (avatar) — остальные
+// раньше терялись молча, хотя buildAvatarsField (avatars.js) заводит
+// полноценную галерею, не одну картинку. relPaths — entity.images как
+// есть; возвращает пустую строку, если показывать нечего.
+export function galleryHtml(images, relPaths, cssClass = "gallery") {
+  const list = (relPaths || []).map((p) => imageDataUri(images, p)).filter(Boolean);
+  if (!list.length) return "";
+  return `<div class="${cssClass}">${list.map((src) => `<img src="${src}" alt="">`).join("")}</div>`;
+}
+
 // template.fields → HTML: подпись + значение, с особым разбором для
 // "richtext" (заголовки "## "/"### " → оглавление + <h3>/<h4>, см.
 // templates.js/parseRichSections). idPrefix отличает #якоря одного

@@ -3,7 +3,7 @@ import { escapeHtml } from "./chips.js";
 import { locationTypeInfo, factionTypeInfo } from "./icons.js";
 import { loadTemplates, templateFor } from "./templates.js";
 import { mentionsToLinkedHtml } from "./mentions.js";
-import { imageDataUri, safeName, renderFieldsHtml } from "./entity-export.js";
+import { imageDataUri, safeName, renderFieldsHtml, galleryHtml } from "./entity-export.js";
 import { i18n } from "./i18n.js";
 import { buildZip } from "./zip-writer.js";
 
@@ -71,6 +71,8 @@ main { max-width: 760px; margin: 0 auto; padding: 24px; }
 h1 { margin-top: 0; }
 .subtitle { color: #a99977; margin: -8px 0 20px; }
 .avatar { width: 96px; height: 96px; border-radius: 12px; object-fit: cover; margin-bottom: 16px; }
+.gallery { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 20px; }
+.gallery img { width: 96px; height: 96px; object-fit: cover; border-radius: 8px; }
 .card-list { display: flex; flex-wrap: wrap; gap: 10px; list-style: none; padding: 0; margin: 0 0 24px; }
 .card-list li { border: 1px solid #3a3020; border-radius: 8px; }
 .card-list a { display: block; padding: 8px 14px; text-decoration: none; }
@@ -115,6 +117,7 @@ export async function exportSiteZip() {
     let body = `<h1>${escapeHtml(c.name || i18n("Без имени"))}</h1>`;
     if (c.role) body += `<p class="subtitle">${escapeHtml(c.role)}</p>`;
     if (avatar) body += `<img class="avatar" src="${avatar}" alt="">`;
+    body += galleryHtml(images, (c.images || []).slice(1));
     body += renderFieldsHtml(templateFor(charTemplates, c.templateId), c, characters, hrefForChar);
 
     const relRows = relationships.filter((r) => r.charA === c.id || r.charB === c.id);
@@ -137,6 +140,7 @@ export async function exportSiteZip() {
     const avatar = imageDataUri(images, loc.images?.[0]);
     let body = `<h1>${escapeHtml(loc.name || i18n("Без имени"))}</h1><p class="subtitle">${escapeHtml(i18n(typeLabel))}</p>`;
     if (avatar) body += `<img class="avatar" src="${avatar}" alt="">`;
+    body += galleryHtml(images, (loc.images || []).slice(1));
 
     const parent = loc.parentId && locations.find((l) => l.id === loc.parentId);
     if (parent) {
@@ -163,6 +167,7 @@ export async function exportSiteZip() {
     const hq = locations.find((l) => l.id === f.headquartersId);
     let body = `<h1>${escapeHtml(f.name || i18n("Без имени"))}</h1><p class="subtitle">${escapeHtml(i18n(typeLabel))}</p>`;
     if (avatar) body += `<img class="avatar" src="${avatar}" alt="">`;
+    body += galleryHtml(images, (f.images || []).slice(1));
     if (leader) body += `<div class="field-block"><div class="field-label">${escapeHtml(i18n("Глава фракции"))}</div><p><a href="${charHref(leader.id)}">${escapeHtml(leader.name || i18n("Без имени"))}</a></p></div>`;
     if (hq) body += `<div class="field-block"><div class="field-label">${escapeHtml(i18n("Штаб-квартира"))}</div><p><a href="${locHref(hq.id)}">${escapeHtml(hq.name || i18n("Без имени"))}</a></p></div>`;
     body += renderFieldsHtml(templateFor(factionTemplates, f.templateId), f, characters, hrefForChar);
