@@ -1,4 +1,6 @@
 import { escapeHtml } from "./chips.js";
+import { openContextMenu } from "./context-menu.js";
+import { i18n } from "./i18n.js";
 
 function escapeRegex(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -163,6 +165,153 @@ export function attachMentionAutocomplete(field, getCharacters) {
     if (e.key === "Escape") hide();
   });
   field.addEventListener("blur", () => setTimeout(hide, 150));
+}
+
+// ══════════════════════════════════════════════
+//  ПРАВЫЙ КЛИК: "ДОБАВИТЬ УПОМИНАНИЕ" / "ИЗМЕНИТЬ ОТОБРАЖАЕМЫЙ ТЕКСТ"
+//
+//  Синтаксис @[Имя|как показать] сам по себе никто не найдёт, если не
+//  прочитать об этом — поэтому вместо документации сам правый клик
+//  предлагает нужное действие: по обычному слову — "Добавить
+//  упоминание" (выбор персонажа из списка сам решает, нужен ли
+//  псевдоним — если слово совпадает с именем один в один, вставляется
+//  просто "@Имя", иначе "@[Имя|то_что_было_выделено]"); по уже
+//  существующему упоминанию — "Изменить отображаемый текст…".
+// ══════════════════════════════════════════════
+
+function isWordChar(ch) {
+  return !!ch && /[A-Za-zА-Яа-яЁё0-9_]/.test(ch);
+}
+
+// Слово под кареткой, когда явного выделения нет — раздвигаем границы
+// от позиции клика влево/вправо, пока идут словообразующие символы.
+function wordAt(text, pos) {
+  let start = pos;
+  let end = pos;
+  while (start > 0 && isWordChar(text[start - 1])) start--;
+  while (end < text.length && isWordChar(text[end])) end++;
+  if (start === end) return null;
+  return { start, end, raw: text.slice(start, end) };
+}
+
+// Токен @[...] или @Слово, в границы которого попадает pos — чтобы
+// правый клик в любом месте существующего упоминания (в том числе
+// внутри квадратных скобок псевдонима) находил его целиком, а не одно
+// слово внутри.
+function mentionTokenAt(text, pos) {
+  const re = /@\[[^\]]*\]|@[A-Za-zА-Яа-яЁё0-9_]+/g;
+  let m;
+  while ((m = re.exec(text))) {
+    const start = m.index;
+    const end = start + m[0].length;
+    if (pos >= start && pos <= end) return { start, end, raw: m[0] };
+  }
+  return null;
+}
+
+// То же самое, но когда диапазон уже задан явным выделением — просто
+// проверяем, что выделено ровно одно упоминание целиком, а не кусок.
+function selectionAsMentionToken(text, start, end) {
+  const raw = text.slice(start, end);
+  if (/^@\[[^\]]*\]$/.test(raw) || /^@[A-Za-zА-Яа-яЁё0-9_]+$/.test(raw)) return { start, end, raw };
+  return null;
+}
+
+function parseMentionToken(raw, characters) {
+  const alias = /^@\[(.+)\|(.+)\]$/.exec(raw);
+  if (alias) {
+    const char = characters.find((c) => c.name === alias[1]);
+    return char ? { char, display: alias[2] } : null;
+  }
+  const bare = /^@(.+)$/.exec(raw);
+  if (bare) {
+    const char = characters.find((c) => c.name === bare[1]);
+    return char ? { char, display: bare[1] } : null;
+  }
+  return null;
+}
+
+function replaceRange(field, range, insertText) {
+  const value = field.value;
+  field.value = value.slice(0, range.start) + insertText + value.slice(range.end);
+  const newPos = range.start + insertText.length;
+  field.setSelectionRange(newPos, newPos);
+  field.dispatchEvent(new Event("input")); // тот же приём, что и вставка автодополнением выше — включает autosave поля
+  field.focus();
+}
+
+function renameMention(field, range, char) {
+  const current = parseMentionToken(field.value.slice(range.start, range.end), [char])?.display || char.name;
+  const next = window.prompt(i18n("Как показывать «{name}» в тексте:", { name: char.name }), current);
+  if (next === null) return; // отменили
+  const trimmed = next.trim();
+  if (!trimmed) return;
+  const token = trimmed === char.name ? `@${char.name}` : `@[${char.name}|${trimmed}]`;
+  replaceRange(field, range, token);
+}
+
+// Чистый строитель пунктов меню (без побочных эффектов и без своего
+// contextmenu-слушателя) — под позицию клика/выделение прямо сейчас в
+// field. Возвращает [] когда там нет ни слова, ни упоминания (тогда
+// вызывающая сторона просто не добавляет ничего в своё меню). Нужен
+// отдельно от attachMentionContextMenu ниже затем, что у некоторых
+// полей (главы рукописи, manuscript.js/attachEditorContextMenu) уже
+// есть свой contextmenu-слушатель с другими пунктами — туда эти
+// пункты нужно подмешать, а не завести второй независимый слушатель
+// поверх (второй openContextMenu просто закрыл бы меню первого).
+export function buildMentionContextMenuItems(field, characters) {
+  if (!characters.length) return [];
+
+  const text = field.value;
+  const hasSelection = field.selectionStart !== field.selectionEnd;
+
+  const mentionRange = hasSelection
+    ? selectionAsMentionToken(text, field.selectionStart, field.selectionEnd)
+    : mentionTokenAt(text, field.selectionStart);
+  const parsed = mentionRange && parseMentionToken(mentionRange.raw, characters);
+
+  if (mentionRange && parsed) {
+    return [
+      {
+        label: i18n("Изменить отображаемый текст…"),
+        action: () => renameMention(field, mentionRange, parsed.char),
+      },
+    ];
+  }
+
+  const word = hasSelection
+    ? { start: field.selectionStart, end: field.selectionEnd, raw: text.slice(field.selectionStart, field.selectionEnd) }
+    : wordAt(text, field.selectionStart);
+  const raw = word?.raw.trim();
+  if (!raw) return [];
+
+  const exact = characters.find((c) => c.name === raw);
+  if (exact) {
+    return [{ label: i18n("Добавить упоминание «{name}»", { name: exact.name }), action: () => replaceRange(field, word, `@${exact.name}`) }];
+  }
+  return [
+    {
+      label: i18n("Добавить упоминание"),
+      items: characters.map((c) => ({
+        label: c.name,
+        action: () => replaceRange(field, word, `@[${c.name}|${raw}]`),
+      })),
+    },
+  ];
+}
+
+// Удобная обёртка поверх buildMentionContextMenuItems для полей БЕЗ
+// собственного contextmenu-слушателя (timeline.js) — заводит его сама
+// и открывает меню целиком из этих пунктов. Если пунктов нет (клик
+// мимо слова), preventDefault не зовём — сработает обычное системное
+// меню (вставить/копировать и т.п.).
+export function attachMentionContextMenu(field, getCharacters) {
+  field.addEventListener("contextmenu", (e) => {
+    const items = buildMentionContextMenuItems(field, getCharacters());
+    if (!items.length) return;
+    e.preventDefault();
+    openContextMenu(e.clientX, e.clientY, items);
+  });
 }
 
 // Hover-превью карточки при наведении на @упоминание в режиме просмотра.

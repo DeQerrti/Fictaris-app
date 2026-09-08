@@ -1,6 +1,6 @@
 import { apiGet, apiPost, uid } from "./api.js";
 import { debounceSave } from "./save-badge.js";
-import { mentionsToHtml, attachMentionAutocomplete, attachMentionHoverPreview } from "./mentions.js";
+import { mentionsToHtml, attachMentionAutocomplete, attachMentionHoverPreview, buildMentionContextMenuItems } from "./mentions.js";
 import { stickersToHtml, attachStickyPopover } from "./stickies.js";
 import { buildManuscriptDocx } from "./docx.js";
 import { openContextMenu } from "./context-menu.js";
@@ -202,7 +202,14 @@ function attachEditorContextMenu(textarea, chapter) {
     e.preventDefault();
     const hasSelection = textarea.selectionStart !== textarea.selectionEnd;
     const selectedWords = hasSelection ? wordCount(textarea.value.slice(textarea.selectionStart, textarea.selectionEnd)) : 0;
+    // Пункты "Добавить упоминание"/"Изменить отображаемый текст…" —
+    // под слово/упоминание в точке клика (mentions.js). Здесь, а не
+    // отдельным слушателем на этом же textarea: у поля уже есть один
+    // contextmenu-обработчик (этот самый), второй независимый просто
+    // закрыл бы меню первого через свой же openContextMenu.
+    const mentionItems = buildMentionContextMenuItems(textarea, characters);
     openContextMenu(e.clientX, e.clientY, [
+      ...(mentionItems.length ? [...mentionItems, { separator: true }] : []),
       { label: i18n("Жирный"), disabled: !hasSelection, action: () => wrapSelection(textarea, "**", "**") },
       { label: i18n("Курсив"), disabled: !hasSelection, action: () => wrapSelection(textarea, "*", "*") },
       { separator: true },

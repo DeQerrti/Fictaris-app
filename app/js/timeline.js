@@ -2,7 +2,7 @@ import { apiGet, apiPost, uid } from "./api.js";
 import { debounceSave } from "./save-badge.js";
 import { escapeHtml, buildToggleGroup } from "./chips.js";
 import { locationTypeInfo } from "./icons.js";
-import { attachMentionAutocomplete } from "./mentions.js";
+import { attachMentionAutocomplete, attachMentionContextMenu } from "./mentions.js";
 import { pushTrash } from "./trash.js";
 import { buildExportPngButton } from "./png-export.js";
 import { loadCalendar, absoluteDay, formatDate } from "./calendar.js";
@@ -329,6 +329,7 @@ function buildDrawer(ev) {
   descArea.addEventListener("input", () => { ev.description = descArea.value; persist(); });
   descField.appendChild(descArea);
   attachMentionAutocomplete(descArea, () => characters);
+  attachMentionContextMenu(descArea, () => characters);
   drawer.appendChild(descField);
 
   drawer.appendChild(buildToggleGroup(i18n("Персонажи"), characters, ev.characterIds || [], (ids) => {

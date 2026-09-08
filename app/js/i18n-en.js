@@ -568,6 +568,11 @@ export const EN_DICT = {
   "Не получилось создать PDF. Доступно только в десктопной версии Fictaris.": "Couldn't create the PDF. Only available in the desktop version of Fictaris.",
   "Экспорт в PDF доступен только в десктопной версии Fictaris.": "PDF export is only available in the desktop version of Fictaris.",
 
+  "Изменить отображаемый текст…": "Change display text…",
+  "Как показывать «{name}» в тексте:": "How to show \"{name}\" in the text:",
+  "Добавить упоминание «{name}»": "Add mention \"{name}\"",
+  "Добавить упоминание": "Add mention",
+
   "Скачать этот шаблон файлом — переслать или перенести в другой проект": "Download this template as a file — send it or move it to another project",
   "Это не файл шаблона Fictaris.": "This isn't a Fictaris template file.",
   "Загрузить шаблон из файла — добавится новой вкладкой": "Load a template from a file — it will appear as a new tab",
