@@ -21,7 +21,12 @@ const WIDTH_KEY = "fictaris_sidebar_width";
 const PINNED_KEY = "fictaris_sidebar_pinned";
 const MIN_WIDTH = 160;
 const MAX_WIDTH = 420;
-const DEFAULT_WIDTH = 200;
+// Было 200 — уже с полутора десятками пунктов меню (характеры, локации,
+// карта сюжета, знания и т.д.) это тесно: длинные подписи переносятся
+// на вторую строку ("Глава N. …" в списке глав рукописи). 240 — нижняя
+// граница диапазона, который в 2026-м считается разумным для боковой
+// панели такого рода (240–300px), не крайняя ширина сама по себе.
+const DEFAULT_WIDTH = 240;
 
 function clampWidth(w) {
   return Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, w));

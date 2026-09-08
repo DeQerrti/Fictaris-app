@@ -1,6 +1,6 @@
 import { apiGet, apiPost, uid } from "./api.js";
 import { debounceSave } from "./save-badge.js";
-import { escapeHtml, buildToggleGroup, characterSelect } from "./chips.js";
+import { escapeHtml, buildToggleGroup, characterSelect, centerGridIfSparse } from "./chips.js";
 import { pushTrash } from "./trash.js";
 import { buildReverseLinks } from "./reverse-links.js";
 import { loadTagsMap, buildTagsField } from "./tags.js";
@@ -187,6 +187,7 @@ function draw() {
   if (active) view.appendChild(buildDrawer(active));
 
   container.appendChild(view);
+  centerGridIfSparse(grid);
 }
 
 function buildFamilySection(c) {

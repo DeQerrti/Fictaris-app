@@ -1,6 +1,6 @@
 import { apiGet, apiPost, uid } from "./api.js";
 import { debounceSave } from "./save-badge.js";
-import { escapeHtml } from "./chips.js";
+import { escapeHtml, centerGridIfSparse } from "./chips.js";
 import { pushTrash } from "./trash.js";
 import { LOCATION_TYPES, locationTypeInfo, iconSvg } from "./icons.js";
 import { buildReverseLinks } from "./reverse-links.js";
@@ -197,6 +197,7 @@ function draw() {
   if (active) view.appendChild(buildDrawer(active));
 
   container.appendChild(view);
+  centerGridIfSparse(grid);
 }
 
 // Дочерние локации — тем же приёмом, что buildFamilySection у детей

@@ -113,7 +113,7 @@ html, body {
 #app { display: flex; height: 100vh; }
 
 .sidebar {
-  width: var(--sidebar-width, 200px);
+  width: var(--sidebar-width, 240px);
   flex-shrink: 0;
   background: var(--panel-alt);
   border-right: 1px solid var(--border);
@@ -265,7 +265,7 @@ body.focus-mode .sidebar { display: none; }
   }
 
   #app.sidebar-autohide .sidebar:hover {
-    width: var(--sidebar-width, 200px);
+    width: var(--sidebar-width, 240px);
     padding: 16px 10px;
     overflow: visible;
     border-right: 1px solid var(--border);
@@ -494,6 +494,20 @@ body.focus-mode .sidebar { display: none; }
 
 .nav-item:hover { color: var(--text); background: var(--panel); }
 
+/* Иконка перед подписью (icons.js, applyNavIcons) — inline-flex, а не
+   переводить .nav-item целиком на flex: содержимое кнопки (текст,
+   у «Корзины» ещё и .trash-badge) и так уже течёт в строку само по
+   себе, менять модель разметки ради одной иконки незачем. */
+.nav-icon {
+  display: inline-flex;
+  vertical-align: -3px;
+  margin-right: 8px;
+  color: var(--text-faint);
+  opacity: 0.85;
+}
+.nav-item:hover .nav-icon,
+.nav-item.active .nav-icon { color: var(--text-dim); opacity: 1; }
+
 .nav-item-hidden { display: none; }
 
 .nav-item.active {
@@ -569,6 +583,12 @@ body.focus-mode .sidebar { display: none; }
   gap: 14px;
   align-content: start;
 }
+
+/* centerGridIfSparse (chips.js) — переключается сама, когда карточек
+   мало и они и без того целиком помещаются без скролла: та же сетка,
+   просто по центру экрана, а не прижата к потолку с пустотой во весь
+   оставшийся экран под ней. */
+.characters-grid.grid-sparse { align-content: center; }
 
 /* Карточка — раньше маленький кружок-аватарка сверху и подпись снизу,
    с кучей пустого места вокруг; теперь аватарка — во всю левую сторону
@@ -1472,6 +1492,19 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
   overflow: hidden;
   display: flex;
+}
+
+/* Компактный вариант — для модалок с горсткой коротких полей (точка
+   карты сюжета, plot.js; редактор шаблона на лету,
+   template-editor-modal.js), которым 1100×820 от общей .entity-modal-panel
+   оставляют огромную пустую панель вокруг трёх полей. Высота — auto по
+   содержимому, а не растянута на весь экран, как у карточек персонажей
+   с их полями/галереей/обратными связями. */
+.entity-modal-panel.compact {
+  max-width: 560px;
+  height: auto;
+  max-height: 90vh;
+  overflow-y: auto;
 }
 
 .entity-modal-body { flex: 1; min-width: 0; overflow-y: auto; }

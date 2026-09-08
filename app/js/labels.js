@@ -76,11 +76,13 @@ export async function applyLabels() {
   document.querySelectorAll(".nav-item[data-module]").forEach((btn) => {
     const text = labels.nav[btn.dataset.module];
     if (!text) return;
-    // У «Корзины» внутри лежит <span class="trash-badge"> со счётчиком —
-    // трогаем только текстовый узел перед ним, не весь innerHTML.
-    const firstNode = btn.childNodes[0];
-    if (firstNode && firstNode.nodeType === Node.TEXT_NODE) firstNode.textContent = `${text} `;
-    else btn.textContent = text;
+    // У «Корзины» внутри лежит <span class="trash-badge"> со счётчиком,
+    // у любого пункта теперь ещё и <span class="nav-icon"> перед
+    // подписью (applyNavIcons, icons.js) — ищем именно текстовый узел
+    // среди детей, а не полагаемся на его позицию (childNodes[0] это
+    // уже не текст, а иконка), и трогаем только его, не весь innerHTML.
+    const textNode = Array.from(btn.childNodes).find((n) => n.nodeType === Node.TEXT_NODE);
+    if (textNode) textNode.textContent = `${text} `;
   });
 
   return labels;

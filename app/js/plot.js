@@ -422,7 +422,7 @@ function openNodeModal(n) {
   });
 
   const panel = document.createElement("div");
-  panel.className = "entity-modal-panel sheet-panel";
+  panel.className = "entity-modal-panel sheet-panel compact";
 
   const closeBtn = document.createElement("button");
   closeBtn.className = "entity-modal-close";

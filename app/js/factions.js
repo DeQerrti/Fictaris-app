@@ -1,6 +1,6 @@
 import { apiGet, apiPost, uid } from "./api.js";
 import { debounceSave } from "./save-badge.js";
-import { escapeHtml, characterSelect, buildToggleGroup } from "./chips.js";
+import { escapeHtml, characterSelect, buildToggleGroup, centerGridIfSparse } from "./chips.js";
 import { FACTION_TYPES, factionTypeInfo, iconSvg } from "./icons.js";
 import { pushTrash } from "./trash.js";
 import { loadTagsMap, buildTagsField } from "./tags.js";
@@ -121,6 +121,7 @@ function draw() {
   if (active) view.appendChild(buildDrawer(active));
 
   container.appendChild(view);
+  centerGridIfSparse(grid);
 }
 
 function openSheet(f) {

@@ -22,6 +22,7 @@ import { initProjectSwitcher } from "./project-switcher.js";
 import { initUpdateBanner } from "./update-banner.js";
 import { applyTheme } from "./theme.js";
 import { applyLabels } from "./labels.js";
+import { applyNavIcons } from "./icons.js";
 import { applyTabVisibility, applyTabOrder, getHiddenTabs } from "./visibility.js";
 import { initSearch } from "./search.js";
 import { initShortcuts, loadShortcuts } from "./shortcuts.js";
@@ -143,6 +144,7 @@ document.addEventListener("fictaris:trash-changed", refreshTrashBadge);
 async function boot() {
   await loadLang(); // до всего остального — applyLabels и любой другой i18n() ниже должны видеть уже загруженный язык
   applyTheme(); // независимо от info — кэш уже применён инлайн-скриптом, здесь только свежие данные
+  applyNavIcons();
   applyLabels();
   applyTabOrder();
   applyTabVisibility();

@@ -26,7 +26,66 @@ const PATHS = {
   shuffle: '<polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/>',
   chevronLeft: '<path d="M15 6l-6 6 6 6"/>',
   chevronRight: '<path d="M9 6l6 6-6 6"/>',
+
+  // Иконки пунктов сайдбара (applyNavIcons ниже) — с полутора десятками
+  // разделов один текст без единой опорной точки сканируется взглядом
+  // хуже, чем текст + иконка; тот же набор из брифа (lucide-style
+  // simple line icons), просто под конкретные разделы меню, а не типы
+  // сущностей. Нарочно геометрически простые — при 16px в сайдбаре
+  // детализация всё равно не читается, а простая форма ещё узнаётся.
+  book: '<path d="M4 5a2 2 0 0 1 2-2h11v16H6a2 2 0 0 0-2 2z"/><path d="M17 3v16"/>',
+  columns: '<rect x="3" y="4" width="6" height="16" rx="1"/><rect x="10" y="4" width="6" height="10" rx="1"/><rect x="17" y="4" width="4" height="7" rx="1"/>',
+  user: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-7 8-7s8 3 8 7"/>',
+  link: '<path d="M9 15l6-6"/><path d="M13 5l1-1a4 4 0 0 1 6 6l-1 1"/><path d="M11 19l-1 1a4 4 0 0 1-6-6l1-1"/>',
+  clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/>',
+  map: '<path d="M9 4l-6 2v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/>',
+  network: '<circle cx="6" cy="6" r="2.2"/><circle cx="18" cy="6" r="2.2"/><circle cx="12" cy="18" r="2.2"/><path d="M7.8 7.2L11 16M16.2 7.2L13 16M8.2 6h7.6"/>',
+  tree: '<circle cx="12" cy="5" r="2"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="19" r="2"/><path d="M12 7v4M12 11L6 17M12 11l6 6"/>',
+  frame: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/>',
+  route: '<circle cx="6" cy="4" r="2"/><circle cx="6" cy="20" r="2"/><circle cx="18" cy="12" r="2"/><path d="M6 6v12"/><path d="M6 12h6a4 4 0 0 0 4-4"/>',
+  lightbulb: '<path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/>',
+  barChart: '<path d="M4 20V10M12 20V4M20 20v-7"/>',
+  checkShield: '<path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/><path d="M9 12l2 2 4-4"/>',
+  trash: '<path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13"/><path d="M10 11v6M14 11v6"/>',
 };
+
+// Пункт сайдбара → ключ иконки выше. locations/factions переиспользуют
+// pin/shield — те же геометрические формы уже значат "место"/"защита"
+// в самих карточках локаций/фракций (LOCATION_TYPES/FACTION_TYPES),
+// смысл не расходится.
+const NAV_ICONS = {
+  manuscript: "book",
+  board: "columns",
+  characters: "user",
+  locations: "pin",
+  factions: "shield",
+  relationships: "link",
+  timeline: "clock",
+  map: "map",
+  graph: "network",
+  familytree: "tree",
+  canvas: "frame",
+  plotgraph: "route",
+  knowledge: "lightbulb",
+  stats: "barChart",
+  continuity: "checkShield",
+  trash: "trash",
+};
+
+// Вызывается один раз при загрузке (main.js, boot()), до applyLabels() —
+// та работает через первый текстовый узел кнопки и не трогает то, что
+// перед ним, так что порядок здесь не принципиален, но так нагляднее:
+// сперва иконка появляется, потом подпись подстраивается под язык.
+export function applyNavIcons() {
+  document.querySelectorAll(".nav-item[data-module]").forEach((btn) => {
+    const key = NAV_ICONS[btn.dataset.module];
+    if (!key || btn.querySelector(".nav-icon")) return;
+    const icon = document.createElement("span");
+    icon.className = "nav-icon";
+    icon.innerHTML = iconSvg(key, 16);
+    btn.prepend(icon);
+  });
+}
 
 export const LOCATION_TYPES = [
   ["settlement", "Город / поселение", "landmark", "#c9944a"],

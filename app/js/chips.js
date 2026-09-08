@@ -11,6 +11,23 @@ export function escapeHtml(s) {
   }[c]));
 }
 
+// Сетки карточек (персонажи/локации/фракции — все три через один и тот
+// же класс .characters-grid) по умолчанию прижаты к верхнему краю
+// (align-content: start) — так и должно быть, когда карточек больше,
+// чем помещается на экран, и появляется скролл. Но когда карточек
+// всего три-пять, тот же прижим к верху на большом мониторе оставляет
+// голую пустоту на весь оставшийся экран — ощущается как недоделанный
+// экран, а не спокойный минимализм. Переключаем на центрирование
+// только когда сетка и без того целиком помещается без скролла —
+// scrollHeight/clientHeight можно мерить лишь после того, как сетка
+// уже в живом DOM (сразу после appendChild), отсюда requestAnimationFrame:
+// ждём кадр, чтобы браузер успел посчитать раскладку.
+export function centerGridIfSparse(grid) {
+  requestAnimationFrame(() => {
+    grid.classList.toggle("grid-sparse", grid.scrollHeight <= grid.clientHeight);
+  });
+}
+
 export function characterSelect(list, selectedId, placeholder) {
   const select = document.createElement("select");
   if (placeholder) {

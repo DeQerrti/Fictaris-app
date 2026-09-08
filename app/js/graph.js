@@ -27,7 +27,13 @@ let simWidth = 0;
 let simHeight = 0;
 let simPositionAll = null;
 
-const REPULSION = 2600;
+// Было 2600 — с подписями узлов (не только их кружками) это позволяло
+// плотным кластерам сходиться настолько тесно, что текст соседних точек
+// перекрывался. Больше отталкивания — реже такая теснота вообще
+// возникает; плашка-подложка под текстом (см. draw()) добивает
+// остальное — то, что даже так иногда окажется рядом, останется
+// читаемым по отдельности, а не сливающимся текстом.
+const REPULSION = 3200;
 const SPRING_LENGTH = 110;
 const SPRING_STRENGTH = 0.02;
 const CENTER_PULL = 0.0025;
@@ -245,13 +251,33 @@ function draw() {
       g.appendChild(fo);
     }
 
+    // Плашка-подложка под подписью — при кучности узлов (сила
+    // отталкивания считает расстояние между самими узлами, не между
+    // подписями) текст соседних точек иначе перекрывался и становился
+    // совсем нечитаемым — не только друг с другом, но и поверх линий
+    // связей. Ширина — грубая оценка по числу символов (точных метрик
+    // текста тут не измерить дёшево, а +- пара пикселей роли не играет,
+    // плашка всё равно с запасом), не идеальная подгонка, но полностью
+    // решает нечитаемость.
+    const label = n.name || "?";
+    const haloWidth = Math.max(22, label.length * 6.4 + 8);
+    const halo = document.createElementNS(svgNS, "rect");
+    halo.setAttribute("x", -haloWidth / 2);
+    halo.setAttribute("y", 18);
+    halo.setAttribute("width", haloWidth);
+    halo.setAttribute("height", 14);
+    halo.setAttribute("rx", 4);
+    halo.setAttribute("fill", "var(--panel)");
+    halo.setAttribute("opacity", "0.85");
+    g.appendChild(halo);
+
     const text = document.createElementNS(svgNS, "text");
     text.setAttribute("text-anchor", "middle");
     text.setAttribute("y", 26);
     text.setAttribute("fill", "#a99977");
     text.setAttribute("font-size", "11");
     text.setAttribute("font-family", "Inter,sans-serif");
-    text.textContent = n.name || "?";
+    text.textContent = label;
     g.appendChild(text);
 
     g.addEventListener("mouseenter", () => { if (!dragState) highlight(n.id, lineByNode, nodeEls); });
