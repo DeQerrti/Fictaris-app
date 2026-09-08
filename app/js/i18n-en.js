@@ -186,7 +186,8 @@ export const EN_DICT = {
   "Сохранить текущий текст как снимок версии (до 20 на главу)": "Save the current text as a version snapshot (up to 20 per chapter)",
   "{count} слов": "{count} words",
   "Глава пуста.": "The chapter is empty.",
-  "Пиши здесь… @имя вставит упоминание персонажа": "Write here… @name inserts a character mention",
+  "Пиши здесь… @имя вставит упоминание персонажа, @[Имя|нужный падеж] — если по тексту не «Надя», а «Наде»":
+    "Write here… @name inserts a character mention, @[Name|display text] — for a different grammatical form in the sentence",
   "📌 Стикер": "📌 Sticky note",
   "Вставить инлайн-заметку в текст": "Insert an inline note into the text",
   "Заметки автора": "Author's notes",

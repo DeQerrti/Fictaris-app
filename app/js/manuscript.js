@@ -769,7 +769,7 @@ function buildEditor() {
     const textarea = document.createElement("textarea");
     textarea.className = "chapter-content";
     textarea.value = chapter.content;
-    textarea.placeholder = i18n("Пиши здесь… @имя вставит упоминание персонажа");
+    textarea.placeholder = i18n("Пиши здесь… @имя вставит упоминание персонажа, @[Имя|нужный падеж] — если по тексту не «Надя», а «Наде»");
     textarea.addEventListener("input", () => {
       chapter.content = textarea.value;
       wc.textContent = i18n("{count} слов", { count: wordCount(chapter.content) });

@@ -9,6 +9,20 @@ function escapeRegex(s) {
 // внутри имени «Астра». Вместо \b — negative lookahead: совпадение не
 // продолжается словообразующим символом (латиница, кириллица, цифра,
 // подчёркивание) сразу после имени.
+//
+// Две формы упоминания в одном регулярном выражении:
+//   @[Имя|Как показать]  — псевдоним, тем же приёмом, что [[Имя|текст]]
+//                           в Obsidian: слева от "|" — точное имя карточки
+//                           (по нему ищется персонаж), справа — как это
+//                           место должно читаться в самом тексте.
+//                           Специально ради падежей: имя карточки —
+//                           именительный ("Надя"), а в предложении нужно
+//                           "Наде" — искать по m[1], показывать m[2].
+//   @Имя                  — как раньше, без изменений.
+// Обычная форма — резервная строгая проверка по границе слова
+// (?!...), поэтому её нельзя просто "или" склеить наивно: движок
+// сперва пробует форму с [ ], и только не найдя "[" сразу после "@" —
+// обычную. Поэтому альтернативы идут именно в этом порядке.
 function buildMentionRegex(characters) {
   const names = characters
     .map((c) => c.name)
@@ -16,7 +30,18 @@ function buildMentionRegex(characters) {
     .sort((a, b) => b.length - a.length) // длинные имена раньше коротких — иначе «Аста» перехватит начало «Астра»
     .map(escapeRegex);
   if (!names.length) return null;
-  return new RegExp(`@(${names.join("|")})(?![A-Za-zА-Яа-яЁё0-9_])`, "g");
+  const alt = names.join("|");
+  return new RegExp(`@\\[(${alt})\\|([^\\]]+)\\]|@(${alt})(?![A-Za-zА-Яа-яЁё0-9_])`, "g");
+}
+
+// Персонаж и то, что должно быть видно в тексте, — общая часть для
+// всех трёх функций ниже, чтобы не дублировать разбор групп m[1..3]
+// трижды.
+function resolveMatch(m, characters) {
+  if (m[1] !== undefined) {
+    return { char: characters.find((ch) => ch.name === m[1]), display: m[2] };
+  }
+  return { char: characters.find((ch) => ch.name === m[3]), display: `@${m[3]}` };
 }
 
 // Экранированный HTML с @упоминаниями, обёрнутыми в кликабельный span.
@@ -29,9 +54,8 @@ export function mentionsToHtml(text, characters) {
   let m;
   while ((m = regex.exec(text))) {
     html += escapeHtml(text.slice(last, m.index));
-    const name = m[1];
-    const c = characters.find((ch) => ch.name === name);
-    html += `<span class="mention" data-char-id="${c.id}" style="color:${c.color || "var(--accent)"}">@${escapeHtml(name)}</span>`;
+    const { char, display } = resolveMatch(m, characters);
+    html += `<span class="mention" data-char-id="${char.id}" style="color:${char.color || "var(--accent)"}">${escapeHtml(display)}</span>`;
     last = m.index + m[0].length;
   }
   html += escapeHtml(text.slice(last));
@@ -53,10 +77,9 @@ export function mentionsToLinkedHtml(text, characters, hrefFor) {
   let m;
   while ((m = regex.exec(text))) {
     html += escapeHtml(text.slice(last, m.index));
-    const name = m[1];
-    const c = characters.find((ch) => ch.name === name);
-    const href = hrefFor(c);
-    html += href ? `<a href="${href}">@${escapeHtml(name)}</a>` : `@${escapeHtml(name)}`;
+    const { char, display } = resolveMatch(m, characters);
+    const href = hrefFor(char);
+    html += href ? `<a href="${href}">${escapeHtml(display)}</a>` : escapeHtml(display);
     last = m.index + m[0].length;
   }
   html += escapeHtml(text.slice(last));
@@ -72,8 +95,8 @@ export function findMentionedIds(text, characters) {
   if (!regex) return ids;
   let m;
   while ((m = regex.exec(text))) {
-    const c = characters.find((ch) => ch.name === m[1]);
-    if (c) ids.add(c.id);
+    const { char } = resolveMatch(m, characters);
+    if (char) ids.add(char.id);
   }
   return ids;
 }
