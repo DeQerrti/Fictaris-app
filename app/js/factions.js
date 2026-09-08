@@ -1,6 +1,6 @@
 import { apiGet, apiPost, uid } from "./api.js";
 import { debounceSave } from "./save-badge.js";
-import { escapeHtml, characterSelect, buildToggleGroup, centerGridIfSparse } from "./chips.js";
+import { escapeHtml, characterSelect, buildToggleGroup, centerGridIfSparse, buildEmptyState } from "./chips.js";
 import { FACTION_TYPES, factionTypeInfo, iconSvg } from "./icons.js";
 import { pushTrash } from "./trash.js";
 import { loadTagsMap, buildTagsField } from "./tags.js";
@@ -80,10 +80,8 @@ function draw() {
   grid.className = "characters-grid";
 
   if (!factions.length) {
-    const empty = document.createElement("div");
-    empty.className = "empty-state";
+    const empty = buildEmptyState(i18n("Фракций пока нет — добавь первую."), "shield");
     empty.style.gridColumn = "1 / -1";
-    empty.textContent = i18n("Фракций пока нет — добавь первую.");
     grid.appendChild(empty);
   }
 

@@ -1,5 +1,5 @@
 import { apiGet, apiPost, uid } from "./api.js";
-import { escapeHtml } from "./chips.js";
+import { escapeHtml, buildEmptyState } from "./chips.js";
 import { i18n } from "./i18n.js";
 
 const TRASH_LIMIT = 200;
@@ -84,9 +84,7 @@ export async function renderTrash(root) {
   wrap.className = "trash-panel";
 
   if (!trash.length) {
-    const empty = document.createElement("div");
-    empty.className = "empty-state";
-    empty.textContent = i18n("Корзина пуста.");
+    const empty = buildEmptyState(i18n("Корзина пуста."), "trash");
     wrap.appendChild(empty);
     root.appendChild(wrap);
     return;

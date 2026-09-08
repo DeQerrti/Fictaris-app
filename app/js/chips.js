@@ -4,6 +4,7 @@
 // переписывания компонента.
 
 import { i18n } from "./i18n.js";
+import { iconSvg } from "./icons.js";
 
 export function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({
@@ -26,6 +27,27 @@ export function centerGridIfSparse(grid) {
   requestAnimationFrame(() => {
     grid.classList.toggle("grid-sparse", grid.scrollHeight <= grid.clientHeight);
   });
+}
+
+// Пустое состояние с иконкой над текстом — та же иконка, что и у
+// соответствующего пункта сайдбара (iconSvg/icons.js), чтобы совсем
+// пустой раздел читался как "здесь пока нечего показывать", а не как
+// оборванный рендер (голая серая строка текста посреди чёрного
+// экрана). iconKey — необязательный: без него получится ровно то же
+// самое, что раньше делали руками (просто текст).
+export function buildEmptyState(text, iconKey) {
+  const el = document.createElement("div");
+  el.className = "empty-state";
+  if (iconKey) {
+    const icon = document.createElement("div");
+    icon.className = "empty-state-icon";
+    icon.innerHTML = iconSvg(iconKey, 28);
+    el.appendChild(icon);
+  }
+  const p = document.createElement("p");
+  p.textContent = text;
+  el.appendChild(p);
+  return el;
 }
 
 export function characterSelect(list, selectedId, placeholder) {

@@ -569,6 +569,14 @@ body.focus-mode .sidebar { display: none; }
   color: var(--text-faint);
   font-size: 0.95rem;
 }
+.empty-state p { margin: 0; max-width: 360px; }
+.empty-state-icon {
+  display: flex;
+  justify-content: center;
+  margin: 0 0 10px;
+  color: var(--text-faint);
+  opacity: 0.7;
+}
 
 /* ── Персонажи ─────────────────────────────── */
 

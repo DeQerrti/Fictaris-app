@@ -1,6 +1,7 @@
 import { apiGet, apiPost, uid } from "./api.js";
 import { i18n } from "./i18n.js";
 import { openEntityModal } from "./entity-modal.js";
+import { buildEmptyState } from "./chips.js";
 
 // ══════════════════════════════════════════════
 //  РОДОСЛОВНАЯ
@@ -245,9 +246,10 @@ function draw() {
   const inTree = characters.filter((c) => (c.parentIds || []).length || hasChild.has(c.id));
 
   if (!inTree.length) {
-    const empty = document.createElement("div");
-    empty.className = "empty-state";
-    empty.textContent = i18n("Пока пусто — укажи родителей в карточке персонажа (или добавь нового прямо здесь), чтобы здесь появилось дерево.");
+    const empty = buildEmptyState(
+      i18n("Пока пусто — укажи родителей в карточке персонажа (или добавь нового прямо здесь), чтобы здесь появилось дерево."),
+      "tree"
+    );
     wrap.appendChild(empty);
     root.appendChild(wrap);
     return;

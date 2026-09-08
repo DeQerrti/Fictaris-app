@@ -1,5 +1,5 @@
 import { apiGet } from "./api.js";
-import { escapeHtml } from "./chips.js";
+import { escapeHtml, buildEmptyState } from "./chips.js";
 import { knowledgeIssues } from "./knowledge.js";
 import { i18n } from "./i18n.js";
 
@@ -139,9 +139,7 @@ export async function renderContinuity(root) {
   const total = sections.reduce((sum, [, list]) => sum + list.length, 0);
 
   if (!total) {
-    const ok = document.createElement("div");
-    ok.className = "empty-state";
-    ok.textContent = i18n("Всё чисто — проверка не нашла проблем.");
+    const ok = buildEmptyState(i18n("Всё чисто — проверка не нашла проблем."), "checkShield");
     wrap.appendChild(ok);
     return;
   }

@@ -1,6 +1,6 @@
 import { apiGet, apiPost, uid } from "./api.js";
 import { debounceSave } from "./save-badge.js";
-import { escapeHtml, buildToggleGroup, characterSelect, centerGridIfSparse } from "./chips.js";
+import { escapeHtml, buildToggleGroup, characterSelect, centerGridIfSparse, buildEmptyState } from "./chips.js";
 import { pushTrash } from "./trash.js";
 import { buildReverseLinks } from "./reverse-links.js";
 import { loadTagsMap, buildTagsField } from "./tags.js";
@@ -144,10 +144,8 @@ function draw() {
   grid.className = "characters-grid";
 
   if (!characters.length) {
-    const empty = document.createElement("div");
-    empty.className = "empty-state";
+    const empty = buildEmptyState(i18n("Персонажей пока нет — добавь первого."), "user");
     empty.style.gridColumn = "1 / -1";
-    empty.textContent = i18n("Персонажей пока нет — добавь первого.");
     grid.appendChild(empty);
   }
 

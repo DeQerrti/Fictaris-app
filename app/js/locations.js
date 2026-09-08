@@ -1,6 +1,6 @@
 import { apiGet, apiPost, uid } from "./api.js";
 import { debounceSave } from "./save-badge.js";
-import { escapeHtml, centerGridIfSparse } from "./chips.js";
+import { escapeHtml, centerGridIfSparse, buildEmptyState } from "./chips.js";
 import { pushTrash } from "./trash.js";
 import { LOCATION_TYPES, locationTypeInfo, iconSvg } from "./icons.js";
 import { buildReverseLinks } from "./reverse-links.js";
@@ -153,10 +153,8 @@ function draw() {
   grid.className = "characters-grid";
 
   if (!locations.length) {
-    const empty = document.createElement("div");
-    empty.className = "empty-state";
+    const empty = buildEmptyState(i18n("Локаций пока нет — добавь первую."), "pin");
     empty.style.gridColumn = "1 / -1";
-    empty.textContent = i18n("Локаций пока нет — добавь первую.");
     grid.appendChild(empty);
   }
 

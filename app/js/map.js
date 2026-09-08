@@ -1,6 +1,6 @@
 import { apiGet, apiPost, uid } from "./api.js";
 import { debounceSave } from "./save-badge.js";
-import { characterSelect, escapeHtml } from "./chips.js";
+import { characterSelect, escapeHtml, buildEmptyState } from "./chips.js";
 import { locationTypeInfo, iconSvg } from "./icons.js";
 import { compressImage } from "./image-compress.js";
 import { buildExportPngButton } from "./png-export.js";
@@ -91,10 +91,8 @@ function buildMapsHome() {
   grid.className = "characters-grid";
 
   if (!map.rootIds.length) {
-    const empty = document.createElement("div");
-    empty.className = "empty-state";
+    const empty = buildEmptyState(i18n("Карт пока нет — загрузи изображение, чтобы создать первую."), "map");
     empty.style.gridColumn = "1 / -1";
-    empty.textContent = i18n("Карт пока нет — загрузи изображение, чтобы создать первую.");
     grid.appendChild(empty);
   }
 

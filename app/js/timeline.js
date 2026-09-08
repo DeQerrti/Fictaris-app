@@ -1,6 +1,6 @@
 import { apiGet, apiPost, uid } from "./api.js";
 import { debounceSave } from "./save-badge.js";
-import { escapeHtml, buildToggleGroup } from "./chips.js";
+import { escapeHtml, buildToggleGroup, buildEmptyState } from "./chips.js";
 import { locationTypeInfo } from "./icons.js";
 import { attachMentionAutocomplete, attachMentionContextMenu } from "./mentions.js";
 import { pushTrash } from "./trash.js";
@@ -156,9 +156,12 @@ function buildList() {
 
   const items = visibleEvents();
   if (!items.length) {
-    const empty = document.createElement("div");
-    empty.className = "empty-state";
-    empty.textContent = events.length ? i18n("Нет событий с таким фильтром.") : i18n("Событий пока нет — добавь первое.");
+    // Иконка — только для честно пустого таймлайна, не для "отфильтровали
+    // всё подчистую": та временная (снял фильтр — событий полно), а
+    // иконка нужна ровно для "здесь пока правда нечего показывать".
+    const empty = events.length
+      ? buildEmptyState(i18n("Нет событий с таким фильтром."))
+      : buildEmptyState(i18n("Событий пока нет — добавь первое."), "clock");
     list.appendChild(empty);
   }
 

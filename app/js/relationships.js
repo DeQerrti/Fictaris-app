@@ -1,6 +1,6 @@
 import { apiGet, apiPost, uid } from "./api.js";
 import { debounceSave } from "./save-badge.js";
-import { escapeHtml, characterSelect } from "./chips.js";
+import { escapeHtml, characterSelect, buildEmptyState } from "./chips.js";
 import { pushTrash } from "./trash.js";
 import { i18n } from "./i18n.js";
 
@@ -67,9 +67,7 @@ function draw() {
   wrap.className = "rel-view";
 
   if (characters.length < 2) {
-    const empty = document.createElement("div");
-    empty.className = "empty-state";
-    empty.textContent = i18n("Нужно как минимум два персонажа, чтобы связать их между собой.");
+    const empty = buildEmptyState(i18n("Нужно как минимум два персонажа, чтобы связать их между собой."), "link");
     wrap.appendChild(empty);
     container.appendChild(wrap);
     return;

@@ -1,6 +1,6 @@
 import { apiGet, apiPost, uid } from "./api.js";
 import { debounceSave } from "./save-badge.js";
-import { escapeHtml } from "./chips.js";
+import { escapeHtml, buildEmptyState } from "./chips.js";
 import { openContextMenu } from "./context-menu.js";
 import { i18n } from "./i18n.js";
 
@@ -68,10 +68,11 @@ function buildHome() {
   grid.className = "characters-grid";
 
   if (!data.order.length) {
-    const empty = document.createElement("div");
-    empty.className = "empty-state";
+    const empty = buildEmptyState(
+      i18n("Холстов пока нет — создай первый для свободных заметок и схем, не привязанных к конкретным персонажам или локациям."),
+      "frame"
+    );
     empty.style.gridColumn = "1 / -1";
-    empty.textContent = i18n("Холстов пока нет — создай первый для свободных заметок и схем, не привязанных к конкретным персонажам или локациям.");
     grid.appendChild(empty);
   }
 

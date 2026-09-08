@@ -1,6 +1,7 @@
 import { apiGet, apiPost, uid } from "./api.js";
 import { debounceSave } from "./save-badge.js";
 import { openContextMenu } from "./context-menu.js";
+import { buildEmptyState } from "./chips.js";
 import { i18n } from "./i18n.js";
 
 // ══════════════════════════════════════════════
@@ -66,9 +67,7 @@ function draw() {
   list.className = "knowledge-list";
 
   if (!facts.length) {
-    const empty = document.createElement("div");
-    empty.className = "empty-state";
-    empty.textContent = i18n("Пока нет ни одного факта — добавь первый.");
+    const empty = buildEmptyState(i18n("Пока нет ни одного факта — добавь первый."), "lightbulb");
     list.appendChild(empty);
   }
 

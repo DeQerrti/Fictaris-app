@@ -2,6 +2,7 @@ import { apiGet } from "./api.js";
 import { locationTypeInfo, factionTypeInfo, iconSvg } from "./icons.js";
 import { loadTemplates, templateFor } from "./templates.js";
 import { findMentionedIds } from "./mentions.js";
+import { buildEmptyState } from "./chips.js";
 import { i18n } from "./i18n.js";
 
 // ══════════════════════════════════════════════
@@ -160,9 +161,7 @@ function draw() {
   container.innerHTML = "";
 
   if (nodes.length < 2) {
-    const empty = document.createElement("div");
-    empty.className = "empty-state";
-    empty.textContent = i18n("Добавь персонажей, локаций или фракций, чтобы увидеть граф проекта.");
+    const empty = buildEmptyState(i18n("Добавь персонажей, локаций или фракций, чтобы увидеть граф проекта."), "network");
     container.appendChild(empty);
     return;
   }
