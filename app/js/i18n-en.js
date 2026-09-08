@@ -491,8 +491,8 @@ export const EN_DICT = {
 
   // ── Данные (data-panel.js) ──
   "Экспорт проекта": "Export project",
-  "Один JSON-файл со всеми модулями: персонажи, локации, связи, фракции, таймлайн, доска, карта (только метки — картинки остаются файлами на диске), рукопись.":
-    "One JSON file with every module: characters, locations, relationships, factions, timeline, board, map (labels only — images stay as files on disk), manuscript.",
+  "Один JSON-файл со всеми модулями: персонажи, локации, связи, фракции, таймлайн, доска, карта (только метки — картинки остаются файлами на диске), карта сюжета, знания, рукопись.":
+    "One JSON file with every module: characters, locations, relationships, factions, timeline, board, map (labels only — images stay as files on disk), story map, knowledge, manuscript.",
   "Экспортировать": "Export",
 
   "Импорт проекта": "Import project",

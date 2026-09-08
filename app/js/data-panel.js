@@ -9,9 +9,11 @@ const SCHEMA_VERSION = 1;
 const EMPTY_MANUSCRIPT = { chapters: [], activeChapterId: null };
 const EMPTY_BOARD = { columns: [], cards: {}, cardOrder: {} };
 const EMPTY_MAP = { rootIds: [], maps: {} };
+const EMPTY_PLOT = { nodes: [], edges: [] };
+const EMPTY_KNOWLEDGE = { facts: [] };
 
 async function fetchAll() {
-  const [characters, locations, relationships, factions, timeline, board, map, manuscript] = await Promise.all([
+  const [characters, locations, relationships, factions, timeline, board, map, manuscript, plot, knowledge] = await Promise.all([
     apiGet("/api/characters"),
     apiGet("/api/locations"),
     apiGet("/api/relationships"),
@@ -20,14 +22,16 @@ async function fetchAll() {
     apiGet("/api/board"),
     apiGet("/api/map"),
     apiGet("/api/manuscript"),
+    apiGet("/api/plot"),
+    apiGet("/api/knowledge"),
   ]);
-  return { characters, locations, relationships, factions, timeline, board, map, manuscript };
+  return { characters, locations, relationships, factions, timeline, board, map, manuscript, plot, knowledge };
 }
 
 // Полная замена — импорт и «Заполнить примером» идут одним и тем же
-// путём, чтобы не держать два места, которые пишут во все восемь файлов.
-// Карта переносит только структуру (метки, названия под-карт) — сами
-// картинки лежат файлами в maps/ и в JSON-экспорт не попадают.
+// путём, чтобы не держать два места, которые пишут во все десять
+// файлов. Карта переносит только структуру (метки, названия под-карт) —
+// сами картинки лежат файлами в maps/ и в JSON-экспорт не попадают.
 async function applyAll(bundle) {
   await Promise.all([
     apiPost("/api/characters", Array.isArray(bundle.characters) ? bundle.characters : []),
@@ -38,6 +42,8 @@ async function applyAll(bundle) {
     apiPost("/api/board", bundle.board && Array.isArray(bundle.board.columns) ? bundle.board : EMPTY_BOARD),
     apiPost("/api/map", bundle.map && typeof bundle.map.maps === "object" ? bundle.map : EMPTY_MAP),
     apiPost("/api/manuscript", bundle.manuscript && Array.isArray(bundle.manuscript.chapters) ? bundle.manuscript : EMPTY_MANUSCRIPT),
+    apiPost("/api/plot", bundle.plot && Array.isArray(bundle.plot.nodes) ? bundle.plot : EMPTY_PLOT),
+    apiPost("/api/knowledge", bundle.knowledge && Array.isArray(bundle.knowledge.facts) ? bundle.knowledge : EMPTY_KNOWLEDGE),
   ]);
 }
 
@@ -321,7 +327,7 @@ function buildHistoryRow(file, version) {
 function buildExportSection() {
   const section = document.createElement("div");
   section.className = "data-section";
-  section.innerHTML = `<h3>${i18n("Экспорт проекта")}</h3><p>${i18n("Один JSON-файл со всеми модулями: персонажи, локации, связи, фракции, таймлайн, доска, карта (только метки — картинки остаются файлами на диске), рукопись.")}</p>`;
+  section.innerHTML = `<h3>${i18n("Экспорт проекта")}</h3><p>${i18n("Один JSON-файл со всеми модулями: персонажи, локации, связи, фракции, таймлайн, доска, карта (только метки — картинки остаются файлами на диске), карта сюжета, знания, рукопись.")}</p>`;
   const btn = document.createElement("button");
   btn.className = "btn";
   btn.textContent = i18n("Экспортировать");

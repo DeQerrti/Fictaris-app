@@ -1,17 +1,22 @@
 // Связный тестовый сюжет для кнопки «Заполнить примером» — по духу
 // демо из брифа ("Хроники Раскола Троп"): персонажи, локации, связи,
-// фракции, таймлайн, доска, карта и пара глав рукописи, всё ссылается
-// друг на друга. Раньше карта сюда не входила (заполняла все вкладки,
-// кроме неё) — теперь функция асинхронная: рисует холст-заглушку и
-// заливает его через /api/map/image, как обычная загрузка картинки
-// пользователем, а map.json ссылается на полученный путь.
+// фракции, таймлайн, доска, карта (карты — во множественном числе, см.
+// ниже), карта сюжета, знания и пара глав рукописи, всё ссылается друг
+// на друга. Карта — асинхронно: рисует холст-заглушку и заливает его
+// через /api/map/image, как обычная загрузка картинки пользователем, а
+// map.json ссылается на полученный путь.
 import { apiPost } from "./api.js";
+import { KNOWS_FROM_START } from "./knowledge.js";
 
 // Простая карта-заглушка, нарисованная на <canvas> — тот же приём, что
 // в image-compress.js: рисуем, берём dataURL, отрезаем префикс до base64.
 // Реального изображения-подложки не нужно: смысл демо-карты в метках,
-// а не в художественной ценности фона.
-function buildDemoMapImage() {
+// а не в художественной ценности фона. title/accent — чтобы вторую
+// карту (Сольвейн) не рисовать копипастой той же функции с одной
+// заменённой строкой: демо нарочно заводит две карты, не одну — иначе
+// не было бы видно, что «Карта» вообще умеет несколько штук разом
+// (переключатель карт в map.js для одной карты просто не появляется).
+function buildDemoMapImage(title, accent = "#6b5636") {
   const canvas = document.createElement("canvas");
   canvas.width = 1200;
   canvas.height = 800;
@@ -23,14 +28,14 @@ function buildDemoMapImage() {
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, 1200, 800);
 
-  ctx.strokeStyle = "#6b5636";
+  ctx.strokeStyle = accent;
   ctx.lineWidth = 10;
   ctx.strokeRect(16, 16, 1168, 768);
 
   ctx.fillStyle = "#4a3b22";
   ctx.font = "bold 42px serif";
   ctx.textAlign = "center";
-  ctx.fillText("Побережье Раскола", 600, 90);
+  ctx.fillText(title, 600, 90);
 
   ctx.strokeStyle = "#8a744f";
   ctx.lineWidth = 3;
@@ -172,22 +177,78 @@ export async function buildDemoBundle() {
     activeChapterId: "demo-ch-1",
   };
 
-  const { path: mapImagePath } = await apiPost("/api/map/image", { data: buildDemoMapImage(), ext: "jpg" });
+  // Две карты, не одна — иначе не видно, что «Карта» вообще умеет
+  // несколько штук разом (переключатель списка карт для одной-единственной
+  // просто не появляется). Метка столицы на первой карте вдобавок
+  // ссылается на вторую через linkedMapId — тот же переход "открыть
+  // план города", каким обычно и пользуются: metка ведёт на карту
+  // помельче, а не всё держат одним изображением.
+  const [{ path: coastImagePath }, { path: capitalImagePath }] = await Promise.all([
+    apiPost("/api/map/image", { data: buildDemoMapImage("Побережье Раскола"), ext: "jpg" }),
+    apiPost("/api/map/image", { data: buildDemoMapImage("Сольвейн", "#7d6a9e"), ext: "jpg" }),
+  ]);
   const map = {
-    rootIds: ["demo-map-coast"],
+    rootIds: ["demo-map-coast", "demo-map-capital"],
     maps: {
       "demo-map-coast": {
         id: "demo-map-coast",
         name: "Побережье Раскола",
-        imageRelPath: mapImagePath,
+        imageRelPath: coastImagePath,
         pins: [
           { id: "demo-pin-fortress", x: 74, y: 22, label: fortress.name, note: "", characterId: null, locationId: fortress.id, linkedMapId: null },
-          { id: "demo-pin-capital", x: 28, y: 38, label: capital.name, note: "", characterId: null, locationId: capital.id, linkedMapId: null },
+          { id: "demo-pin-capital", x: 28, y: 38, label: capital.name, note: "Открыть план города", characterId: null, locationId: capital.id, linkedMapId: "demo-map-capital" },
           { id: "demo-pin-harbor", x: 46, y: 72, label: harbor.name, note: "", characterId: null, locationId: harbor.id, linkedMapId: null },
+        ],
+      },
+      "demo-map-capital": {
+        id: "demo-map-capital",
+        name: "Сольвейн",
+        imageRelPath: capitalImagePath,
+        pins: [
+          { id: "demo-pin-palace", x: 50, y: 30, label: "Дворец", note: "Резиденция Варна после переворота", characterId: varn.id, locationId: null, linkedMapId: null },
         ],
       },
     },
   };
 
-  return { characters, locations, relationships, factions, timeline, board, map, manuscript };
+  // Карта сюжета — те же пять сюжетных точек, что и в таймлайне выше,
+  // просто как узлы с направленными связями между ними; не одна точка,
+  // а цепочка, иначе не видно, что связи вообще для чего-то нужны.
+  const plot = {
+    nodes: [
+      { id: "demo-p-1", title: "Переворот", note: "Варн захватывает Сольвейн, семья Астры гибнет", chapterLabel: "Глава 1", x: 140, y: 160 },
+      { id: "demo-p-2", title: "Бегство", note: "Каэль вывозит юную Астру из столицы", chapterLabel: "Глава 1", x: 380, y: 160 },
+      { id: "demo-p-3", title: "Возвращение", note: "Астра и Каэль прибывают в портовый квартал десять лет спустя", chapterLabel: "Глава 2", x: 620, y: 160 },
+      { id: "demo-p-4", title: "Сделка с Нессой", note: "Несса соглашается провести их к крепости — за долю от находки", chapterLabel: "", x: 620, y: 340 },
+      { id: "demo-p-5", title: "Крепость Раскола", note: "Отряд достигает крепости в поисках клинка", chapterLabel: "", x: 860, y: 340 },
+    ],
+    edges: [
+      { id: "demo-pe-1", from: "demo-p-1", to: "demo-p-2", label: "вынуждает бежать" },
+      { id: "demo-pe-2", from: "demo-p-2", to: "demo-p-3", label: "десять лет спустя" },
+      { id: "demo-pe-3", from: "demo-p-3", to: "demo-p-4", label: "нужен проводник" },
+      { id: "demo-pe-4", from: "demo-p-4", to: "demo-p-5", label: "ведёт к цели" },
+    ],
+  };
+
+  // Знания — два факта, у каждого несколько персонажей на разных
+  // главах (а не один факт с одним персонажем — тогда было бы не
+  // видно, зачем вообще заводить несколько строк в одном факте).
+  const knowledge = {
+    facts: [
+      {
+        id: "demo-k-1",
+        label: "Где спрятан Раскольный клинок",
+        note: "Артефакт, легитимизирующий притязания на трон",
+        entries: { [aster.id]: "demo-ch-2", [kael.id]: KNOWS_FROM_START },
+      },
+      {
+        id: "demo-k-2",
+        label: "Кто отдал приказ убить Дом Вирен",
+        note: "",
+        entries: { [aster.id]: KNOWS_FROM_START, [varn.id]: KNOWS_FROM_START, [nessa.id]: "demo-ch-2" },
+      },
+    ],
+  };
+
+  return { characters, locations, relationships, factions, timeline, board, map, manuscript, plot, knowledge };
 }
