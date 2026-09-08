@@ -20,6 +20,7 @@ const KNOWN_FILES = new Set([
   "site-settings.json",
   "writing-log.json",
   "plot.json",
+  "knowledge.json",
 ]);
 
 export function isAllowedFile(name) {

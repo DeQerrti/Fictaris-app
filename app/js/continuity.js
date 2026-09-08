@@ -1,5 +1,6 @@
 import { apiGet } from "./api.js";
 import { escapeHtml } from "./chips.js";
+import { knowledgeIssues } from "./knowledge.js";
 import { i18n } from "./i18n.js";
 
 // Список проверок из брифа: битые ссылки, «забытые» сущности, дубли на
@@ -113,7 +114,7 @@ export async function renderContinuity(root) {
   wrap.innerHTML = `<div class="empty-state">${i18n("Проверяю…")}</div>`;
   root.appendChild(wrap);
 
-  const [characters, locations, relationships, factions, timeline, board, map, manuscript] = await Promise.all([
+  const [characters, locations, relationships, factions, timeline, board, map, manuscript, knowledge] = await Promise.all([
     apiGet("/api/characters"),
     apiGet("/api/locations"),
     apiGet("/api/relationships"),
@@ -122,14 +123,16 @@ export async function renderContinuity(root) {
     apiGet("/api/board"),
     apiGet("/api/map"),
     apiGet("/api/manuscript"),
+    apiGet("/api/knowledge"),
   ]);
-  const data = { characters, locations, relationships, factions, timeline, board, map, manuscript };
+  const data = { characters, locations, relationships, factions, timeline, board, map, manuscript, knowledge };
 
   const sections = [
     [i18n("Битые ссылки"), brokenRefs(data)],
     [i18n("Забытые сущности"), orphans(data)],
     [i18n("Возможные дубли на таймлайне"), duplicateTimelineEntries(data)],
     [i18n("Главы «Готово» с пустым текстом"), emptyDoneChapters(data)],
+    [i18n("Знания без выбранной главы или со ссылкой на удалённое"), knowledgeIssues(data)],
   ];
 
   wrap.innerHTML = "";

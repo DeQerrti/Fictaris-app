@@ -589,6 +589,27 @@ export const EN_DICT = {
   "Глава / место в рукописи (необязательно)": "Chapter / place in the manuscript (optional)",
   "например: Глава 7": "e.g. Chapter 7",
 
+  "Знания": "Knowledge",
+  "Кто из персонажей что знает и с какой главы — свериться при редактуре, чтобы никто не знал того, что ещё не должен":
+    "Which character knows what, and from which chapter — check while editing, so no one knows something too soon",
+  "Факт мира и для каждого причастного персонажа — глава, с которой это стало ему известно. Свериться при редактуре: никто не должен знать раньше своей главы.":
+    "A fact about the world, and for each involved character, the chapter from which they know it. Check while editing: no one should know before their own chapter.",
+  "Пока нет ни одного факта — добавь первый.": "No facts yet — add the first one.",
+  "+ Факт": "+ Fact",
+  "Новый факт": "New fact",
+  "Удалить факт": "Delete fact",
+  "Заметка о факте (необязательно)…": "Note about the fact (optional)…",
+  "Пока ни один персонаж не отмечен.": "No character is marked yet.",
+  "+ Персонаж": "+ Character",
+  "— глава не выбрана —": "— no chapter selected —",
+  "С самого начала истории": "From the very start of the story",
+  "(удалённый персонаж)": "(deleted character)",
+  "Убрать персонажа из этого факта": "Remove this character from the fact",
+  "Знания без выбранной главы или со ссылкой на удалённое": "Knowledge entries missing a chapter or pointing to something deleted",
+  "Факт «{label}» ссылается на несуществующего персонажа": "Fact \"{label}\" refers to a character that no longer exists",
+  "Факт «{label}»: у «{name}» не выбрана глава": "Fact \"{label}\": no chapter selected for \"{name}\"",
+  "Факт «{label}»: у «{name}» указана удалённая глава": "Fact \"{label}\": \"{name}\" points to a deleted chapter",
+
   "Скачать этот шаблон файлом — переслать или перенести в другой проект": "Download this template as a file — send it or move it to another project",
   "Это не файл шаблона Fictaris.": "This isn't a Fictaris template file.",
   "Загрузить шаблон из файла — добавится новой вкладкой": "Load a template from a file — it will appear as a new tab",

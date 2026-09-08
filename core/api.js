@@ -22,6 +22,7 @@ const EMPTY_MAP = { rootIds: [], maps: {} };
 const EMPTY_CANVAS = { order: [], canvases: {} };
 const EMPTY_WRITING_LOG = { dailyGoal: 300, days: {} };
 const EMPTY_PLOT = { nodes: [], edges: [] };
+const EMPTY_KNOWLEDGE = { facts: [] };
 const IMAGE_EXT = /^(jpg|jpeg|png|webp)$/i;
 
 // Резервная копия/синхронизация (app/js/sync.js) — весь проект одним
@@ -42,6 +43,7 @@ const BACKUP_FILES = [
   "canvas.json",
   "writing-log.json",
   "plot.json",
+  "knowledge.json",
 ];
 
 async function exportBackup({ vault }) {
@@ -61,6 +63,8 @@ async function exportBackup({ vault }) {
         ? EMPTY_WRITING_LOG
         : name === "plot.json"
         ? EMPTY_PLOT
+        : name === "knowledge.json"
+        ? EMPTY_KNOWLEDGE
         : []
     );
   }
@@ -194,6 +198,19 @@ export const ROUTES = {
   "POST /api/plot": async ({ vault, body }) => {
     if (!body || !Array.isArray(body.nodes) || !Array.isArray(body.edges)) throw new ApiError("Некорректная карта сюжета");
     return vault.writeJson("plot.json", body);
+  },
+
+  // "Кто что знает и когда" (app/js/knowledge.js) — по образцу
+  // articy:expresso/переменных состояния: не автоматическая проверка
+  // текста (для этого пришлось бы разбирать прозу — ненадёжно и не
+  // тот уровень доверия, который нужен для "правды" о мире), а
+  // структурированный список фактов с явной привязкой персонаж→глава,
+  // где именно этот факт стал ему известен — свериться с ним при
+  // редактуре может уже сам автор.
+  "GET /api/knowledge": async ({ vault }) => vault.readJson("knowledge.json", EMPTY_KNOWLEDGE),
+  "POST /api/knowledge": async ({ vault, body }) => {
+    if (!body || !Array.isArray(body.facts)) throw new ApiError("Некорректный список фактов");
+    return vault.writeJson("knowledge.json", body);
   },
 
   "GET /api/canvas": async ({ vault }) => vault.readJson("canvas.json", EMPTY_CANVAS),
