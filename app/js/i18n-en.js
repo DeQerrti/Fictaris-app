@@ -648,4 +648,9 @@ export const EN_DICT = {
   "Экспорт всей рукописи в .pdf": "Export the whole manuscript as .pdf",
 
   "Свой цвет…": "Custom color…",
+
+  "Связать с локацией": "Link to a location",
+  "Связать с главой": "Link to a chapter",
+  "Без локации": "No location",
+  "Без главы": "No chapter",
 };

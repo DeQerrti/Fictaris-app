@@ -4,7 +4,7 @@ import { pushTrash } from "./trash.js";
 import { buildExportPngButton } from "./png-export.js";
 import { openContextMenu } from "./context-menu.js";
 import { escapeHtml } from "./chips.js";
-import { iconSvg } from "./icons.js";
+import { iconSvg, locationTypeInfo } from "./icons.js";
 import { i18n } from "./i18n.js";
 
 const LABEL_COLORS = [
@@ -22,6 +22,8 @@ let data = { boards: [], activeBoardId: null };
 let board = null;
 let characters = [];
 let factions = [];
+let locations = [];
+let chapters = [];
 let container = null;
 const save = debounceSave((d) => apiPost("/api/board", d));
 
@@ -176,11 +178,27 @@ function factionById(id) {
   return factions.find((f) => f.id === id);
 }
 
+function locationById(id) {
+  return locations.find((l) => l.id === id);
+}
+
+function chapterById(id) {
+  return chapters.find((c) => c.id === id);
+}
+
 export async function renderBoard(root) {
   container = root;
-  const [rawBoard, chars, facs] = await Promise.all([apiGet("/api/board"), apiGet("/api/characters"), apiGet("/api/factions")]);
+  const [rawBoard, chars, facs, locs, manuscriptData] = await Promise.all([
+    apiGet("/api/board"),
+    apiGet("/api/characters"),
+    apiGet("/api/factions"),
+    apiGet("/api/locations"),
+    apiGet("/api/manuscript"),
+  ]);
   characters = chars;
   factions = facs;
+  locations = locs;
+  chapters = manuscriptData.chapters || [];
   data = migrate(rawBoard);
   board = data.boards.find((b) => b.id === data.activeBoardId) || data.boards[0];
   if (!board.columns.length) {
@@ -283,7 +301,7 @@ function buildColumn(col) {
   addCard.className = "add-chapter";
   addCard.textContent = i18n("+ Карточка");
   addCard.addEventListener("click", () => {
-    const card = { id: uid(), title: i18n("Новая карточка"), notes: "", characterId: null, factionId: null, labelColor: null };
+    const card = { id: uid(), title: i18n("Новая карточка"), notes: "", characterId: null, factionId: null, locationId: null, chapterId: null, labelColor: null };
     board.cards[card.id] = card;
     board.cardOrder[col.id].push(card.id);
     persist();
@@ -375,10 +393,31 @@ function cardContextItems(card, colId) {
     })),
   ];
 
+  const locationItems = [
+    { label: i18n("Без локации"), checked: !card.locationId, action: () => { card.locationId = null; persist(); draw(); } },
+    ...locations.map((l) => {
+      const [, , , color] = locationTypeInfo(l.type);
+      return {
+        label: escapeHtml(l.name || i18n("Без имени")), swatch: color, checked: card.locationId === l.id,
+        action: () => { card.locationId = l.id; persist(); draw(); },
+      };
+    }),
+  ];
+
+  const chapterItems = [
+    { label: i18n("Без главы"), checked: !card.chapterId, action: () => { card.chapterId = null; persist(); draw(); } },
+    ...chapters.map((c) => ({
+      label: escapeHtml(c.title || i18n("Без названия")), checked: card.chapterId === c.id,
+      action: () => { card.chapterId = c.id; persist(); draw(); },
+    })),
+  ];
+
   return [
     { label: i18n("Цвет метки"), items: colorItems },
     { label: i18n("Связать с персонажем"), items: characterItems, disabled: !characters.length },
     { label: i18n("Связать с фракцией"), items: factionItems, disabled: !factions.length },
+    { label: i18n("Связать с локацией"), items: locationItems, disabled: !locations.length },
+    { label: i18n("Связать с главой"), items: chapterItems, disabled: !chapters.length },
     { separator: true },
     { label: i18n("Удалить карточку"), danger: true, action: () => deleteCard(card, colId) },
   ];
@@ -447,6 +486,25 @@ function buildCard(card, colId) {
     chip.style.color = "var(--text-dim)";
     chip.style.border = "1px solid var(--border)";
     chip.textContent = linkedFaction.name;
+    chipsRow.appendChild(chip);
+  }
+  const linkedLocation = locationById(card.locationId);
+  if (linkedLocation) {
+    const [, , , color] = locationTypeInfo(linkedLocation.type);
+    const chip = document.createElement("span");
+    chip.className = "chip";
+    chip.style.background = color;
+    chip.textContent = linkedLocation.name || i18n("Без имени");
+    chipsRow.appendChild(chip);
+  }
+  const linkedChapter = chapterById(card.chapterId);
+  if (linkedChapter) {
+    const chip = document.createElement("span");
+    chip.className = "chip";
+    chip.style.background = "var(--panel-alt)";
+    chip.style.color = "var(--text-dim)";
+    chip.style.border = "1px solid var(--border)";
+    chip.textContent = linkedChapter.title || i18n("Без названия");
     chipsRow.appendChild(chip);
   }
   if (chipsRow.children.length) el.appendChild(chipsRow);
