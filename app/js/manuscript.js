@@ -936,7 +936,7 @@ function buildNotesEditor(chapter) {
 
     const delBtn = document.createElement("button");
     delBtn.className = "btn danger";
-    delBtn.textContent = "✕";
+    delBtn.innerHTML = iconSvg("close", 12);
     delBtn.title = i18n("Удалить заметку");
     delBtn.addEventListener("click", () => {
       chapter.notes = chapter.notes.filter((n) => n.id !== note.id);
@@ -990,7 +990,7 @@ function buildStickyEditor(chapter) {
 
     const delBtn = document.createElement("button");
     delBtn.className = "btn danger";
-    delBtn.textContent = "✕";
+    delBtn.innerHTML = iconSvg("close", 12);
     delBtn.title = i18n("Удалить стикер вместе с его маркером в тексте главы");
     delBtn.addEventListener("click", () => {
       // Раньше маркер [[note:id]] оставался в тексте главы как обычный
@@ -1079,7 +1079,7 @@ function buildSnapshots(chapter) {
 
     const delBtn = document.createElement("button");
     delBtn.className = "btn danger";
-    delBtn.textContent = "✕";
+    delBtn.innerHTML = iconSvg("close", 12);
     delBtn.addEventListener("click", () => {
       chapter.snapshots = chapter.snapshots.filter((s) => s.id !== snap.id);
       persist();

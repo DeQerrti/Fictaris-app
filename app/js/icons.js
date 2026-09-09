@@ -23,6 +23,7 @@ const PATHS = {
   more: '<circle cx="5" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.6" fill="currentColor" stroke="none"/>',
   focus: '<path d="M4 9V5a1 1 0 0 1 1-1h4M15 4h4a1 1 0 0 1 1 1v4M20 15v4a1 1 0 0 1-1 1h-4M9 20H5a1 1 0 0 1-1-1v-4"/>',
   close: '<path d="M5 5l14 14M19 5L5 19"/>',
+  check: '<path d="M4 12l5 5L20 6"/>',
   shuffle: '<polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/>',
   chevronLeft: '<path d="M15 6l-6 6 6 6"/>',
   chevronRight: '<path d="M9 6l6 6-6 6"/>',
@@ -33,6 +34,14 @@ const PATHS = {
   // кнопками-плашками внизу списка).
   notePlus: '<path d="M6 3h9l4 4v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3v5h5"/><path d="M9 14h6M12 11v6"/>',
   folderPlus: '<path d="M3 6a1 1 0 0 1 1-1h5l2 2h9a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6z"/><path d="M9 13h6M12 10v6"/>',
+
+  // Значок настроек (settingsBtn, index.html) — раньше был голым
+  // символом "⚙" прямо в разметке, единственное место в сайдбаре, не
+  // нарисованное этим набором. "Ползунки" вместо шестерёнки — тот же
+  // смысл (настройки), но геометрически надёжнее нарисовать вручную,
+  // чем зубчатый круг: три прямые линии и три кружка вместо дюжины
+  // сегментов дуг, риск получить кривую форму заметно ниже.
+  settings: '<line x1="4" y1="6" x2="20" y2="6"/><circle cx="9" cy="6" r="2"/><line x1="4" y1="12" x2="20" y2="12"/><circle cx="15" cy="12" r="2"/><line x1="4" y1="18" x2="20" y2="18"/><circle cx="9" cy="18" r="2"/>',
 
   // Иконки пунктов сайдбара (applyNavIcons ниже) — с полутора десятками
   // разделов один текст без единой опорной точки сканируется взглядом
@@ -90,6 +99,11 @@ const NAV_ICONS = {
 // перед ним, так что порядок здесь не принципиален, но так нагляднее:
 // сперва иконка появляется, потом подпись подстраивается под язык.
 export function applyNavIcons() {
+  // Кнопка настроек — не .nav-item (см. комментарий в main.js про
+  // нумерацию горячих клавиш), поэтому мимо цикла ниже; тот же приём.
+  const settingsBtn = document.getElementById("settingsBtn");
+  if (settingsBtn && !settingsBtn.innerHTML) settingsBtn.innerHTML = iconSvg("settings", 16);
+
   document.querySelectorAll(".nav-item[data-module]").forEach((btn) => {
     const key = NAV_ICONS[btn.dataset.module];
     if (key && !btn.querySelector(".nav-icon")) {

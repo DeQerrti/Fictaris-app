@@ -1,4 +1,5 @@
 import { apiGet, apiPost } from "./api.js";
+import { iconSvg } from "./icons.js";
 import { i18n } from "./i18n.js";
 
 const btn = document.getElementById("projectBtn");
@@ -30,7 +31,7 @@ function promptForNameRow(onCreate) {
   input.placeholder = i18n("Название проекта");
   const create = document.createElement("button");
   create.className = "project-row-del";
-  create.textContent = "✓";
+  create.innerHTML = iconSvg("check", 12);
   create.title = i18n("Создать");
   create.addEventListener("click", (e) => {
     e.stopPropagation();
@@ -80,7 +81,7 @@ async function openMenu() {
 
     const renameBtn = document.createElement("button");
     renameBtn.className = "project-row-del";
-    renameBtn.textContent = "✎";
+    renameBtn.innerHTML = iconSvg("pencil", 12);
     renameBtn.title = i18n("Переименовать");
     renameBtn.addEventListener("click", (e) => {
       e.stopPropagation();
@@ -94,10 +95,11 @@ async function openMenu() {
     if ((info.vaults || []).length > 1) {
       const delBtn = document.createElement("button");
       delBtn.className = "project-row-del";
-      delBtn.textContent = "✕";
-      delBtn.title = info.mobile
+      delBtn.innerHTML = iconSvg("close", 12);
+      const delTitle = info.mobile
         ? i18n("Удалить проект вместе с файлами — это необратимо")
         : i18n("Убрать из списка (файлы на диске не трогает)");
+      delBtn.title = delTitle;
       delBtn.addEventListener("click", async (e) => {
         e.stopPropagation();
         if (delBtn.dataset.confirm === "1") {
@@ -113,7 +115,8 @@ async function openMenu() {
         delBtn.textContent = "?";
         setTimeout(() => {
           delBtn.dataset.confirm = "";
-          delBtn.textContent = "✕";
+          delBtn.innerHTML = iconSvg("close", 12);
+          delBtn.title = delTitle;
         }, 3000);
       });
       row.appendChild(delBtn);

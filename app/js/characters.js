@@ -6,6 +6,7 @@ import { buildReverseLinks } from "./reverse-links.js";
 import { loadTagsMap, buildTagsField } from "./tags.js";
 import { buildNameGeneratorButton } from "./name-generator.js";
 import { avatarInnerHtml, buildAvatarsField } from "./avatars.js";
+import { iconSvg } from "./icons.js";
 import { loadTemplates, saveTemplates, templateFor, buildFieldHint } from "./templates.js";
 import { openEntitySheet } from "./entity-sheet.js";
 import { chooseTemplate } from "./template-choice.js";
@@ -265,7 +266,7 @@ function buildRelationshipsField(c) {
 
       const delBtn = document.createElement("button");
       delBtn.className = "btn danger";
-      delBtn.textContent = "✕";
+      delBtn.innerHTML = iconSvg("close", 12);
       delBtn.addEventListener("click", async () => {
         await pushTrash("relationship", rel);
         relationships = relationships.filter((r) => r.id !== rel.id);

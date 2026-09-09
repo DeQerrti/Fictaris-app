@@ -2,6 +2,7 @@ import { apiGet, apiPost, uid } from "./api.js";
 import { debounceSave } from "./save-badge.js";
 import { escapeHtml, buildEmptyState } from "./chips.js";
 import { openContextMenu } from "./context-menu.js";
+import { iconSvg } from "./icons.js";
 import { i18n } from "./i18n.js";
 
 // ══════════════════════════════════════════════
@@ -85,7 +86,7 @@ function buildHome() {
     const open = document.createElement("button");
     open.className = "map-home-open";
     open.innerHTML = `
-      <div class="char-avatar" style="background:#7d6a9e">✎</div>
+      <div class="char-avatar" style="background:#7d6a9e">${iconSvg("frame", 30)}</div>
       <div class="char-name">${escapeHtml(cv.name || i18n("Без названия"))}</div>
       <div class="char-role">${i18n("{n} карточек", { n: (cv.cards || []).length })}</div>
     `;
@@ -97,7 +98,7 @@ function buildHome() {
 
     const delBtn = document.createElement("button");
     delBtn.className = "board-column-del";
-    delBtn.textContent = "✕";
+    delBtn.innerHTML = iconSvg("close", 12);
     delBtn.title = i18n("Удалить холст");
     delBtn.addEventListener("click", (e) => {
       e.stopPropagation();
@@ -113,7 +114,8 @@ function buildHome() {
       delBtn.title = i18n("Точно удалить холст со всеми карточками?");
       setTimeout(() => {
         delBtn.dataset.confirm = "";
-        delBtn.textContent = "✕";
+        delBtn.innerHTML = iconSvg("close", 12);
+        delBtn.title = i18n("Удалить холст");
       }, 3000);
     });
     card.appendChild(delBtn);
@@ -305,7 +307,8 @@ function buildCanvasView() {
       const otherId = e.fromId === card.id ? e.toId : e.fromId;
       const other = cv.cards.find((c) => c.id === otherId);
       return {
-        label: i18n("✕ {label}", { label: other ? edgeLabel(other) : "?" }),
+        label: other ? edgeLabel(other) : "?",
+        icon: "close",
         action: () => {
           cv.edges = cv.edges.filter((x) => x.id !== e.id);
           persist();

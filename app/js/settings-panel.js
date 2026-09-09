@@ -670,7 +670,7 @@ function renderTagsManageList(list, merged, hidden, custom) {
 
       const renameBtn = document.createElement("button");
       renameBtn.className = "btn shortcut-clear";
-      renameBtn.textContent = "✎";
+      renameBtn.innerHTML = iconSvg("pencil", 13);
       renameBtn.title = i18n("Переименовать");
       renameBtn.addEventListener("click", () => {
         const input = document.createElement("input");

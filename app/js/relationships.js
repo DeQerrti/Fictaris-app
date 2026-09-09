@@ -2,6 +2,7 @@ import { apiGet, apiPost, uid } from "./api.js";
 import { debounceSave } from "./save-badge.js";
 import { escapeHtml, characterSelect, buildEmptyState } from "./chips.js";
 import { pushTrash } from "./trash.js";
+import { iconSvg } from "./icons.js";
 import { i18n } from "./i18n.js";
 
 // ══════════════════════════════════════════════
@@ -430,7 +431,7 @@ function buildRelRow(rel) {
 
   const delBtn = document.createElement("button");
   delBtn.className = "btn danger";
-  delBtn.textContent = "✕";
+  delBtn.innerHTML = iconSvg("close", 12);
   delBtn.addEventListener("click", async () => {
     await pushTrash("relationship", rel);
     relationships = relationships.filter((r) => r.id !== rel.id);

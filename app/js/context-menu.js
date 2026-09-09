@@ -18,7 +18,10 @@ import { iconSvg } from "./icons.js";
 
 let menuEl = null;
 
-function closeMenu() {
+// Экспортирован — вызывающая сторона попапа (openPopover) может закрыть
+// его сама после своего действия (board.js: переименование/удаление
+// доски внутри выпадающего списка не ждёт клика мимо, чтобы закрыться).
+export function closeMenu() {
   menuEl?.remove();
   menuEl = null;
   document.removeEventListener("mousedown", onOutside, true);

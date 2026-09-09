@@ -2,7 +2,7 @@ import { apiGet, apiPost, uid } from "./api.js";
 import { debounceSave } from "./save-badge.js";
 import { pushTrash } from "./trash.js";
 import { buildExportPngButton } from "./png-export.js";
-import { openContextMenu } from "./context-menu.js";
+import { openContextMenu, openPopover, closeMenu } from "./context-menu.js";
 import { escapeHtml } from "./chips.js";
 import { iconSvg, locationTypeInfo } from "./icons.js";
 import { i18n } from "./i18n.js";
@@ -72,100 +72,121 @@ function switchBoard(id) {
   draw();
 }
 
-function deleteBoard() {
+function deleteBoardById(id) {
   if (data.boards.length <= 1) return;
-  data.boards = data.boards.filter((b) => b.id !== board.id);
-  switchBoard(data.boards[0].id);
+  const wasActive = board.id === id;
+  data.boards = data.boards.filter((b) => b.id !== id);
+  if (wasActive) switchBoard(data.boards[0].id);
+  else { persist(); draw(); }
 }
 
-// Переименование — не отдельное постоянно видимое поле рядом с
-// кнопкой (было раньше: тот же текст дважды, в кнопке и в input, одна
-// область только под имя), а карандаш, включающий его на месте, тем же
-// приёмом, что и "+ Новая доска" в самом выпадающем списке переключателя
-// ниже — вместо отдельной вечно видимой "+ Доска" сбоку.
-let renamingBoard = false;
+// Список досок с переименованием и удалением — карандаш/крестик не
+// отдельными вечно видимыми кнопками рядом с переключателем (это и
+// была вечно занимающая место двойная кнопка "Доска 1"/поле имени), а
+// внутри самого выпадающего списка, у каждой строки — тем же приёмом,
+// что и переключатель проектов (project-switcher.js, project-row):
+// имя переключает доску по клику, две мелкие иконки рядом — правят её,
+// не мешая друг другу (stopPropagation).
+function buildBoardSwitchList() {
+  const wrap = document.createElement("div");
+  wrap.className = "board-switch-list";
+
+  for (const b of data.boards) {
+    const row = document.createElement("div");
+    row.className = "board-switch-row" + (b.id === board.id ? " active" : "");
+
+    const nameBtn = document.createElement("button");
+    nameBtn.className = "board-switch-name";
+    nameBtn.textContent = b.name;
+    nameBtn.addEventListener("click", () => {
+      closeMenu();
+      switchBoard(b.id);
+    });
+    row.appendChild(nameBtn);
+
+    const renameBtn = document.createElement("button");
+    renameBtn.className = "board-switch-action";
+    renameBtn.innerHTML = iconSvg("pencil", 13);
+    renameBtn.title = i18n("Переименовать доску");
+    renameBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const input = document.createElement("input");
+      input.className = "board-switch-input";
+      input.value = b.name;
+      nameBtn.replaceWith(input);
+      input.focus();
+      input.select();
+      const commit = () => {
+        b.name = input.value.trim() || b.name;
+        persist();
+        closeMenu();
+        draw();
+      };
+      input.addEventListener("click", (e2) => e2.stopPropagation());
+      input.addEventListener("blur", commit);
+      input.addEventListener("keydown", (e2) => {
+        if (e2.key === "Enter") input.blur();
+        else if (e2.key === "Escape") { input.value = b.name; input.blur(); }
+      });
+    });
+    row.appendChild(renameBtn);
+
+    if (data.boards.length > 1) {
+      const delBtn = document.createElement("button");
+      delBtn.className = "board-switch-action";
+      delBtn.innerHTML = iconSvg("close", 13);
+      delBtn.title = i18n("Удалить эту доску навсегда");
+      delBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (delBtn.dataset.confirm === "1") {
+          closeMenu();
+          deleteBoardById(b.id);
+          return;
+        }
+        delBtn.dataset.confirm = "1";
+        delBtn.title = i18n("Точно?");
+        setTimeout(() => {
+          delBtn.dataset.confirm = "";
+          delBtn.title = i18n("Удалить эту доску навсегда");
+        }, 3000);
+      });
+      row.appendChild(delBtn);
+    }
+
+    wrap.appendChild(row);
+  }
+
+  const divider = document.createElement("div");
+  divider.className = "board-switch-divider";
+  wrap.appendChild(divider);
+
+  const addBtn = document.createElement("button");
+  addBtn.className = "board-switch-name";
+  addBtn.textContent = i18n("+ Новая доска");
+  addBtn.addEventListener("click", () => {
+    closeMenu();
+    addBoard();
+  });
+  wrap.appendChild(addBtn);
+
+  return wrap;
+}
 
 function buildBoardSwitcher() {
   const bar = document.createElement("div");
   bar.className = "board-switcher-bar";
 
-  if (renamingBoard) {
-    const nameInput = document.createElement("input");
-    nameInput.type = "text";
-    nameInput.className = "board-switcher-rename";
-    nameInput.value = board.name;
-    const commit = () => {
-      board.name = nameInput.value.trim() || board.name;
-      renamingBoard = false;
-      persist();
-      draw();
-    };
-    nameInput.addEventListener("blur", commit);
-    nameInput.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") { e.preventDefault(); commit(); }
-      if (e.key === "Escape") { renamingBoard = false; draw(); }
-    });
-    bar.appendChild(nameInput);
-  } else {
-    // Не нативный <select> — его выпадающий список рисует сама ОС/Chromium
-    // своей собственной подсветкой выбранного пункта (обычно системным
-    // синим), которую не перекрасить в цвета темы. Тот же переиспользуемый
-    // список ПКМ (context-menu.js), что и везде в приложении, — и вид, и
-    // подсветка совпадают с остальным интерфейсом. "+ Новая доска" —
-    // последним пунктом того же списка, а не отдельной кнопкой сбоку.
-    const switchBtn = document.createElement("button");
-    switchBtn.className = "btn board-switcher-current";
-    switchBtn.textContent = board.name;
-    switchBtn.title = i18n("Переключить доску");
-    switchBtn.addEventListener("click", () => {
-      const r = switchBtn.getBoundingClientRect();
-      openContextMenu(r.left, r.bottom + 4, [
-        ...data.boards.map((b) => ({
-          label: b.name,
-          checked: b.id === board.id,
-          action: () => switchBoard(b.id),
-        })),
-        { separator: true },
-        { label: i18n("+ Новая доска"), action: addBoard },
-      ]);
-    });
-    bar.appendChild(switchBtn);
-
-    const renameBtn = document.createElement("button");
-    renameBtn.className = "btn icon-btn";
-    renameBtn.innerHTML = iconSvg("pencil", 14);
-    renameBtn.title = i18n("Переименовать доску");
-    renameBtn.addEventListener("click", () => {
-      renamingBoard = true;
-      draw();
-      const input = container.querySelector(".board-switcher-rename");
-      input?.focus();
-      input?.select();
-    });
-    bar.appendChild(renameBtn);
-  }
+  const switchBtn = document.createElement("button");
+  switchBtn.className = "btn board-switcher-current";
+  switchBtn.textContent = board.name;
+  switchBtn.title = i18n("Переключить доску");
+  switchBtn.addEventListener("click", () => {
+    const r = switchBtn.getBoundingClientRect();
+    openPopover(r.left, r.bottom + 4, buildBoardSwitchList(), "board-switch-popover");
+  });
+  bar.appendChild(switchBtn);
 
   bar.appendChild(buildExportPngButton(() => container.querySelector(".board-view"), i18n("доска")));
-
-  if (data.boards.length > 1) {
-    const delBtn = document.createElement("button");
-    delBtn.className = "btn danger";
-    delBtn.innerHTML = iconSvg("trash", 14);
-    delBtn.title = i18n("Удалить эту доску навсегда");
-    delBtn.addEventListener("click", () => {
-      if (delBtn.dataset.confirm === "1") {
-        deleteBoard();
-        return;
-      }
-      delBtn.dataset.confirm = "1";
-      delBtn.textContent = i18n("Точно?");
-      setTimeout(() => {
-        delBtn.dataset.confirm = "";
-        delBtn.innerHTML = iconSvg("trash", 14);
-      }, 3000);
-    });
-    bar.appendChild(delBtn);
-  }
 
   return bar;
 }
@@ -258,7 +279,7 @@ function buildColumn(col) {
 
   const delBtn = document.createElement("button");
   delBtn.className = "board-column-del";
-  delBtn.textContent = "✕";
+  delBtn.innerHTML = iconSvg("close", 12);
   delBtn.title = i18n("Удалить колонку");
   delBtn.addEventListener("click", () => {
     if (delBtn.dataset.confirm === "1") {
@@ -274,7 +295,7 @@ function buildColumn(col) {
     delBtn.textContent = i18n("Точно?");
     setTimeout(() => {
       delBtn.dataset.confirm = "";
-      delBtn.textContent = "✕";
+      delBtn.innerHTML = iconSvg("close", 12);
     }, 3000);
   });
   header.appendChild(delBtn);
@@ -445,14 +466,35 @@ function buildCard(card, colId) {
     openContextMenu(e.clientX, e.clientY, cardContextItems(card, colId));
   });
 
-  const titleInput = document.createElement("input");
+  // <textarea>, а не <input> — у input текст молча обрезается по краю
+  // поля, не перенося слово на новую строку (в отличие от заметок ниже,
+  // которые уже textarea). rows=1 + автоподгон высоты по scrollHeight —
+  // однострочный вид, пока заголовок короткий, и сам растёт вниз, когда
+  // не помещается, вместо потери текста.
+  const titleInput = document.createElement("textarea");
   titleInput.className = "board-card-title";
+  titleInput.rows = 1;
   titleInput.value = card.title;
+  function autosizeTitle() {
+    titleInput.style.height = "auto";
+    titleInput.style.height = `${titleInput.scrollHeight}px`;
+  }
   titleInput.addEventListener("input", () => {
     card.title = titleInput.value;
     persist();
+    autosizeTitle();
+  });
+  // Enter завершает правку, а не переносит строку внутри заголовка —
+  // перенос здесь только от нехватки места (word-wrap), не ручной.
+  titleInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); titleInput.blur(); }
   });
   el.appendChild(titleInput);
+  // scrollHeight у только что созданного, ещё не вставленного в живой
+  // DOM элемента ничего не измеряет (нет раскладки) — откладываем
+  // первый замер на следующий тик, когда draw() уже вставит карточку
+  // в контейнер целиком.
+  setTimeout(autosizeTitle, 0);
 
   // Лицевая сторона — в основном свободный текст: заметки растут на всё
   // оставшееся место карточки (flex, а не фиксированные rows), заголовок
@@ -511,7 +553,7 @@ function buildCard(card, colId) {
 
   const delBtn = document.createElement("button");
   delBtn.className = "board-card-del";
-  delBtn.textContent = "✕";
+  delBtn.innerHTML = iconSvg("close", 12);
   delBtn.title = i18n("Удалить карточку");
   delBtn.addEventListener("click", () => deleteCard(card, colId));
   el.appendChild(delBtn);

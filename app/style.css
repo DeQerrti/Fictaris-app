@@ -268,29 +268,6 @@ body.focus-mode .sidebar { display: none; }
 .sidebar-collapse-btn.active { color: var(--accent); }
 .sidebar-collapse-btn svg { transition: transform 0.15s ease; }
 
-/* Кнопки "назад"/"вперёд" по истории переходов (main.js) — сразу под
-   шапкой сайдбара, до списка разделов, чтобы быть на виду независимо
-   от прокрутки .sidebar-nav и от того, свёрнут ли сайдбар до иконок. */
-.nav-history-row {
-  display: flex;
-  gap: 2px;
-  padding: 2px 4px 8px;
-}
-.nav-history-btn {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 26px;
-  background: none;
-  border: none;
-  border-radius: 6px;
-  color: var(--text-dim);
-  cursor: pointer;
-}
-.nav-history-btn:hover:not(:disabled) { background: var(--panel); color: var(--text); }
-.nav-history-btn:disabled { color: var(--text-faint); opacity: 0.4; cursor: default; }
-
 @media (min-width: 861px) {
   .sidebar-resize-handle {
     position: absolute;
@@ -359,7 +336,6 @@ body.focus-mode .sidebar { display: none; }
   #app.sidebar-collapsed .sidebar-pin,
   #app.sidebar-collapsed .sidebar-resize-handle { display: none; }
   #app.sidebar-collapsed .sidebar-collapse-btn svg { transform: rotate(180deg); }
-  #app.sidebar-collapsed .nav-history-row { justify-content: center; }
 
   /* Открепление (авто-скрытие) и режим "только иконки" — оба сами по
      себе управляют шириной .sidebar, и без этого блока сталкиваются:
@@ -379,7 +355,7 @@ body.focus-mode .sidebar { display: none; }
 }
 
 @media (max-width: 860px) {
-  .sidebar-pin, .sidebar-resize-handle, .sidebar-collapse-btn, .nav-history-row { display: none; }
+  .sidebar-pin, .sidebar-resize-handle, .sidebar-collapse-btn { display: none; }
 }
 
 /* Переключатель проекта теперь в самом низу сайдбара, под «Корзиной» —
@@ -472,6 +448,9 @@ body.focus-mode .sidebar { display: none; }
 }
 
 .project-row-del {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: none;
   border: none;
   color: var(--text-faint);
@@ -1517,6 +1496,9 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
 }
 
 .shortcut-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 26px;
   height: 26px;
   padding: 0;
@@ -2114,17 +2096,60 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
   white-space: nowrap;
 }
 
-.board-switcher-rename {
+/* Список досок в попапе переключателя (board.js, buildBoardSwitchList) —
+   тем же приёмом, что и переключатель проектов (.project-row и
+   соседи) — имя переключает, две мелкие иконки правят на месте. */
+.board-switch-list { display: flex; flex-direction: column; min-width: 200px; gap: 1px; }
+
+.board-switch-row { display: flex; align-items: center; gap: 2px; }
+
+.board-switch-name {
   flex: 1;
-  max-width: 260px;
-  background: var(--panel-alt);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  color: var(--text);
-  padding: 6px 10px;
+  min-width: 0;
+  text-align: left;
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 0.85rem;
   font-family: inherit;
-  font-size: 0.82rem;
+  padding: 7px 8px;
+  border-radius: 5px;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
+.board-switch-name:hover { background: var(--panel-alt); color: var(--text); }
+.board-switch-row.active .board-switch-name { color: var(--accent-hover); font-weight: 600; }
+
+.board-switch-action {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background: none;
+  border: none;
+  border-radius: 5px;
+  color: var(--text-faint);
+  cursor: pointer;
+}
+.board-switch-action:hover { background: var(--panel-alt); color: var(--text); }
+
+.board-switch-input {
+  flex: 1;
+  min-width: 0;
+  background: var(--panel);
+  border: 1px solid var(--accent);
+  border-radius: 5px;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.85rem;
+  padding: 6px 8px;
+}
+
+.board-switch-divider { height: 1px; background: var(--border); margin: 4px 0; }
 
 .board-card-chips {
   display: flex;
@@ -2164,6 +2189,9 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
 .board-column-title:focus { outline: none; }
 
 .board-column-del, .board-card-del {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: none;
   border: none;
   color: var(--text-faint);
@@ -2192,11 +2220,16 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
 .board-card:hover { border-color: var(--accent); }
 
 .board-card-title {
+  display: block;
   width: 100%;
   background: none;
   border: none;
   color: var(--text);
+  font-family: inherit;
   font-size: 0.88rem;
+  line-height: 1.3;
+  resize: none;
+  overflow: hidden;
 }
 
 .board-card-title:focus { outline: none; }

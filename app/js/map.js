@@ -118,7 +118,7 @@ function buildMapsHome() {
 
     const delBtn = document.createElement("button");
     delBtn.className = "board-column-del";
-    delBtn.textContent = "✕";
+    delBtn.innerHTML = iconSvg("close", 12);
     delBtn.title = i18n("Удалить карту со всеми вложенными под-картами");
     delBtn.addEventListener("click", (e) => {
       e.stopPropagation();
@@ -134,7 +134,8 @@ function buildMapsHome() {
       delBtn.title = i18n("Удалит карту со всем вложенным. Точно?");
       setTimeout(() => {
         delBtn.dataset.confirm = "";
-        delBtn.textContent = "✕";
+        delBtn.innerHTML = iconSvg("close", 12);
+        delBtn.title = i18n("Удалить карту со всеми вложенными под-картами");
       }, 3000);
     });
     card.appendChild(delBtn);

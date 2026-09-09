@@ -371,10 +371,10 @@ export const EN_DICT = {
   "Добро пожаловать в Fictaris": "Welcome to Fictaris",
   "<b>Поиск</b> — клавиша <kbd>/</kbd> или кнопка в сайдбаре ищет сразу по всем модулям.":
     "<b>Search</b> — the <kbd>/</kbd> key or the sidebar button searches across every module at once.",
-  "<b>⚙ Настройки</b> — тема, акцент, подписи меню, горячие клавиши, синхронизация между устройствами.":
-    "<b>⚙ Settings</b> — theme, accent color, menu labels, keyboard shortcuts, sync between devices.",
-  "<b>«⚙ Настройки» → «Данные» → «Заполнить примером»</b> — связный тестовый сюжет, чтобы сразу увидеть, как модули работают вместе.":
-    "<b>“⚙ Settings” → “Data” → “Fill with example”</b> — a connected sample story so you can see right away how the modules work together.",
+  "<b>Настройки</b> — тема, акцент, подписи меню, горячие клавиши, синхронизация между устройствами.":
+    "<b>Settings</b> — theme, accent color, menu labels, keyboard shortcuts, sync between devices.",
+  "<b>«Настройки» → «Данные» → «Заполнить примером»</b> — связный тестовый сюжет, чтобы сразу увидеть, как модули работают вместе.":
+    "<b>“Settings” → “Data” → “Fill with example”</b> — a connected sample story so you can see right away how the modules work together.",
   "Заполнить примером": "Fill with example",
   "Понятно, дальше сам": "Got it, I'll explore",
 
@@ -624,8 +624,6 @@ export const EN_DICT = {
   "Загрузить шаблон из файла — добавится новой вкладкой": "Load a template from a file — it will appear as a new tab",
 
   "Недавнее": "Recent",
-  "Назад": "Back",
-  "Вперёд": "Forward",
   "Открыть родительскую локацию": "Open parent location",
   "Свернуть список разделов до одних иконок": "Collapse the section list to icons only",
   "Список свёрнут до иконок — нажми, чтобы вернуть подписи": "List collapsed to icons — click to bring back labels",
