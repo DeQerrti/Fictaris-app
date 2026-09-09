@@ -110,6 +110,25 @@ html, body {
   overflow: hidden;
 }
 
+/* ── Скроллбары ────────────────────────────────
+   Без этого блока в любом прокручиваемом месте (сайдбар, панель
+   Настроек, анкеты, модалки) рисуется системный скроллбар — на тёмной
+   теме это широкая светлая полоса, чужеродная на вид рядом с остальным
+   интерфейсом. ::-webkit-scrollbar работает только в Chromium
+   (Electron внутри и есть Chromium) — в других браузерах правило
+   просто ничего не делает, ничего не ломая. Цвета — переменные темы, а
+   не фиксированные значения, чтобы полоса не выбивалась и в «Пергаменте». */
+::-webkit-scrollbar { width: 9px; height: 9px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 5px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--text-faint); }
+::-webkit-scrollbar-corner { background: transparent; }
+
 #app { display: flex; height: 100vh; }
 
 .sidebar {
@@ -341,6 +360,22 @@ body.focus-mode .sidebar { display: none; }
   #app.sidebar-collapsed .sidebar-resize-handle { display: none; }
   #app.sidebar-collapsed .sidebar-collapse-btn svg { transform: rotate(180deg); }
   #app.sidebar-collapsed .nav-history-row { justify-content: center; }
+
+  /* Открепление (авто-скрытие) и режим "только иконки" — оба сами по
+     себе управляют шириной .sidebar, и без этого блока сталкиваются:
+     у #app.sidebar-collapsed .sidebar { width: 56px } и
+     #app.sidebar-autohide .sidebar { width: 10px } одинаковая
+     специфичность, побеждает та, что ниже по файлу — 56px перебивал
+     тонкую полоску авто-скрытия даже когда мышь не наведена (сама
+     полоска пряталась, а невидимый 56-пиксельный короб оставался), а
+     при наведении сайдбар всё равно раскрывался на полную сохранённую
+     ширину (var(--sidebar-width)) вместо узкой иконочной — подписи
+     ведь спрятаны, но место под них никто не отбирал, и иконки
+     повисали посередине пустой панели. Здесь оба класса в одном
+     селекторе — специфичность выше обоих правил по отдельности,
+     побеждает независимо от порядка в файле. */
+  #app.sidebar-autohide.sidebar-collapsed .sidebar { width: 10px; min-width: 10px; }
+  #app.sidebar-autohide.sidebar-collapsed .sidebar:hover { width: 56px; padding: 16px 6px; }
 }
 
 @media (max-width: 860px) {
