@@ -317,13 +317,46 @@ async function deleteCard(card, colId) {
 // собственно текст, а места для сути сцены оставалось на одну-две
 // строки. Лицевая сторона теперь — заголовок и заметки на весь рост,
 // а привязки — второстепенное действие, как в Trello/Obsidian.
+// Невидимый <input type="color"> — открывает нативный (системный/
+// Chromium) выбор цвета сразу по клику, без своего колесика/палитры:
+// тот же приём, что скрытый <input type="file"> для загрузки картинки
+// (avatars.js), только с color вместо file. onChange зовётся на каждое
+// "input" (цвет уже виден на кнопке доски вживую, пока крутишь колесо),
+// а не только по закрытию диалога.
+function pickCustomColor(initialColor, onChange) {
+  const input = document.createElement("input");
+  input.type = "color";
+  input.value = /^#[0-9a-f]{6}$/i.test(initialColor || "") ? initialColor : "#c9944a";
+  input.style.position = "fixed";
+  input.style.opacity = "0";
+  input.style.pointerEvents = "none";
+  document.body.appendChild(input);
+  input.addEventListener("input", () => onChange(input.value));
+  // change — диалог закрыли выбором; blur — закрыли как угодно ещё
+  // (Esc, клик мимо) — оба раза подчищаем за собой инпут из DOM.
+  input.addEventListener("change", () => input.remove());
+  input.addEventListener("blur", () => setTimeout(() => input.remove(), 0));
+  input.click();
+}
+
 function cardContextItems(card, colId) {
+  // "Свой цвет…" показывает текущий выбор своим свотчем/галочкой,
+  // только если он не совпадает ни с одним пресетом ниже — иначе тот
+  // же цвет отмечался бы галочкой сразу в двух местах списка.
+  const isPresetColor = LABEL_COLORS.includes(card.labelColor);
   const colorItems = [
     { label: i18n("Без метки"), swatch: "var(--panel-alt)", checked: !card.labelColor, action: () => { card.labelColor = null; persist(); draw(); } },
     ...LABEL_COLORS.map((color) => ({
       label: color, swatch: color, checked: card.labelColor === color,
       action: () => { card.labelColor = color; persist(); draw(); },
     })),
+    { separator: true },
+    {
+      label: i18n("Свой цвет…"),
+      swatch: !isPresetColor && card.labelColor ? card.labelColor : undefined,
+      checked: !isPresetColor && !!card.labelColor,
+      action: () => pickCustomColor(card.labelColor, (color) => { card.labelColor = color; persist(); draw(); }),
+    },
   ];
 
   const characterItems = [

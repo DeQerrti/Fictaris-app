@@ -646,4 +646,6 @@ export const EN_DICT = {
   "Экспорт главы в .pdf": "Export chapter as .pdf",
   "Экспорт папки в .pdf": "Export folder as .pdf",
   "Экспорт всей рукописи в .pdf": "Export the whole manuscript as .pdf",
+
+  "Свой цвет…": "Custom color…",
 };
