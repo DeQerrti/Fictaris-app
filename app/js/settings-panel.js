@@ -18,7 +18,6 @@ import {
 } from "./visibility.js";
 import { captureKey, saveShortcut, clearShortcut } from "./shortcuts.js";
 import { DEFAULT_TAGS_MAP, CATEGORY_LABELS, parseTags, stringifyTags } from "./tags.js";
-import { DEFAULT_STATUSES, loadStatuses, saveStatuses, renderStatusesList } from "./chapter-status.js";
 import { KIND_LABELS, loadTemplates, saveTemplates, blankField } from "./templates.js";
 import { defaultMonths, loadCalendar, saveCalendar } from "./calendar.js";
 import {
@@ -67,7 +66,6 @@ export async function renderSettings(root, focusTab) {
     ["labels", () => i18n("Подписи интерфейса"), () => buildLabelsSection()],
     ["shortcuts", () => i18n("Горячие клавиши"), () => buildShortcutsSection()],
     ["tags", () => i18n("Теги"), () => buildTagsSection()],
-    ["statuses", () => i18n("Статусы глав"), () => buildStatusesSection()],
     ["templates", () => i18n("Шаблоны анкет"), () => buildTemplatesSection()],
     ["calendar", () => i18n("Календарь"), () => buildCalendarSection()],
     ["sync", () => i18n("Синхронизация"), () => buildSyncSection()],
@@ -751,47 +749,6 @@ function renderTagsManageList(list, merged, hidden, custom) {
     }
     list.appendChild(group);
   }
-}
-
-// ── Статусы глав и папок ──────────────────────
-// Раньше три статуса (Черновик/На редактуре/Готово) были зашиты кодом —
-// теперь настраиваемый список (chapter-status.js), общий для глав и
-// папок рукописи (manuscript.js). Тот же приём подтверждения удаления в
-// два клика, что и у тегов выше.
-
-async function buildStatusesSection() {
-  const section = document.createElement("div");
-  section.className = "data-section";
-  section.innerHTML = `<h3>${i18n("Статусы глав")}</h3><p>${i18n("Переименуй, задай свой цвет или смайлик вместо цвета — статусы глав и папок в «Рукописи».")}</p>`;
-
-  const list = document.createElement("div");
-  list.className = "tags-manage-list";
-  const statuses = await loadStatuses();
-  renderStatusesList(list, statuses);
-  section.appendChild(list);
-
-  const addBtn = document.createElement("button");
-  addBtn.className = "btn";
-  addBtn.textContent = i18n("Добавить статус");
-  addBtn.addEventListener("click", async () => {
-    const current = await loadStatuses();
-    const next = [...current, { key: `status-${Date.now()}`, label: i18n("Новый статус"), color: "#7c7157", emoji: "" }];
-    await saveStatuses(next);
-    renderStatusesList(list, next);
-  });
-  section.appendChild(addBtn);
-
-  const resetBtn = document.createElement("button");
-  resetBtn.className = "btn";
-  resetBtn.style.marginLeft = "8px";
-  resetBtn.textContent = i18n("Сбросить к трём стандартным");
-  resetBtn.addEventListener("click", async () => {
-    await saveStatuses(DEFAULT_STATUSES);
-    renderStatusesList(list, DEFAULT_STATUSES);
-  });
-  section.appendChild(resetBtn);
-
-  return section;
 }
 
 

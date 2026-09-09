@@ -58,14 +58,14 @@ export async function fillWithDemoData() {
 
 // Инлайн-подтверждение вместо browser confirm() — общая полоска
 // «сообщение + Да/Отмена», которую показывает и импорт, и демо-данные.
-function showConfirmBar(bar, message, onConfirm) {
+function showConfirmBar(bar, message, onConfirm, confirmLabel) {
   bar.innerHTML = "";
   bar.className = "confirm-bar";
   const text = document.createElement("span");
   text.textContent = message;
   const yes = document.createElement("button");
   yes.className = "btn danger";
-  yes.textContent = i18n("Да, заменить");
+  yes.textContent = confirmLabel || i18n("Да, заменить");
   yes.addEventListener("click", () => {
     bar.innerHTML = "";
     onConfirm();
@@ -457,6 +457,30 @@ function buildDemoSection() {
     });
   });
 
-  section.append(btn, confirmBar);
+  // Разобрался в примере, посмотрел, как модули связаны друг с другом —
+  // и дальше нужен чистый проект, а не ручное стирание десятка сущностей
+  // по одной. applyAll({}) — тот же путь, что и "Заполнить примером"
+  // выше и импорт файла (buildDataSections/восстановление), только с
+  // пустым набором вместо чужих/примерных данных: каждое поле сборки
+  // само откатывается к [] / EMPTY_* без bundle.characters и т.п.
+  const clearBtn = document.createElement("button");
+  clearBtn.className = "btn danger";
+  clearBtn.style.marginTop = "8px";
+  clearBtn.textContent = i18n("Убрать пример…");
+  clearBtn.title = i18n("Стереть весь текущий сюжет и начать с чистого проекта");
+  const clearConfirmBar = document.createElement("div");
+  clearBtn.addEventListener("click", () => {
+    showConfirmBar(
+      clearConfirmBar,
+      i18n("Все текущие данные будут стёрты без возможности отменить. Продолжить?"),
+      async () => {
+        await applyAll({});
+        location.reload();
+      },
+      i18n("Да, стереть")
+    );
+  });
+
+  section.append(btn, confirmBar, clearBtn, clearConfirmBar);
   return section;
 }

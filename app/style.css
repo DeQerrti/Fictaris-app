@@ -2370,6 +2370,20 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
   cursor: text;
 }
 
+/* Форматирование из ПКМ редактора (manuscript.js, wrapSelection) — в
+   режиме "Правка" это просто условные маркеры в тексте (**/~~/==/<u>),
+   в "Просмотре" applyInlineMarkup превращает их в настоящие теги.
+   <strong>/<em>/<s>/<u> уже выглядят как надо без правок — только
+   <mark> нужен свой фон: браузерный жёлтый маркер не вписывается в
+   тёмную тему, color-mix с --accent — вписывается в любую (и «Пергамент»
+   тоже, без своей отдельной переменной под альфа-канал). */
+.chapter-content-view mark {
+  background: color-mix(in srgb, var(--accent) 35%, transparent);
+  color: inherit;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
 .sticky-marker {
   display: inline-flex;
   vertical-align: -2px;

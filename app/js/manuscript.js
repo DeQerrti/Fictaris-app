@@ -11,9 +11,10 @@ import { iconSvg } from "./icons.js";
 import { recordToday } from "./writing-goal.js";
 import { i18n } from "./i18n.js";
 
-// Список статусов — настраиваемый (Настройки → Статусы глав, см.
-// chapter-status.js), общий для глав и папок; читается заново при
-// каждом открытии вкладки в renderManuscript.
+// Список статусов — настраиваемый (chapter-status.js; править —
+// "Статус" → "Управлять статусами…" по ПКМ на главе/папке), общий для
+// глав и папок; читается заново при каждом открытии вкладки в
+// renderManuscript.
 let statuses = [];
 
 // Размер шрифта текста главы — раньше жил в Настройках, отдельно от
@@ -196,6 +197,24 @@ function wrapSelection(textarea, before, after) {
   textarea.dispatchEvent(new Event("input"));
 }
 
+// Превращает условные маркеры форматирования (wrapSelection выше их и
+// расставляет) в настоящие теги — только в режиме "Просмотр"
+// (buildEditor, viewMode), сама textarea режима "Правка" их не трогает,
+// как и не трогала раньше. Работает поверх уже готовой (экранированной,
+// с настоящими <span> упоминаний и стикеров) HTML-строки — **/~~/==
+// пережили html-экранирование как обычные символы, а <u> экранировался
+// в &lt;u&gt;, поэтому ищем именно так, а не сырые "<u>". Порядок важен:
+// **жирный** разбирается раньше одиночных *, иначе первая пара *…*
+// съела бы половину **жирного** как курсив.
+function applyInlineMarkup(html) {
+  return html
+    .replace(/\*\*([^\n]+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/(?<!\*)\*([^\n*]+?)\*(?!\*)/g, "<em>$1</em>")
+    .replace(/~~([^\n]+?)~~/g, "<s>$1</s>")
+    .replace(/==([^\n]+?)==/g, "<mark>$1</mark>")
+    .replace(/&lt;u&gt;([\s\S]+?)&lt;\/u&gt;/g, "<u>$1</u>");
+}
+
 // Общая точка для смены размера шрифта — зовут и число в шапке
 // редактора, и подменю правого клика (см. attachEditorContextMenu),
 // чтобы оба места не разъезжались в логике сохранения/клампа.
@@ -228,20 +247,18 @@ function attachEditorContextMenu(textarea, chapter) {
       {
         label: i18n("Форматирование"),
         // Тот же набор, что в панели форматирования Obsidian (жирный,
-        // курсив, зачёркнутый, код, выделение) плюс подчёркивание —
-        // у Markdown/Obsidian для него нет своего значка, но в Word и
+        // курсив, зачёркнутый, выделение) плюс подчёркивание — у
+        // Markdown/Obsidian для него нет своего значка, но в Word и
         // Google Docs оно есть на том же правом клике, и как раз о нём
-        // отдельно спросили. Само форматирование остаётся условным
-        // (просто оборачивает текст маркерами, как жирный/курсив уже
-        // делали) — ни редактор, ни экспорт рукописи это не разбирает,
-        // это просто общепринятый способ разметить текст для себя же.
+        // отдельно спросили. В режиме "Просмотр" (viewMode ниже,
+        // applyInlineMarkup) все пять и правда становятся жирным/
+        // курсивом/и т.д., а не остаются условными маркерами как текст.
         items: [
           { label: i18n("Жирный"), disabled: !hasSelection, action: () => wrapSelection(textarea, "**", "**") },
           { label: i18n("Курсив"), disabled: !hasSelection, action: () => wrapSelection(textarea, "*", "*") },
           { label: i18n("Подчёркнутый"), disabled: !hasSelection, action: () => wrapSelection(textarea, "<u>", "</u>") },
           { label: i18n("Зачёркнутый"), disabled: !hasSelection, action: () => wrapSelection(textarea, "~~", "~~") },
           { label: i18n("Выделение цветом"), disabled: !hasSelection, action: () => wrapSelection(textarea, "==", "==") },
-          { label: i18n("Код"), disabled: !hasSelection, action: () => wrapSelection(textarea, "`", "`") },
         ],
       },
       { separator: true },
@@ -844,8 +861,8 @@ function buildEditor() {
   if (viewMode) {
     const view = document.createElement("div");
     view.className = "chapter-content chapter-content-view";
-    const mentioned = mentionsToHtml(chapter.content, characters);
-    view.innerHTML = stickersToHtml(mentioned, chapter.stickies || []) || `<span class="empty-state">${i18n("Глава пуста.")}</span>`;
+    const formatted = applyInlineMarkup(mentionsToHtml(chapter.content, characters));
+    view.innerHTML = stickersToHtml(formatted, chapter.stickies || []) || `<span class="empty-state">${i18n("Глава пуста.")}</span>`;
     view.addEventListener("click", (e) => {
       const charId = e.target.dataset?.charId;
       if (charId) document.dispatchEvent(new CustomEvent("fictaris:open-character", { detail: { id: charId } }));

@@ -634,7 +634,6 @@ export const EN_DICT = {
   "Подчёркнутый": "Underline",
   "Зачёркнутый": "Strikethrough",
   "Выделение цветом": "Highlight",
-  "Код": "Code",
 
   "+ Новая доска": "+ New board",
   "Переименовать доску": "Rename board",
@@ -651,4 +650,10 @@ export const EN_DICT = {
   "Связать с главой": "Link to a chapter",
   "Без локации": "No location",
   "Без главы": "No chapter",
+
+  "Убрать пример…": "Remove example…",
+  "Стереть весь текущий сюжет и начать с чистого проекта": "Erase the whole current story and start with a clean project",
+  "Все текущие данные будут стёрты без возможности отменить. Продолжить?":
+    "All current data will be erased with no way to undo. Continue?",
+  "Да, стереть": "Yes, erase",
 };
