@@ -203,3 +203,40 @@ export async function exportWorldPdf() {
   }
   return res;
 }
+
+// ══════════════════════════════════════════════
+//  ЭКСПОРТ ГЛАВ РУКОПИСИ В PDF
+//
+//  Третий формат рядом с уже существующими .md/.docx (manuscript.js) —
+//  та же пара "готовим HTML тут, печатаем в электроне" и та же проверка
+//  мобильного ok:true-без-path, что и у exportWorldPdf выше, просто
+//  вёрстка попроще: без справочных полей/оглавлений, только заголовок
+//  и текст главы — как и .md/.docx-экспорт, без разбора **жирного**/
+//  *курсива* и прочей условной разметки, которую вставляет ПКМ в
+//  редакторе (см. wrapSelection) — те тоже просто сохраняются буквально.
+// ══════════════════════════════════════════════
+
+function chapterPdfHtml(chapters, title) {
+  let body = `<div class="cover"><h1>${escapeHtml(title)}</h1><p>${escapeHtml(new Date().toLocaleDateString())}</p></div>`;
+  for (const ch of chapters) {
+    body += `<section class="kind"><h1>${escapeHtml(ch.title || i18n("Без названия"))}</h1>`;
+    const paragraphs = (ch.content || "").split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+    for (const p of paragraphs) body += `<p>${escapeHtml(p).replace(/\n/g, "<br>")}</p>`;
+    body += `</section>`;
+  }
+  return pageHtml(title, body);
+}
+
+// title — и заголовок на обложке, и (через filename) предложенное имя
+// файла в диалоге сохранения — тем же именем, что показывает "Сохранить
+// в .md/.docx" рядом (см. safeFileName в manuscript.js, откуда сюда и
+// приходит уже готовое безопасное имя).
+export async function exportChaptersPdf(chapters, title, filename) {
+  const html = chapterPdfHtml(chapters, title);
+  const res = await apiPost("/api/app/export-pdf", { html, filename });
+  if (res?.error) throw new Error(res.error);
+  if (res?.ok === true && !res.path) {
+    throw new Error(i18n("Экспорт в PDF доступен только в десктопной версии Fictaris."));
+  }
+  return res;
+}

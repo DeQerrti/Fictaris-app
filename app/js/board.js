@@ -4,18 +4,12 @@ import { pushTrash } from "./trash.js";
 import { buildExportPngButton } from "./png-export.js";
 import { openContextMenu } from "./context-menu.js";
 import { escapeHtml } from "./chips.js";
+import { iconSvg } from "./icons.js";
 import { i18n } from "./i18n.js";
 
 const LABEL_COLORS = [
   "#c9944a", "#4f7d74", "#a4483c", "#7d6a9e",
   "#6a8fae", "#9a9250", "#b5636b", "#5a8a5f",
-];
-
-// Шаблоны структуры — только колонки, без карточек: наполнение всё
-// равно у каждой рукописи своё, шаблон задаёт только скелет доски.
-const TEMPLATES = [
-  ["three_act", "Три акта", ["Завязка", "Развитие", "Развязка"]],
-  ["hero_journey", "Путь героя", ["Обычный мир", "Зов к приключению", "Испытания", "Кризис", "Награда", "Возвращение"]],
 ];
 
 // Несколько досок в одном хранилище (например, отдельные книги в одном
@@ -82,50 +76,74 @@ function deleteBoard() {
   switchBoard(data.boards[0].id);
 }
 
+// Переименование — не отдельное постоянно видимое поле рядом с
+// кнопкой (было раньше: тот же текст дважды, в кнопке и в input, одна
+// область только под имя), а карандаш, включающий его на месте, тем же
+// приёмом, что и "+ Новая доска" в самом выпадающем списке переключателя
+// ниже — вместо отдельной вечно видимой "+ Доска" сбоку.
+let renamingBoard = false;
+
 function buildBoardSwitcher() {
   const bar = document.createElement("div");
   bar.className = "board-switcher-bar";
 
-  // Не нативный <select> — его выпадающий список рисует сама ОС/Chromium
-  // своей собственной подсветкой выбранного пункта (обычно системным
-  // синим), которую не перекрасить в цвета темы. Тот же переиспользуемый
-  // список ПКМ (context-menu.js), что и везде в приложении, — и вид, и
-  // подсветка совпадают с остальным интерфейсом.
-  const switchBtn = document.createElement("button");
-  switchBtn.className = "btn board-switcher-current";
-  switchBtn.textContent = board.name;
-  switchBtn.title = i18n("Переключить доску");
-  switchBtn.addEventListener("click", () => {
-    const r = switchBtn.getBoundingClientRect();
-    openContextMenu(
-      r.left,
-      r.bottom + 4,
-      data.boards.map((b) => ({
-        label: b.name,
-        checked: b.id === board.id,
-        action: () => switchBoard(b.id),
-      }))
-    );
-  });
-  bar.appendChild(switchBtn);
+  if (renamingBoard) {
+    const nameInput = document.createElement("input");
+    nameInput.type = "text";
+    nameInput.className = "board-switcher-rename";
+    nameInput.value = board.name;
+    const commit = () => {
+      board.name = nameInput.value.trim() || board.name;
+      renamingBoard = false;
+      persist();
+      draw();
+    };
+    nameInput.addEventListener("blur", commit);
+    nameInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); commit(); }
+      if (e.key === "Escape") { renamingBoard = false; draw(); }
+    });
+    bar.appendChild(nameInput);
+  } else {
+    // Не нативный <select> — его выпадающий список рисует сама ОС/Chromium
+    // своей собственной подсветкой выбранного пункта (обычно системным
+    // синим), которую не перекрасить в цвета темы. Тот же переиспользуемый
+    // список ПКМ (context-menu.js), что и везде в приложении, — и вид, и
+    // подсветка совпадают с остальным интерфейсом. "+ Новая доска" —
+    // последним пунктом того же списка, а не отдельной кнопкой сбоку.
+    const switchBtn = document.createElement("button");
+    switchBtn.className = "btn board-switcher-current";
+    switchBtn.textContent = board.name;
+    switchBtn.title = i18n("Переключить доску");
+    switchBtn.addEventListener("click", () => {
+      const r = switchBtn.getBoundingClientRect();
+      openContextMenu(r.left, r.bottom + 4, [
+        ...data.boards.map((b) => ({
+          label: b.name,
+          checked: b.id === board.id,
+          action: () => switchBoard(b.id),
+        })),
+        { separator: true },
+        { label: i18n("+ Новая доска"), action: addBoard },
+      ]);
+    });
+    bar.appendChild(switchBtn);
 
-  const nameInput = document.createElement("input");
-  nameInput.type = "text";
-  nameInput.className = "board-switcher-rename";
-  nameInput.value = board.name;
-  nameInput.title = i18n("Название доски");
-  nameInput.addEventListener("input", () => {
-    board.name = nameInput.value;
-    switchBtn.textContent = nameInput.value;
-    persist();
-  });
-  bar.appendChild(nameInput);
+    const renameBtn = document.createElement("button");
+    renameBtn.className = "btn icon-btn";
+    renameBtn.innerHTML = iconSvg("pencil", 14);
+    renameBtn.title = i18n("Переименовать доску");
+    renameBtn.addEventListener("click", () => {
+      renamingBoard = true;
+      draw();
+      const input = container.querySelector(".board-switcher-rename");
+      input?.focus();
+      input?.select();
+    });
+    bar.appendChild(renameBtn);
+  }
 
-  const addBtn = document.createElement("button");
-  addBtn.className = "btn";
-  addBtn.textContent = i18n("+ Доска");
-  addBtn.addEventListener("click", addBoard);
-  bar.appendChild(addBtn);
+  bar.appendChild(buildExportPngButton(() => container.querySelector(".board-view"), i18n("доска")));
 
   if (data.boards.length > 1) {
     const delBtn = document.createElement("button");
@@ -199,60 +217,7 @@ function draw() {
   view.appendChild(addCol);
 
   outer.appendChild(view);
-  outer.appendChild(buildTemplateBar());
   container.appendChild(outer);
-}
-
-function buildTemplateBar() {
-  const bar = document.createElement("div");
-  bar.className = "board-template-bar";
-
-  const select = document.createElement("select");
-  const placeholder = document.createElement("option");
-  placeholder.value = "";
-  placeholder.textContent = i18n("Шаблон структуры…");
-  select.appendChild(placeholder);
-  for (const [value, label] of TEMPLATES) {
-    const opt = document.createElement("option");
-    opt.value = value;
-    opt.textContent = i18n(label);
-    select.appendChild(opt);
-  }
-  bar.appendChild(select);
-
-  const applyBtn = document.createElement("button");
-  applyBtn.className = "btn";
-  applyBtn.textContent = i18n("Применить");
-  applyBtn.disabled = true;
-  select.addEventListener("change", () => { applyBtn.disabled = !select.value; });
-  applyBtn.addEventListener("click", () => {
-    if (!select.value) return;
-    if (applyBtn.dataset.confirm === "1") {
-      const template = TEMPLATES.find((t) => t[0] === select.value);
-      Object.assign(board, columnsFromTitles(template[2].map((t) => i18n(t))));
-      persist();
-      draw();
-      return;
-    }
-    applyBtn.dataset.confirm = "1";
-    // Шаблон — это не «переименовать колонки», а «начать доску заново»:
-    // старые колонки уйдут вместе со всеми карточками внутри них, без
-    // возможности восстановить (в отличие от удаления одной карточки —
-    // то через pushTrash). Раньше текст предупреждал только про колонки,
-    // и потерю карточек можно было принять за баг («применил шаблон — и
-    // всё пропало, шаблоны не работают»), а не за то, что и
-    // задумано.
-    applyBtn.textContent = i18n("Удалит все карточки и колонки. Точно?");
-    setTimeout(() => {
-      applyBtn.dataset.confirm = "";
-      applyBtn.textContent = i18n("Применить");
-    }, 4000);
-  });
-  bar.appendChild(applyBtn);
-
-  bar.appendChild(buildExportPngButton(() => container.querySelector(".board-view"), i18n("доска")));
-
-  return bar;
 }
 
 let dragCardId = null;

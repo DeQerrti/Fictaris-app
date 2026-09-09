@@ -637,4 +637,13 @@ export const EN_DICT = {
   "Зачёркнутый": "Strikethrough",
   "Выделение цветом": "Highlight",
   "Код": "Code",
+
+  "+ Новая доска": "+ New board",
+  "Переименовать доску": "Rename board",
+  "Новая папка": "New folder",
+  "Создать папку": "Create folder",
+  "Управлять статусами…": "Manage statuses…",
+  "Экспорт главы в .pdf": "Export chapter as .pdf",
+  "Экспорт папки в .pdf": "Export folder as .pdf",
+  "Экспорт всей рукописи в .pdf": "Export the whole manuscript as .pdf",
 };

@@ -88,13 +88,7 @@ function buildList(items) {
   return list;
 }
 
-export function openContextMenu(x, y, items) {
-  closeMenu();
-  menuEl = document.createElement("div");
-  menuEl.className = "context-menu";
-  menuEl.appendChild(buildList(items));
-  document.body.appendChild(menuEl);
-
+function place(x, y) {
   const rect = menuEl.getBoundingClientRect();
   const left = Math.min(x, window.innerWidth - rect.width - 8);
   const top = Math.min(y, window.innerHeight - rect.height - 8);
@@ -105,4 +99,28 @@ export function openContextMenu(x, y, items) {
     document.addEventListener("mousedown", onOutside, true);
     document.addEventListener("keydown", onEscape, true);
   }, 0);
+}
+
+export function openContextMenu(x, y, items) {
+  closeMenu();
+  menuEl = document.createElement("div");
+  menuEl.className = "context-menu";
+  menuEl.appendChild(buildList(items));
+  document.body.appendChild(menuEl);
+  place(x, y);
+}
+
+// Тот же плавающий контейнер и то же закрытие по клику вовне/Escape,
+// что и у openContextMenu, но с произвольным содержимым (форма, а не
+// список кликабельных пунктов) — для мест вроде "Управлять статусами…"
+// в ПКМ на главе рукописи (manuscript.js), куда обычного списка
+// пунктов меню недостаточно. extraClass — свой класс поверх .context-menu
+// для содержимого, которому нужна не стандартная ширина/отступы списка.
+export function openPopover(x, y, contentEl, extraClass = "") {
+  closeMenu();
+  menuEl = document.createElement("div");
+  menuEl.className = extraClass ? `context-menu ${extraClass}` : "context-menu";
+  menuEl.appendChild(contentEl);
+  document.body.appendChild(menuEl);
+  place(x, y);
 }

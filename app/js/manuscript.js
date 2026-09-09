@@ -3,8 +3,9 @@ import { debounceSave } from "./save-badge.js";
 import { mentionsToHtml, attachMentionAutocomplete, attachMentionHoverPreview, buildMentionContextMenuItems } from "./mentions.js";
 import { stickersToHtml, attachStickyPopover } from "./stickies.js";
 import { buildManuscriptDocx } from "./docx.js";
-import { openContextMenu } from "./context-menu.js";
-import { loadStatuses, buildStatusDot } from "./chapter-status.js";
+import { exportChaptersPdf } from "./export-pdf.js";
+import { openContextMenu, openPopover } from "./context-menu.js";
+import { loadStatuses, buildStatusDot, buildStatusManagePanel } from "./chapter-status.js";
 import { pushTrash } from "./trash.js";
 import { iconSvg } from "./icons.js";
 import { recordToday } from "./writing-goal.js";
@@ -138,6 +139,20 @@ function exportDocx(chapters = manuscript.chapters, filename = "manuscript.docx"
   );
 }
 
+// В отличие от .md/.docx выше (готовый Blob сразу же), PDF собирает
+// главный процесс Electron (см. export-pdf.js) — доступен только в
+// десктопной версии, поэтому обёрнут в try/catch с тем же сообщением
+// об ошибке, что и у "Экспортировать мир в PDF" в командной палитре
+// (search.js) — то же самое ограничение, тот же текст.
+async function exportPdfAction(chapters, title) {
+  try {
+    const res = await exportChaptersPdf(chapters, title, safeFileName(title));
+    if (res && res.ok === false) return; // диалог сохранения отменили — не ошибка
+  } catch (e) {
+    alert(e.message || i18n("Не получилось создать PDF. Доступно только в десктопной версии Fictaris."));
+  }
+}
+
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && focusMode) {
     focusMode = false;
@@ -251,6 +266,21 @@ function attachEditorContextMenu(textarea, chapter) {
   });
 }
 
+// Всплывающая панель "Управлять статусами…" (см. пункты меню статуса
+// главы/папки выше) — тот же список-с-редактированием, что и в
+// Настройках (chapter-status.js, buildStatusManagePanel), только
+// открытый прямо в точке правого клика, а не через переход на другую
+// вкладку. onSaved обновляет статусы этого модуля и перерисовывает
+// список глав — сам попап остаётся открытым (он не часть этого дерева
+// DOM, draw() его не трогает), можно править несколько статусов подряд.
+function openStatusManagePopover(x, y) {
+  const panel = buildStatusManagePanel(statuses, (next) => {
+    statuses = next;
+    draw();
+  });
+  openPopover(x, y, panel, "status-manage-popover");
+}
+
 export async function renderManuscript(root, focusChapterId) {
   container = root;
   focusMode = false; // модуль всегда открывается в обычном виде, фокус — временное состояние сессии просмотра
@@ -325,20 +355,32 @@ function buildChapterItem(ch, depth) {
     openContextMenu(x, y, [
       {
         label: i18n("Статус"),
-        items: statuses.map((s) => ({
-          label: i18n(s.label),
-          checked: ch.status === s.key,
-          action: () => {
-            ch.status = s.key;
-            persist();
-            draw();
-          },
-        })),
+        items: [
+          ...statuses.map((s) => ({
+            label: i18n(s.label),
+            checked: ch.status === s.key,
+            action: () => {
+              ch.status = s.key;
+              persist();
+              draw();
+            },
+          })),
+          { separator: true },
+          // Раньше статусы можно было только выбрать здесь — переименовать,
+          // задать цвет/смайлик или завести новый было только через
+          // Настройки. Тот же попап (chapter-status.js), что и там,
+          // открытый прямо на месте — правки видны сразу, список статусов
+          // в этом же меню при следующем открытии уже свежий.
+          { label: i18n("Управлять статусами…"), action: () => openStatusManagePopover(x, y) },
+        ],
       },
       {
         label: i18n("Папка"),
+        // Список папок для перемещения + создание новой — как
+        // "Переместить файл в…" в Обсидиане. Отдельного пункта "Без
+        // папки" здесь больше нет: перенести главу из папки в общий
+        // список можно перетаскиванием на пустое место списка.
         items: [
-          { label: i18n("Без папки"), checked: !ch.folderId, action: () => { ch.folderId = null; persist(); draw(); } },
           ...manuscript.folders.map((f) => ({
             label: f.name || i18n("Без названия"),
             checked: ch.folderId === f.id,
@@ -346,7 +388,7 @@ function buildChapterItem(ch, depth) {
           })),
           { separator: true },
           {
-            label: i18n("Новая папка с этой главой"),
+            label: i18n("Создать папку"),
             action: () => {
               const folder = blankFolder();
               manuscript.folders.push(folder);
@@ -359,6 +401,7 @@ function buildChapterItem(ch, depth) {
       },
       { separator: true },
       { label: i18n("Экспорт главы в .md"), action: () => exportMarkdown([ch], `${safeFileName(ch.title)}.md`) },
+      { label: i18n("Экспорт главы в .pdf"), action: () => exportPdfAction([ch], ch.title || i18n("Без названия")) },
       { label: i18n("Экспорт главы в .docx"), action: () => exportDocx([ch], `${safeFileName(ch.title)}.docx`) },
       { separator: true },
       {
@@ -451,7 +494,7 @@ function folderContextMenuItems(folder, x, y) {
   const chaptersInFolder = collectFolderChapters(folder.id);
   return [
     {
-      label: i18n("Новая глава здесь"),
+      label: i18n("Новая глава"),
       action: () => {
         const c = blankChapter(folder.id);
         manuscript.chapters.push(c);
@@ -480,10 +523,13 @@ function folderContextMenuItems(folder, x, y) {
           checked: folder.status === s.key,
           action: () => { folder.status = s.key; persist(); draw(); },
         })),
+        { separator: true },
+        { label: i18n("Управлять статусами…"), action: () => openStatusManagePopover(x, y) },
       ],
     },
     { separator: true },
     { label: i18n("Экспорт папки в .md"), action: () => exportMarkdown(chaptersInFolder, `${safeFileName(folder.name)}.md`) },
+    { label: i18n("Экспорт папки в .pdf"), action: () => exportPdfAction(chaptersInFolder, folder.name || i18n("Без названия")) },
     { label: i18n("Экспорт папки в .docx"), action: () => exportDocx(chaptersInFolder, `${safeFileName(folder.name)}.docx`) },
     { separator: true },
     {
@@ -623,32 +669,73 @@ function emptyAreaContextMenuItems() {
     },
     { separator: true },
     { label: i18n("Экспорт всей рукописи в .md"), action: () => exportMarkdown() },
+    { label: i18n("Экспорт всей рукописи в .pdf"), action: () => exportPdfAction(manuscript.chapters, i18n("Рукопись")) },
     { label: i18n("Экспорт всей рукописи в .docx"), action: () => exportDocx() },
   ];
 }
 
-function buildChapterList() {
-  const list = document.createElement("div");
-  list.className = "chapter-list";
+// Значки создания в шапке списка — вместо двух кнопок-плашек "+ Глава"/
+// "+ Папка" внизу списка (были видны только докрутив до конца, если
+// глав много): та же идея, что у "новая заметка"/"новая папка" в шапке
+// проводника файлов Obsidian — на виду и одним кликом, не главное
+// действие среди второстепенного (список глав), а наоборот.
+function buildChapterListToolbar() {
+  const bar = document.createElement("div");
+  bar.className = "chapter-list-toolbar";
 
-  buildFolderTree(list, null, 0);
+  const addChapterBtn = document.createElement("button");
+  addChapterBtn.className = "btn icon-btn";
+  addChapterBtn.innerHTML = iconSvg("notePlus", 15);
+  addChapterBtn.title = i18n("Новая глава");
+  addChapterBtn.addEventListener("click", () => {
+    const c = blankChapter();
+    manuscript.chapters.push(c);
+    manuscript.activeChapterId = c.id;
+    persist();
+    draw();
+  });
+  bar.appendChild(addChapterBtn);
+
+  const addFolderBtn = document.createElement("button");
+  addFolderBtn.className = "btn icon-btn";
+  addFolderBtn.innerHTML = iconSvg("folderPlus", 15);
+  addFolderBtn.title = i18n("Новая папка");
+  addFolderBtn.addEventListener("click", () => {
+    manuscript.folders.push(blankFolder());
+    persist();
+    draw();
+  });
+  bar.appendChild(addFolderBtn);
+
+  return bar;
+}
+
+function buildChapterList() {
+  const wrap = document.createElement("div");
+  wrap.className = "chapter-list";
+  wrap.appendChild(buildChapterListToolbar());
+
+  const rows = document.createElement("div");
+  rows.className = "chapter-list-rows";
+
+  buildFolderTree(rows, null, 0);
   for (const ch of manuscript.chapters.filter((c) => !c.folderId)) {
-    list.appendChild(buildChapterItem(ch, 0));
+    rows.appendChild(buildChapterItem(ch, 0));
   }
 
   // ПКМ по пустому месту списка (не по конкретной главе/папке — те сами
   // останавливают всплытие в своих обработчиках) — быстрое «+ Глава»/
-  // «+ Папка» без похода к кнопкам внизу, как в проводнике файлов.
-  list.addEventListener("contextmenu", (e) => {
+  // «+ Папка» без похода к значкам в шапке, как в проводнике файлов.
+  rows.addEventListener("contextmenu", (e) => {
     e.preventDefault();
     openContextMenu(e.clientX, e.clientY, emptyAreaContextMenuItems());
   });
   // Дроп на пустое место (не на конкретную главу/папку) — тоже
   // «отвязка»: перетащенная папка поднимается на верхний уровень,
   // перетащенная глава становится «без папки».
-  list.addEventListener("dragover", (e) => e.preventDefault());
-  list.addEventListener("drop", (e) => {
-    if (e.target !== list) return;
+  rows.addEventListener("dragover", (e) => e.preventDefault());
+  rows.addEventListener("drop", (e) => {
+    if (e.target !== rows) return;
     e.preventDefault();
     if (dragFolderId !== null) {
       const dragged = manuscript.folders.find((f) => f.id === dragFolderId);
@@ -661,29 +748,8 @@ function buildChapterList() {
     }
   });
 
-  const addBtn = document.createElement("button");
-  addBtn.className = "add-chapter";
-  addBtn.textContent = i18n("+ Глава");
-  addBtn.addEventListener("click", () => {
-    const c = blankChapter();
-    manuscript.chapters.push(c);
-    manuscript.activeChapterId = c.id;
-    persist();
-    draw();
-  });
-  list.appendChild(addBtn);
-
-  const addFolderBtn = document.createElement("button");
-  addFolderBtn.className = "add-chapter";
-  addFolderBtn.textContent = i18n("+ Папка");
-  addFolderBtn.addEventListener("click", () => {
-    manuscript.folders.push(blankFolder());
-    persist();
-    draw();
-  });
-  list.appendChild(addFolderBtn);
-
-  return list;
+  wrap.appendChild(rows);
+  return wrap;
 }
 
 function buildEditor() {

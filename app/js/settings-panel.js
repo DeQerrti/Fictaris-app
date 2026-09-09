@@ -17,7 +17,7 @@ import {
 } from "./visibility.js";
 import { captureKey, saveShortcut, clearShortcut } from "./shortcuts.js";
 import { DEFAULT_TAGS_MAP, CATEGORY_LABELS, parseTags, stringifyTags } from "./tags.js";
-import { DEFAULT_STATUSES, loadStatuses, saveStatuses, buildStatusDot } from "./chapter-status.js";
+import { DEFAULT_STATUSES, loadStatuses, saveStatuses, renderStatusesList } from "./chapter-status.js";
 import { KIND_LABELS, loadTemplates, saveTemplates, blankField } from "./templates.js";
 import { defaultMonths, loadCalendar, saveCalendar } from "./calendar.js";
 import {
@@ -793,84 +793,6 @@ async function buildStatusesSection() {
   return section;
 }
 
-function renderStatusesList(list, statuses) {
-  list.innerHTML = "";
-  for (const status of statuses) {
-    const row = document.createElement("div");
-    row.className = "tags-manage-row";
-
-    row.appendChild(buildStatusDot(status));
-
-    const nameInput = document.createElement("input");
-    nameInput.type = "text";
-    nameInput.className = "tags-manage-rename-input";
-    nameInput.value = status.label;
-    let nameTimer;
-    nameInput.addEventListener("input", () => {
-      clearTimeout(nameTimer);
-      nameTimer = setTimeout(async () => {
-        status.label = nameInput.value.trim() || status.label;
-        const current = await loadStatuses();
-        await saveStatuses(current.map((s) => (s.key === status.key ? status : s)));
-      }, 500);
-    });
-    row.appendChild(nameInput);
-
-    const colorInput = document.createElement("input");
-    colorInput.type = "color";
-    colorInput.value = /^#[0-9a-f]{6}$/i.test(status.color || "") ? status.color : "#7c7157";
-    colorInput.title = i18n("Цвет (используется, если не задан смайлик)");
-    colorInput.addEventListener("input", async () => {
-      status.color = colorInput.value;
-      const current = await loadStatuses();
-      await saveStatuses(current.map((s) => (s.key === status.key ? status : s)));
-    });
-    row.appendChild(colorInput);
-
-    const emojiInput = document.createElement("input");
-    emojiInput.type = "text";
-    emojiInput.className = "status-emoji-input";
-    emojiInput.placeholder = "🙂";
-    emojiInput.maxLength = 4;
-    emojiInput.value = status.emoji || "";
-    emojiInput.title = i18n("Смайлик вместо цветного кружка (необязательно)");
-    let emojiTimer;
-    emojiInput.addEventListener("input", () => {
-      clearTimeout(emojiTimer);
-      emojiTimer = setTimeout(async () => {
-        status.emoji = emojiInput.value.trim();
-        const current = await loadStatuses();
-        await saveStatuses(current.map((s) => (s.key === status.key ? status : s)));
-        row.replaceChild(buildStatusDot(status), row.firstChild);
-      }, 400);
-    });
-    row.appendChild(emojiInput);
-
-    const delBtn = document.createElement("button");
-    delBtn.className = "btn danger shortcut-clear";
-    delBtn.textContent = "🗑";
-    delBtn.title = i18n("Удалить статус навсегда");
-    delBtn.addEventListener("click", async () => {
-      if (statuses.length <= 1) return;
-      if (delBtn.dataset.confirm === "1") {
-        const current = await loadStatuses();
-        const next = current.filter((s) => s.key !== status.key);
-        await saveStatuses(next);
-        renderStatusesList(list, next);
-        return;
-      }
-      delBtn.dataset.confirm = "1";
-      delBtn.textContent = i18n("Точно?");
-      setTimeout(() => {
-        delBtn.dataset.confirm = "";
-        delBtn.textContent = "🗑";
-      }, 3000);
-    });
-    row.appendChild(delBtn);
-
-    list.appendChild(row);
-  }
-}
 
 // ── Шаблоны анкет ─────────────────────────────
 // Поля анкеты персонажа/локации/фракции — не зашиты кодом, а список,

@@ -49,8 +49,8 @@
    Подложка для select/range без отдельного класса (см. relationships.js,
    единственное место, где им взяться неоткуда) — раньше они рисовались
    голым браузерным стилем поверх тёмной темы и сильно из неё выпадали.
-   Любой более специфичный класс (.field select, .board-template-bar
-   select и т.п.) по-прежнему приоритетнее этих правил. */
+   Любой более специфичный класс (.field select и т.п.) по-прежнему
+   приоритетнее этих правил. */
 select {
   background: var(--panel-alt);
   border: 1px solid var(--border);
@@ -536,6 +536,17 @@ body.focus-mode .sidebar { display: none; }
 
 .context-menu-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .context-menu-arrow { color: var(--text-faint); flex-shrink: 0; }
+
+/* Попап "Управлять статусами…" (context-menu.js openPopover, вызван из
+   manuscript.js) — та же плавающая карточка, что и обычное меню ПКМ,
+   но с формой внутри вместо списка кликабельных строк: больше отступов
+   и не такая узкая минимальная ширина, чтобы имя/цвет/смайлик/удалить
+   в одной строке не толкались. */
+.context-menu.status-manage-popover {
+  padding: 12px;
+  min-width: 300px;
+}
+.status-manage-popover .tags-manage-list { max-width: none; margin-bottom: 10px; }
 
 .context-menu-swatch {
   width: 12px;
@@ -1746,10 +1757,27 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
 .chapter-list {
   width: 220px;
   flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
   background: var(--panel);
   border-right: 1px solid var(--border);
+}
+
+/* Значки "Новая глава"/"Новая папка" (buildChapterListToolbar) — на
+   виду сверху всегда, а не в конце списка, куда при десятке глав нужно
+   было докручивать. */
+.chapter-list-toolbar {
+  flex-shrink: 0;
+  display: flex;
+  gap: 2px;
+  padding: 8px 8px 4px;
+}
+
+.chapter-list-rows {
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
-  padding: 12px 8px;
+  padding: 4px 8px 12px;
 }
 
 .chapter-item {
@@ -2061,22 +2089,6 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
   align-items: flex-start;
 }
 
-.board-template-bar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 20px 16px;
-}
-
-.board-template-bar select {
-  background: var(--panel-alt);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  color: var(--text-dim);
-  padding: 6px 10px;
-  font-family: inherit;
-  font-size: 0.82rem;
-}
 
 .board-switcher-bar {
   display: flex;

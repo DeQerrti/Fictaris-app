@@ -295,13 +295,21 @@ function appRoutes() {
     // Готовый HTML целиком приходит от app/js/export-pdf.js — там же
     // вёрстка (та же, что у экспорта сайта, entity-export.js), здесь
     // только печать в PDF и диалог сохранения. Отмена диалога — не
-    // ошибка, просто { ok: false } без исключения.
+    // ошибка, просто { ok: false } без исключения. filename —
+    // необязательное имя файла без расширения (экспорт главы/папки
+    // рукописи хочет предложить в диалоге сохранения имя главы, а не
+    // всегда одно и то же "fictaris-mir-…", как у экспорта мира) —
+    // сюда попадает как есть от клиента, так что вычищаем разделители
+    // пути и прочие небезопасные для имени файла символы сами, а не
+    // доверяем чужому вводу при сборке пути.
     "POST /api/app/export-pdf": async ({ body }) => {
       if (!body.html) throw new Error("Нет содержимого для экспорта");
       const buffer = await renderHtmlToPdf(body.html);
+      const safeName = String(body.filename || "").replace(/[\\/:*?"<>|]/g, "").trim();
+      const defaultName = safeName ? `${safeName}.pdf` : `fictaris-mir-${new Date().toISOString().slice(0, 10)}.pdf`;
       const { canceled, filePath } = await dialog.showSaveDialog(win ?? undefined, {
         title: "Сохранить PDF",
-        defaultPath: path.join(app.getPath("documents"), `fictaris-mir-${new Date().toISOString().slice(0, 10)}.pdf`),
+        defaultPath: path.join(app.getPath("documents"), defaultName),
         filters: [{ name: "PDF", extensions: ["pdf"] }],
       });
       if (canceled || !filePath) return { ok: false };
