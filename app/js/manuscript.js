@@ -210,8 +210,25 @@ function attachEditorContextMenu(textarea, chapter) {
     const mentionItems = buildMentionContextMenuItems(textarea, characters);
     openContextMenu(e.clientX, e.clientY, [
       ...(mentionItems.length ? [...mentionItems, { separator: true }] : []),
-      { label: i18n("Жирный"), disabled: !hasSelection, action: () => wrapSelection(textarea, "**", "**") },
-      { label: i18n("Курсив"), disabled: !hasSelection, action: () => wrapSelection(textarea, "*", "*") },
+      {
+        label: i18n("Форматирование"),
+        // Тот же набор, что в панели форматирования Obsidian (жирный,
+        // курсив, зачёркнутый, код, выделение) плюс подчёркивание —
+        // у Markdown/Obsidian для него нет своего значка, но в Word и
+        // Google Docs оно есть на том же правом клике, и как раз о нём
+        // отдельно спросили. Само форматирование остаётся условным
+        // (просто оборачивает текст маркерами, как жирный/курсив уже
+        // делали) — ни редактор, ни экспорт рукописи это не разбирает,
+        // это просто общепринятый способ разметить текст для себя же.
+        items: [
+          { label: i18n("Жирный"), disabled: !hasSelection, action: () => wrapSelection(textarea, "**", "**") },
+          { label: i18n("Курсив"), disabled: !hasSelection, action: () => wrapSelection(textarea, "*", "*") },
+          { label: i18n("Подчёркнутый"), disabled: !hasSelection, action: () => wrapSelection(textarea, "<u>", "</u>") },
+          { label: i18n("Зачёркнутый"), disabled: !hasSelection, action: () => wrapSelection(textarea, "~~", "~~") },
+          { label: i18n("Выделение цветом"), disabled: !hasSelection, action: () => wrapSelection(textarea, "==", "==") },
+          { label: i18n("Код"), disabled: !hasSelection, action: () => wrapSelection(textarea, "`", "`") },
+        ],
+      },
       { separator: true },
       { label: i18n("Вставить стикер-заметку"), action: () => insertSticky(textarea, chapter) },
       { separator: true },

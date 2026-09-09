@@ -629,4 +629,12 @@ export const EN_DICT = {
   "Открыть родительскую локацию": "Open parent location",
   "Свернуть список разделов до одних иконок": "Collapse the section list to icons only",
   "Список свёрнут до иконок — нажми, чтобы вернуть подписи": "List collapsed to icons — click to bring back labels",
+
+  "Форматирование": "Formatting",
+  "Жирный": "Bold",
+  "Курсив": "Italic",
+  "Подчёркнутый": "Underline",
+  "Зачёркнутый": "Strikethrough",
+  "Выделение цветом": "Highlight",
+  "Код": "Code",
 };
