@@ -1,4 +1,5 @@
 import { apiGet, apiPost } from "./api.js";
+import { iconSvg } from "./icons.js";
 import { i18n } from "./i18n.js";
 
 // ══════════════════════════════════════════════
@@ -102,7 +103,10 @@ export function renderStatusesList(list, statuses, onSaved) {
     const emojiInput = document.createElement("input");
     emojiInput.type = "text";
     emojiInput.className = "status-emoji-input";
-    emojiInput.placeholder = "🙂";
+    // Нейтральный пример вместо смайлика-лица — кружок ближе по духу к
+    // обычной цветной точке статуса, которую смайлик как раз заменяет,
+    // не намекает на конкретное настроение/значение.
+    emojiInput.placeholder = "⚪";
     emojiInput.maxLength = 4;
     emojiInput.value = status.emoji || "";
     emojiInput.title = i18n("Смайлик вместо цветного кружка (необязательно)");
@@ -122,7 +126,7 @@ export function renderStatusesList(list, statuses, onSaved) {
 
     const delBtn = document.createElement("button");
     delBtn.className = "btn danger shortcut-clear";
-    delBtn.textContent = "🗑";
+    delBtn.innerHTML = iconSvg("trash", 14);
     delBtn.title = i18n("Удалить статус навсегда");
     delBtn.addEventListener("click", async () => {
       if (statuses.length <= 1) return;
@@ -138,7 +142,7 @@ export function renderStatusesList(list, statuses, onSaved) {
       delBtn.textContent = i18n("Точно?");
       setTimeout(() => {
         delBtn.dataset.confirm = "";
-        delBtn.textContent = "🗑";
+        delBtn.innerHTML = iconSvg("trash", 14);
       }, 3000);
     });
     row.appendChild(delBtn);

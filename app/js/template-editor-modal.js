@@ -1,4 +1,5 @@
 import { blankField } from "./templates.js";
+import { iconSvg } from "./icons.js";
 import { i18n } from "./i18n.js";
 
 // ══════════════════════════════════════════════
@@ -103,7 +104,7 @@ export function openTemplateEditorModal({ initialFields, onSave }) {
 
     const delBtn = document.createElement("button");
     delBtn.className = "btn danger shortcut-clear";
-    delBtn.textContent = "🗑";
+    delBtn.innerHTML = iconSvg("trash", 14);
     delBtn.addEventListener("click", () => {
       fields = fields.filter((f) => f !== field);
       row.remove();

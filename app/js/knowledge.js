@@ -2,6 +2,7 @@ import { apiGet, apiPost, uid } from "./api.js";
 import { debounceSave } from "./save-badge.js";
 import { openContextMenu } from "./context-menu.js";
 import { buildEmptyState } from "./chips.js";
+import { iconSvg } from "./icons.js";
 import { i18n } from "./i18n.js";
 
 // ══════════════════════════════════════════════
@@ -105,7 +106,7 @@ function buildFactCard(fact) {
 
   const delBtn = document.createElement("button");
   delBtn.className = "btn danger shortcut-clear";
-  delBtn.textContent = "🗑";
+  delBtn.innerHTML = iconSvg("trash", 14);
   delBtn.title = i18n("Удалить факт");
   delBtn.addEventListener("click", () => {
     facts = facts.filter((f) => f !== fact);

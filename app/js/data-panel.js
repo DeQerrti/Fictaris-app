@@ -3,6 +3,7 @@ import { buildDemoBundle } from "./demo-data.js";
 import { exportSiteZip } from "./export-site.js";
 import { exportWorldPdf } from "./export-pdf.js";
 import { diffLines, collapseContext } from "./diff.js";
+import { iconSvg } from "./icons.js";
 import { i18n } from "./i18n.js";
 
 const SCHEMA_VERSION = 1;
@@ -304,7 +305,7 @@ function buildHistoryRow(file, version) {
 
   const delBtn = document.createElement("button");
   delBtn.className = "btn danger";
-  delBtn.textContent = "🗑";
+  delBtn.innerHTML = iconSvg("trash", 14);
   delBtn.title = i18n("Удалить этот снимок навсегда");
   delBtn.addEventListener("click", () => {
     if (delBtn.dataset.confirm === "1") {
@@ -315,7 +316,7 @@ function buildHistoryRow(file, version) {
     delBtn.textContent = i18n("Точно?");
     setTimeout(() => {
       delBtn.dataset.confirm = "";
-      delBtn.textContent = "🗑";
+      delBtn.innerHTML = iconSvg("trash", 14);
     }, 4000);
   });
   actions.appendChild(delBtn);

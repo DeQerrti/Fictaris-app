@@ -3,6 +3,7 @@ import { buildDataSections } from "./data-panel.js";
 import { i18n, currentLang, setLang } from "./i18n.js";
 import { THEME_PRESETS, CUSTOM_COLOR_TOKENS, saveTheme } from "./theme.js";
 import { escapeHtml } from "./chips.js";
+import { iconSvg } from "./icons.js";
 import { defaultLabels, saveLabels, resetLabels } from "./labels.js";
 import {
   getHiddenTabs,
@@ -407,7 +408,7 @@ async function renderLabelsBody(body) {
 
     const delBtn = document.createElement("button");
     delBtn.className = "btn danger labels-group-del";
-    delBtn.textContent = "🗑";
+    delBtn.innerHTML = iconSvg("trash", 14);
     delBtn.title = i18n("Убрать подпись группы (пункты останутся, просто без заголовка)");
     delBtn.addEventListener("click", () => {
       if (delBtn.dataset.confirm === "1") {
@@ -416,7 +417,7 @@ async function renderLabelsBody(body) {
       }
       delBtn.dataset.confirm = "1";
       delBtn.textContent = i18n("Точно?");
-      setTimeout(() => { delBtn.dataset.confirm = ""; delBtn.textContent = "🗑"; }, 3000);
+      setTimeout(() => { delBtn.dataset.confirm = ""; delBtn.innerHTML = iconSvg("trash", 14); }, 3000);
     });
     header.appendChild(delBtn);
 
@@ -724,7 +725,7 @@ function renderTagsManageList(list, merged, hidden, custom) {
       // клика — тот же приём, что и «Удалить навсегда» в корзине.
       const delBtn = document.createElement("button");
       delBtn.className = "btn danger shortcut-clear";
-      delBtn.textContent = "🗑";
+      delBtn.innerHTML = iconSvg("trash", 14);
       delBtn.title = i18n("Удалить тег навсегда");
       delBtn.addEventListener("click", async () => {
         if (delBtn.dataset.confirm === "1") {
@@ -741,7 +742,7 @@ function renderTagsManageList(list, merged, hidden, custom) {
         delBtn.textContent = i18n("Точно?");
         setTimeout(() => {
           delBtn.dataset.confirm = "";
-          delBtn.textContent = "🗑";
+          delBtn.innerHTML = iconSvg("trash", 14);
         }, 3000);
       });
       row.appendChild(delBtn);
@@ -946,7 +947,7 @@ async function renderTemplatesBody(body, kind) {
   if (list.length > 1) {
     const delTemplateBtn = document.createElement("button");
     delTemplateBtn.className = "btn danger";
-    delTemplateBtn.textContent = "🗑";
+    delTemplateBtn.innerHTML = iconSvg("trash", 14);
     delTemplateBtn.title = i18n("Удалить шаблон (карточки, заведённые по нему, останутся — просто покажут первый оставшийся шаблон)");
     delTemplateBtn.addEventListener("click", async () => {
       if (delTemplateBtn.dataset.confirm === "1") {
@@ -960,7 +961,7 @@ async function renderTemplatesBody(body, kind) {
       delTemplateBtn.textContent = i18n("Точно?");
       setTimeout(() => {
         delTemplateBtn.dataset.confirm = "";
-        delTemplateBtn.textContent = "🗑";
+        delTemplateBtn.innerHTML = iconSvg("trash", 14);
       }, 3000);
     });
     nameRow.appendChild(delTemplateBtn);
@@ -1008,7 +1009,7 @@ async function renderTemplatesBody(body, kind) {
 
     const delFieldBtn = document.createElement("button");
     delFieldBtn.className = "btn danger shortcut-clear";
-    delFieldBtn.textContent = "🗑";
+    delFieldBtn.innerHTML = iconSvg("trash", 14);
     delFieldBtn.title = i18n("Убрать поле из этого шаблона (данные, уже введённые в него у существующих карточек, не стираются)");
     delFieldBtn.addEventListener("click", async () => {
       template.fields = template.fields.filter((f) => f.key !== field.key);

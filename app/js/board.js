@@ -150,7 +150,7 @@ function buildBoardSwitcher() {
   if (data.boards.length > 1) {
     const delBtn = document.createElement("button");
     delBtn.className = "btn danger";
-    delBtn.textContent = "🗑";
+    delBtn.innerHTML = iconSvg("trash", 14);
     delBtn.title = i18n("Удалить эту доску навсегда");
     delBtn.addEventListener("click", () => {
       if (delBtn.dataset.confirm === "1") {
@@ -161,7 +161,7 @@ function buildBoardSwitcher() {
       delBtn.textContent = i18n("Точно?");
       setTimeout(() => {
         delBtn.dataset.confirm = "";
-        delBtn.textContent = "🗑";
+        delBtn.innerHTML = iconSvg("trash", 14);
       }, 3000);
     });
     bar.appendChild(delBtn);
