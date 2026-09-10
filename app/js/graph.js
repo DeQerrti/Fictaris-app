@@ -535,8 +535,8 @@ function buildLegend() {
   legend.className = "graph-legend";
   legend.innerHTML = `
     <span><span class="legend-dot" style="background:#c9944a"></span>${i18n("Персонажи")}</span>
-    <span><span class="legend-dot" style="background:#6a8fae"></span>${i18n("Локации/фракции — цвет по типу")}</span>
-    <span><span class="legend-line legend-line-dashed"></span>${i18n("пунктир — найдено по «@упоминанию» в тексте, не задано вручную")}</span>
+    <span><span class="legend-dot" style="background:#6a8fae"></span>${i18n("Локации/фракции – цвет по типу")}</span>
+    <span><span class="legend-line legend-line-dashed"></span>${i18n("пунктир – найдено по «@упоминанию» в тексте, не задано вручную")}</span>
   `;
   return legend;
 }

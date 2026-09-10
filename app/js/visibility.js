@@ -123,14 +123,16 @@ export async function setTabOrder(order) {
 // ── Группы (подписи в сайдбаре) ─────────────────
 // order — порядок групп, которые ещё существуют (удалённые убраны);
 // labels — id группы → подпись (своя, если переименовали, иначе
-// дефолтная из DEFAULT_GROUPS). Пользователь не заводит новые группы
-// с нуля — только переименовывает/удаляет уже готовые четыре, этого
-// достаточно для просьбы «переименовывать разделы и удалять».
+// дефолтная из DEFAULT_GROUPS). Помимо четырёх стартовых можно завести
+// и свои (createGroup ниже) — settings.groups.custom, id → подпись;
+// нужны, если человек удалил все стартовые группы и захотел вернуть
+// хоть одну, или захотел групп больше четырёх.
 export async function getGroupsConfig() {
   const settings = await apiGet("/api/site-settings").catch(() => ({}));
   const g = settings.groups || {};
   const deleted = new Set(Array.isArray(g.deleted) ? g.deleted : []);
-  const knownIds = DEFAULT_GROUPS.map((x) => x.id);
+  const customLabels = g.custom && typeof g.custom === "object" ? g.custom : {};
+  const knownIds = [...DEFAULT_GROUPS.map((x) => x.id), ...Object.keys(customLabels)];
   const orderRaw = Array.isArray(g.order) ? g.order.filter((id) => knownIds.includes(id)) : [];
   const order = orderRaw.filter((id) => !deleted.has(id));
   for (const id of knownIds) {
@@ -141,23 +143,52 @@ export async function getGroupsConfig() {
     const custom = g.labels?.[def.id];
     labels[def.id] = typeof custom === "string" && custom.trim() ? custom.trim() : def.label();
   }
+  for (const [id, label] of Object.entries(customLabels)) {
+    labels[id] = typeof label === "string" && label.trim() ? label.trim() : id;
+  }
   return { order, labels, deleted };
 }
 
 export async function setGroupOrder(order) {
   const settings = (await apiGet("/api/site-settings").catch(() => ({}))) || {};
-  const knownIds = DEFAULT_GROUPS.map((x) => x.id);
-  const groups = { ...settings.groups, order: order.filter((id) => knownIds.includes(id)) };
+  const { order: knownOrder } = await getGroupsConfig();
+  const knownIds = new Set(knownOrder);
+  const groups = { ...settings.groups, order: order.filter((id) => knownIds.has(id)) };
   await apiPost("/api/site-settings", { ...settings, groups });
   await applyTabOrder();
 }
 
+// isDefault решает, в какую половину настроек уходит новое имя —
+// labels (переопределение одной из четырёх стартовых) или custom
+// (своя группа, заведённая createGroup) — getGroupsConfig читает имя
+// custom-группы только оттуда, у неё нет "дефолтного" имени, которое
+// можно было бы просто переопределить.
 export async function setGroupLabel(id, label) {
   const settings = (await apiGet("/api/site-settings").catch(() => ({}))) || {};
-  const labels = { ...settings.groups?.labels, [id]: label };
-  const groups = { ...settings.groups, labels };
+  const isDefault = DEFAULT_GROUPS.some((g) => g.id === id);
+  const groups = isDefault
+    ? { ...settings.groups, labels: { ...settings.groups?.labels, [id]: label } }
+    : { ...settings.groups, custom: { ...settings.groups?.custom, [id]: label } };
   await apiPost("/api/site-settings", { ...settings, groups });
   await applyTabOrder();
+}
+
+// Новая группа — id генерируется здесь же (не пользователем, не нужно
+// проверять уникальность вручную), добавляется в конец текущего
+// порядка. Порядок берём готовым через getGroupsConfig (а не
+// settings.groups.order как есть) — то поле может быть вообще не
+// заведено, если человек ещё не перетаскивал/удалял ничего, и тогда
+// слепая запись потеряла бы все стартовые группы из итогового порядка.
+export async function createGroup(label) {
+  const settings = (await apiGet("/api/site-settings").catch(() => ({}))) || {};
+  const { order: currentOrder } = await getGroupsConfig();
+  const id = `group-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+  const custom = { ...(settings.groups?.custom || {}), [id]: label.trim() || i18n("Новая группа") };
+  const order = [...currentOrder, id];
+  const groups = { ...settings.groups, custom, order };
+  await apiPost("/api/site-settings", { ...settings, groups });
+  await applyTabOrder();
+  return id;
 }
 
 // Удаление — не «стереть насовсем всё про группу», а спрятать саму

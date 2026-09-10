@@ -107,7 +107,7 @@ export async function buildDemoBundle() {
 
   const factions = [
     { id: "demo-f-vieren", name: "Дом Вирен", type: "monarchy",
-      description: "Свергнутый правящий род, единственная законная наследница — Астра",
+      description: "Свергнутый правящий род, единственная законная наследница – Астра",
       notes: "", tags: "изгнанники", leaderId: aster.id, headquartersId: fortress.id,
       memberIds: [aster.id, kael.id] },
     { id: "demo-f-legion", name: "Легион Варна", type: "military",
@@ -119,7 +119,7 @@ export async function buildDemoBundle() {
   const relationships = [
     { id: "demo-r-1", charA: kael.id, charB: aster.id, label: "наставник", score: 70, note: "Учит её десять лет" },
     { id: "demo-r-2", charA: aster.id, charB: varn.id, label: "вражда", score: -90, note: "Он убил её семью" },
-    { id: "demo-r-3", charA: aster.id, charB: nessa.id, label: "хрупкий союз", score: 20, note: "Пока платит — помогает" },
+    { id: "demo-r-3", charA: aster.id, charB: nessa.id, label: "хрупкий союз", score: 20, note: "Пока платит – помогает" },
   ];
 
   const timeline = [
@@ -131,7 +131,7 @@ export async function buildDemoBundle() {
     { id: "demo-t-3", order: 3, date: "год 224", title: "Возвращение",
       description: "Астра и Каэль прибывают в портовый квартал", characterIds: [aster.id, kael.id, nessa.id], locationIds: [harbor.id] },
     { id: "demo-t-4", order: 4, date: "год 224", title: "Сделка с Нессой",
-      description: "Несса соглашается провести их к крепости — за долю от находки",
+      description: "Несса соглашается провести их к крепости – за долю от находки",
       characterIds: [aster.id, nessa.id], locationIds: [harbor.id] },
     { id: "demo-t-5", order: 5, date: "год 224", title: "Крепость Раскола",
       description: "Отряд достигает крепости в поисках клинка",
@@ -148,7 +148,7 @@ export async function buildDemoBundle() {
     cards: {
       "demo-card-1": { id: "demo-card-1", title: "Сцена предательства Нессы?", characterId: nessa.id },
       "demo-card-2": { id: "demo-card-2", title: "Прописать бегство из столицы", characterId: kael.id },
-      "demo-card-3": { id: "demo-card-3", title: "Переворот — глава 1", characterId: varn.id },
+      "demo-card-3": { id: "demo-card-3", title: "Переворот – глава 1", characterId: varn.id },
     },
     cardOrder: {
       [colIdeas]: ["demo-card-1"],
@@ -162,15 +162,15 @@ export async function buildDemoBundle() {
       {
         id: "demo-ch-1", title: "Глава 1. Переворот", status: "done",
         content:
-          "Сольвейн горел не так, как горят обычные пожары — размеренно, будто по расписанию.\n\n" +
+          "Сольвейн горел не так, как горят обычные пожары – размеренно, будто по расписанию.\n\n" +
           "Варн стоял на ступенях дворца и смотрел, как гвардейцы Дома Вирен складывают оружие один за другим.",
-        authorNotes: "Показать переворот глазами Варна, не Астры — контраст с главой 3.",
+        authorNotes: "Показать переворот глазами Варна, не Астры – контраст с главой 3.",
       },
       {
         id: "demo-ch-2", title: "Глава 2. Портовый квартал", status: "editing",
         content:
           "Десять лет спустя запах рыбы и смолы всё ещё казался Астре запахом свободы.\n\n" +
-          "— Ты платишь вперёд, — сказала Несса, не оборачиваясь. — Так делают все, кому есть что терять.",
+          "– Ты платишь вперёд, – сказала Несса, не оборачиваясь. – Так делают все, кому есть что терять.",
         authorNotes: "Нужно больше показать недоверие Каэля к Нессе.",
       },
     ],
@@ -219,7 +219,7 @@ export async function buildDemoBundle() {
       { id: "demo-p-1", title: "Переворот", note: "Варн захватывает Сольвейн, семья Астры гибнет", chapterLabel: "Глава 1", x: 140, y: 160 },
       { id: "demo-p-2", title: "Бегство", note: "Каэль вывозит юную Астру из столицы", chapterLabel: "Глава 1", x: 380, y: 160 },
       { id: "demo-p-3", title: "Возвращение", note: "Астра и Каэль прибывают в портовый квартал десять лет спустя", chapterLabel: "Глава 2", x: 620, y: 160 },
-      { id: "demo-p-4", title: "Сделка с Нессой", note: "Несса соглашается провести их к крепости — за долю от находки", chapterLabel: "", x: 620, y: 340 },
+      { id: "demo-p-4", title: "Сделка с Нессой", note: "Несса соглашается провести их к крепости – за долю от находки", chapterLabel: "", x: 620, y: 340 },
       { id: "demo-p-5", title: "Крепость Раскола", note: "Отряд достигает крепости в поисках клинка", chapterLabel: "", x: 860, y: 340 },
     ],
     edges: [

@@ -136,6 +136,6 @@ export function buildFieldHint(type) {
   if (type !== "richtext") return null;
   const hint = document.createElement("div");
   hint.className = "field-hint";
-  hint.textContent = i18n('Строка с "## " — новый раздел, с "### " — подраздел. Соберётся оглавление.');
+  hint.textContent = i18n('Строка с "## " – новый раздел, с "### " – подраздел. Соберётся оглавление.');
   return hint;
 }

@@ -97,7 +97,7 @@ async function openMenu() {
       delBtn.className = "project-row-del";
       delBtn.innerHTML = iconSvg("close", 12);
       const delTitle = info.mobile
-        ? i18n("Удалить проект вместе с файлами — это необратимо")
+        ? i18n("Удалить проект вместе с файлами – это необратимо")
         : i18n("Убрать из списка (файлы на диске не трогает)");
       delBtn.title = delTitle;
       delBtn.addEventListener("click", async (e) => {

@@ -61,14 +61,14 @@ function draw() {
 
   const intro = document.createElement("p");
   intro.className = "knowledge-intro";
-  intro.textContent = i18n("Факт мира и для каждого причастного персонажа — глава, с которой это стало ему известно. Свериться при редактуре: никто не должен знать раньше своей главы.");
+  intro.textContent = i18n("Факт мира и для каждого причастного персонажа – глава, с которой это стало ему известно. Свериться при редактуре: никто не должен знать раньше своей главы.");
   view.appendChild(intro);
 
   const list = document.createElement("div");
   list.className = "knowledge-list";
 
   if (!facts.length) {
-    const empty = buildEmptyState(i18n("Пока нет ни одного факта — добавь первый."), "lightbulb");
+    const empty = buildEmptyState(i18n("Пока нет ни одного факта – добавь первый."), "lightbulb");
     list.appendChild(empty);
   }
 
@@ -180,7 +180,7 @@ function buildEntryRow(fact, charId, character) {
   select.className = "field-inline-control";
   const noneOpt = document.createElement("option");
   noneOpt.value = "";
-  noneOpt.textContent = i18n("— глава не выбрана —");
+  noneOpt.textContent = i18n("– глава не выбрана –");
   select.appendChild(noneOpt);
   const startOpt = document.createElement("option");
   startOpt.value = KNOWS_FROM_START;

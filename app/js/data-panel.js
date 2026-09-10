@@ -4,6 +4,7 @@ import { exportSiteZip } from "./export-site.js";
 import { exportWorldPdf } from "./export-pdf.js";
 import { diffLines, collapseContext } from "./diff.js";
 import { iconSvg } from "./icons.js";
+import { openPopover, closeMenu } from "./context-menu.js";
 import { i18n } from "./i18n.js";
 
 const SCHEMA_VERSION = 1;
@@ -84,7 +85,7 @@ function showConfirmBar(bar, message, onConfirm, confirmLabel) {
 // (settings-panel.js), а не отдельный пункт сайдбара, и вкладке нужны
 // именно секции, чтобы вписать их в общий контейнер вкладки самой.
 export function buildDataSections() {
-  return [buildExportSection(), buildSiteExportSection(), buildPdfExportSection(), buildImportSection(), buildDemoSection(), buildHistorySection()];
+  return [buildExportSection(), buildImportSection(), buildDemoSection(), buildHistorySection()];
 }
 
 function historyFiles() {
@@ -185,7 +186,7 @@ function buildHistorySection() {
     if (!select.value) return;
     const versions = await apiGet(`/api/history?file=${encodeURIComponent(select.value)}`);
     if (!versions.length) {
-      list.innerHTML = `<div class="empty-state">${i18n("Пока нет прошлых версий — история появляется со второго сохранения.")}</div>`;
+      list.innerHTML = `<div class="empty-state">${i18n("Пока нет прошлых версий – история появляется со второго сохранения.")}</div>`;
       return;
     }
     for (const v of versions) {
@@ -229,7 +230,7 @@ async function buildDiffPanel(file, version) {
 
   const rows = diffLines(oldLines, newLines);
   if (!rows) {
-    panel.textContent = i18n("Файл слишком большой для построчного сравнения — воспользуйся «Восстановить», если нужно вернуть именно эту версию.");
+    panel.textContent = i18n("Файл слишком большой для построчного сравнения – воспользуйся «Восстановить», если нужно вернуть именно эту версию.");
     return panel;
   }
   if (rows.every((r) => r.type === "equal")) {
@@ -325,88 +326,99 @@ function buildHistoryRow(file, version) {
   return wrap;
 }
 
+// Три разных экспорта (JSON проекта — для переноса обратно в Fictaris;
+// сайт и PDF — показать мир кому-то постороннему, набором HTML-страниц
+// или печатным документом, см. export-site.js/export-pdf.js) были
+// тремя отдельными блоками на всю ширину — одна кнопка "Экспорт…"
+// открывает тот же попап-список, что и переключатель доски/управление
+// статусами (context-menu.js, openPopover), с тем же описанием под
+// каждым вариантом, просто не развёрнутым на весь экран постоянно.
 function buildExportSection() {
   const section = document.createElement("div");
   section.className = "data-section";
-  section.innerHTML = `<h3>${i18n("Экспорт проекта")}</h3><p>${i18n("Один JSON-файл со всеми модулями: персонажи, локации, связи, фракции, таймлайн, доска, карта (только метки — картинки остаются файлами на диске), карта сюжета, знания, рукопись.")}</p>`;
+  section.innerHTML = `<h3>${i18n("Экспорт")}</h3>`;
+
   const btn = document.createElement("button");
   btn.className = "btn";
-  btn.textContent = i18n("Экспортировать");
-  btn.addEventListener("click", async () => {
-    const data = await fetchAll();
-    const bundle = { schemaVersion: SCHEMA_VERSION, exportedAt: new Date().toISOString(), ...data };
-    const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `fictaris-export-${new Date().toISOString().slice(0, 10)}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+  btn.textContent = i18n("Экспортировать…");
+  btn.addEventListener("click", () => {
+    const r = btn.getBoundingClientRect();
+    openPopover(r.left, r.bottom + 4, buildExportOptionsList(), "export-options-popover");
   });
   section.appendChild(btn);
   return section;
 }
 
-// Отдельно от JSON-экспорта выше — тот для переноса данных обратно в
-// Fictaris (импорт/резервная копия), этот для показа мира кому-то
-// постороннему: набор HTML-страниц с рабочими ссылками между
-// персонажами/локациями/фракциями/таймлайном, который открывается в
-// любом браузере без самого приложения. См. export-site.js.
-function buildSiteExportSection() {
-  const section = document.createElement("div");
-  section.className = "data-section";
-  section.innerHTML = `<h3>${i18n("Экспорт мира как сайта")}</h3><p>${i18n("Персонажи, локации, фракции и таймлайн — набором связанных HTML-страниц в архиве. Открывается в браузере у кого угодно, без интернета и без Fictaris — чтобы показать мир бета-ридеру или просто сохранить читаемый снимок.")}</p>`;
-  const btn = document.createElement("button");
-  btn.className = "btn";
-  btn.textContent = i18n("Экспортировать сайт");
-  btn.addEventListener("click", async () => {
-    btn.disabled = true;
-    const original = btn.textContent;
-    btn.textContent = i18n("Собираю…");
-    try {
-      await exportSiteZip();
-    } finally {
-      btn.disabled = false;
-      btn.textContent = original;
-    }
-  });
-  section.appendChild(btn);
-  return section;
+async function exportProjectJson() {
+  const data = await fetchAll();
+  const bundle = { schemaVersion: SCHEMA_VERSION, exportedAt: new Date().toISOString(), ...data };
+  const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `fictaris-export-${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
-// Только десктоп: печатает через Electron/Chromium (см. комментарий в
-// electron/main.js о том, почему не свой PDF-писатель) — на телефоне/
-// в браузере POST /api/app/export-pdf отвечать некому, и клик честно
-// говорит об этом, а не зависает молча.
-function buildPdfExportSection() {
-  const section = document.createElement("div");
-  section.className = "data-section";
-  section.innerHTML = `<h3>${i18n("Экспорт мира в PDF")}</h3><p>${i18n("Тот же материал, что и в экспорте сайта, — одним печатным документом: обложка, персонажи, локации, фракции, таймлайн, со ссылками внутри файла. Доступно в десктопной версии.")}</p>`;
-  const btn = document.createElement("button");
-  btn.className = "btn";
-  btn.textContent = i18n("Экспортировать PDF");
-  btn.addEventListener("click", async () => {
-    btn.disabled = true;
-    const original = btn.textContent;
-    btn.textContent = i18n("Готовлю…");
-    try {
-      const res = await exportWorldPdf();
-      if (res && res.ok === false) return; // диалог сохранения отменили — не ошибка
-    } catch (e) {
-      alert(e.message || i18n("Не получилось создать PDF. Доступно только в десктопной версии Fictaris."));
-    } finally {
-      btn.disabled = false;
-      btn.textContent = original;
-    }
-  });
-  section.appendChild(btn);
-  return section;
+// Только десктоп: PDF печатает через Electron/Chromium (см. комментарий
+// в electron/main.js о том, почему не свой PDF-писатель) — на телефоне/
+// в браузере POST /api/app/export-pdf отвечать некому, отсюда try/catch
+// с понятной ошибкой вместо зависания молча.
+async function exportPdfWithErrorAlert() {
+  try {
+    const res = await exportWorldPdf();
+    if (res && res.ok === false) return; // диалог сохранения отменили — не ошибка
+  } catch (e) {
+    alert(e.message || i18n("Не получилось создать PDF. Доступно только в десктопной версии Fictaris."));
+  }
+}
+
+function buildExportOptionsList() {
+  const wrap = document.createElement("div");
+  wrap.className = "export-options-list";
+
+  const options = [
+    {
+      title: i18n("Экспорт проекта"),
+      desc: i18n("Один JSON-файл со всеми модулями: персонажи, локации, связи, фракции, таймлайн, доска, карта (только метки – картинки остаются файлами на диске), карта сюжета, знания, рукопись."),
+      run: exportProjectJson,
+    },
+    {
+      title: i18n("Экспорт мира как сайта"),
+      desc: i18n("Персонажи, локации, фракции и таймлайн – набором связанных HTML-страниц в архиве. Открывается в браузере у кого угодно, без интернета и без Fictaris – чтобы показать мир бета-ридеру или просто сохранить читаемый снимок."),
+      run: exportSiteZip,
+    },
+    {
+      title: i18n("Экспорт мира в PDF"),
+      desc: i18n("Тот же материал, что и в экспорте сайта, – одним печатным документом: обложка, персонажи, локации, фракции, таймлайн, со ссылками внутри файла. Доступно в десктопной версии."),
+      run: exportPdfWithErrorAlert,
+    },
+  ];
+
+  for (const opt of options) {
+    const row = document.createElement("button");
+    row.className = "export-option-row";
+    const title = document.createElement("div");
+    title.className = "export-option-title";
+    title.textContent = opt.title;
+    const desc = document.createElement("div");
+    desc.className = "export-option-desc";
+    desc.textContent = opt.desc;
+    row.append(title, desc);
+    row.addEventListener("click", () => {
+      closeMenu();
+      opt.run();
+    });
+    wrap.appendChild(row);
+  }
+  return wrap;
 }
 
 function buildImportSection() {
   const section = document.createElement("div");
   section.className = "data-section";
-  section.innerHTML = `<h3>${i18n("Импорт проекта")}</h3><p>${i18n("Полностью заменяет текущие данные содержимым файла. Сохрани экспорт перед импортом, если сомневаешься — отменить нельзя.")}</p>`;
+  section.innerHTML = `<h3>${i18n("Импорт проекта")}</h3><p>${i18n("Полностью заменяет текущие данные содержимым файла. Сохрани экспорт перед импортом, если сомневаешься – отменить нельзя.")}</p>`;
 
   const fileInput = document.createElement("input");
   fileInput.type = "file";
@@ -444,7 +456,7 @@ function buildImportSection() {
 function buildDemoSection() {
   const section = document.createElement("div");
   section.className = "data-section";
-  section.innerHTML = `<h3>${i18n("Заполнить примером")}</h3><p>${i18n("Связный тестовый сюжет — персонажи, локации, связи, фракции, таймлайн, доска, карта и две главы рукописи, чтобы сразу увидеть, как модули работают вместе.")}</p>`;
+  section.innerHTML = `<h3>${i18n("Заполнить примером")}</h3><p>${i18n("Связный тестовый сюжет – персонажи, локации, связи, фракции, таймлайн, доска, карта и две главы рукописи, чтобы сразу увидеть, как модули работают вместе.")}</p>`;
 
   const btn = document.createElement("button");
   btn.className = "btn";

@@ -194,7 +194,7 @@ function draw() {
   grid.className = "characters-grid";
 
   if (!locations.length) {
-    const empty = buildEmptyState(i18n("Локаций пока нет — добавь первую."), "pin");
+    const empty = buildEmptyState(i18n("Локаций пока нет – добавь первую."), "pin");
     empty.style.gridColumn = "1 / -1";
     grid.appendChild(empty);
   }
@@ -226,7 +226,7 @@ function draw() {
   const addCard = document.createElement("button");
   addCard.className = "char-card add-card";
   addCard.textContent = i18n("+ Добавить локацию");
-  addCard.title = i18n("Правая кнопка — выбрать шаблон анкеты или завести новый");
+  addCard.title = i18n("Правая кнопка – выбрать шаблон анкеты или завести новый");
   addCard.addEventListener("click", () => {
     chooseTemplate(templates, addCard, addWithTemplate, { onCreateNew: addWithNewTemplate });
   });
@@ -342,7 +342,7 @@ function buildDrawer(loc) {
   const parentSelect = document.createElement("select");
   const noneOpt = document.createElement("option");
   noneOpt.value = "";
-  noneOpt.textContent = i18n("— нет (верхний уровень) —");
+  noneOpt.textContent = i18n("– нет (верхний уровень) –");
   parentSelect.appendChild(noneOpt);
   const excluded = descendantIds(loc.id);
   excluded.add(loc.id);

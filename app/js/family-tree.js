@@ -237,7 +237,7 @@ function draw() {
   addBtn.addEventListener("click", addCharacter);
   const hint = document.createElement("span");
   hint.className = "ftree-hint";
-  hint.textContent = i18n("Клик по узлу открывает карточку — родителей назначают там же.");
+  hint.textContent = i18n("Клик по узлу открывает карточку – родителей назначают там же.");
   toolbar.append(addBtn, hint);
   wrap.appendChild(toolbar);
 
@@ -247,7 +247,7 @@ function draw() {
 
   if (!inTree.length) {
     const empty = buildEmptyState(
-      i18n("Пока пусто — укажи родителей в карточке персонажа (или добавь нового прямо здесь), чтобы здесь появилось дерево."),
+      i18n("Пока пусто – укажи родителей в карточке персонажа (или добавь нового прямо здесь), чтобы здесь появилось дерево."),
       "tree"
     );
     wrap.appendChild(empty);

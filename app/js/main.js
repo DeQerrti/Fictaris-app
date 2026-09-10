@@ -59,7 +59,7 @@ const sidebarToggle = document.getElementById("sidebarToggle");
 const sidebarBackdrop = document.getElementById("sidebarBackdrop");
 // Настройки — отдельная кнопка-значок рядом с названием, а не пункт
 // в общем списке .nav-item: иначе она встряла бы первой в DOM-порядке
-// и сбила нумерацию цифровых горячих клавиш 1–9 (shortcuts.js), которые
+// и сбила нумерацию цифровых горячих клавиш 1—9 (shortcuts.js), которые
 // считают именно по .nav-item.
 const settingsBtn = document.getElementById("settingsBtn");
 

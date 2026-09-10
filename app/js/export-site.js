@@ -48,7 +48,7 @@ function pageShell(base, siteTitle, pageTitle, bodyHtml) {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${escapeHtml(pageTitle)} — ${escapeHtml(siteTitle)}</title>
+<title>${escapeHtml(pageTitle)} – ${escapeHtml(siteTitle)}</title>
 <link rel="stylesheet" href="${base}site.css">
 </head>
 <body>
@@ -126,7 +126,7 @@ export async function exportSiteZip() {
       for (const r of relRows) {
         const other = characters.find((ch) => ch.id === (r.charA === c.id ? r.charB : r.charA));
         if (!other) continue;
-        body += `<li><a href="${safeName(other.id)}.html">${escapeHtml(other.name || i18n("Без имени"))}${r.label ? ` — ${escapeHtml(r.label)}` : ""}</a></li>`;
+        body += `<li><a href="${safeName(other.id)}.html">${escapeHtml(other.name || i18n("Без имени"))}${r.label ? ` – ${escapeHtml(r.label)}` : ""}</a></li>`;
       }
       body += `</ul></div>`;
     }

@@ -24,10 +24,10 @@ export function brokenRefs({ characters, locations, factions, relationships, tim
   }
 
   for (const f of factions) {
-    if (f.leaderId && !chars.has(f.leaderId)) issues.push(i18n("Фракция «{name}» — глава не найден", { name: f.name }));
-    if (f.headquartersId && !locs.has(f.headquartersId)) issues.push(i18n("Фракция «{name}» — штаб-квартира не найдена", { name: f.name }));
+    if (f.leaderId && !chars.has(f.leaderId)) issues.push(i18n("Фракция «{name}» – глава не найден", { name: f.name }));
+    if (f.headquartersId && !locs.has(f.headquartersId)) issues.push(i18n("Фракция «{name}» – штаб-квартира не найдена", { name: f.name }));
     for (const m of f.memberIds || []) {
-      if (!chars.has(m)) issues.push(i18n("Фракция «{name}» — в составе несуществующий персонаж", { name: f.name }));
+      if (!chars.has(m)) issues.push(i18n("Фракция «{name}» – в составе несуществующий персонаж", { name: f.name }));
     }
   }
 
@@ -81,7 +81,7 @@ export function orphans({ characters, locations, relationships, factions, timeli
 
   const issues = [];
   for (const c of characters) {
-    if (!referenced.has(c.id)) issues.push(i18n("Персонаж «{name}» нигде не упомянут — ни в связях, ни в таймлайне, ни во фракциях", { name: c.name }));
+    if (!referenced.has(c.id)) issues.push(i18n("Персонаж «{name}» нигде не упомянут – ни в связях, ни в таймлайне, ни во фракциях", { name: c.name }));
   }
   for (const l of locations) {
     if (!referenced.has(l.id)) issues.push(i18n("Локация «{name}» нигде не упомянута", { name: l.name }));
@@ -139,7 +139,7 @@ export async function renderContinuity(root) {
   const total = sections.reduce((sum, [, list]) => sum + list.length, 0);
 
   if (!total) {
-    const ok = buildEmptyState(i18n("Всё чисто — проверка не нашла проблем."), "checkShield");
+    const ok = buildEmptyState(i18n("Всё чисто – проверка не нашла проблем."), "checkShield");
     wrap.appendChild(ok);
     return;
   }

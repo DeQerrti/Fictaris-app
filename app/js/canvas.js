@@ -70,7 +70,7 @@ function buildHome() {
 
   if (!data.order.length) {
     const empty = buildEmptyState(
-      i18n("Холстов пока нет — создай первый для свободных заметок и схем, не привязанных к конкретным персонажам или локациям."),
+      i18n("Холстов пока нет – создай первый для свободных заметок и схем, не привязанных к конкретным персонажам или локациям."),
       "frame"
     );
     empty.style.gridColumn = "1 / -1";
@@ -180,7 +180,7 @@ function buildCanvasView() {
 
   const hint = document.createElement("span");
   hint.className = "graph-hint";
-  hint.textContent = i18n("Тащи фон — панорама, колесо — зум, ⠿⠿ тянет карточку, точки по краям — тянут связь к другой карточке.");
+  hint.textContent = i18n("Тащи фон – панорама, колесо – зум, ⠿⠿ тянет карточку, точки по краям – тянут связь к другой карточке.");
   toolbar.appendChild(hint);
 
   const holder = document.createElement("div");

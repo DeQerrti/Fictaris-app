@@ -96,16 +96,16 @@ async function githubApi(config, path, { method = "GET", body } = {}) {
       body: body ? JSON.stringify(body) : undefined,
     });
   } catch {
-    throw new SyncError(i18n("Не получилось достучаться до GitHub — проверь соединение с интернетом."));
+    throw new SyncError(i18n("Не получилось достучаться до GitHub – проверь соединение с интернетом."));
   }
 
   if (res.status === 401) {
-    throw new SyncError(i18n("GitHub не принял токен — проверь, что он не истёк и не отозван."));
+    throw new SyncError(i18n("GitHub не принял токен – проверь, что он не истёк и не отозван."));
   }
   if (res.status === 403) {
     const data = await res.json().catch(() => ({}));
     if (/rate limit/i.test(data.message || "")) {
-      throw new SyncError(i18n("GitHub временно ограничил число запросов — попробуй через несколько минут."));
+      throw new SyncError(i18n("GitHub временно ограничил число запросов – попробуй через несколько минут."));
     }
     throw new SyncError(i18n("У токена не хватает прав на этот репозиторий."));
   }

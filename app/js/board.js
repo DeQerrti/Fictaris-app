@@ -502,7 +502,7 @@ function buildCard(card, colId) {
   const notesArea = document.createElement("textarea");
   notesArea.className = "board-card-notes";
   notesArea.value = card.notes || "";
-  notesArea.placeholder = i18n("Пиши здесь свободно — правый клик даёт цвет и связи…");
+  notesArea.placeholder = i18n("Пиши здесь свободно – правый клик даёт цвет и связи…");
   notesArea.rows = 5;
   notesArea.addEventListener("input", () => {
     card.notes = notesArea.value;

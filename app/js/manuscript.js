@@ -876,7 +876,7 @@ function buildEditor() {
     const textarea = document.createElement("textarea");
     textarea.className = "chapter-content";
     textarea.value = chapter.content;
-    textarea.placeholder = i18n("Пиши здесь… @имя вставит упоминание персонажа, @[Имя|нужный падеж] — если по тексту не «Надя», а «Наде»");
+    textarea.placeholder = i18n("Пиши здесь… @имя вставит упоминание персонажа, @[Имя|нужный падеж] – если по тексту не «Надя», а «Наде»");
     textarea.addEventListener("input", () => {
       chapter.content = textarea.value;
       wc.textContent = i18n("{count} слов", { count: wordCount(chapter.content) });
@@ -990,7 +990,7 @@ function buildStickyEditor(chapter) {
   if (!stickies.length) {
     const empty = document.createElement("div");
     empty.className = "hint-text";
-    empty.textContent = i18n("Пока нет — правый клик по тексту главы добавит стикер-заметку.");
+    empty.textContent = i18n("Пока нет – правый клик по тексту главы добавит стикер-заметку.");
     details.appendChild(empty);
   }
 
@@ -1039,7 +1039,7 @@ function buildSnapshots(chapter) {
   if (!(chapter.snapshots || []).length) {
     const empty = document.createElement("div");
     empty.className = "hint-text";
-    empty.textContent = i18n("Пока нет снимков — кнопка «Снимок» в шапке главы сохранит текущий текст.");
+    empty.textContent = i18n("Пока нет снимков – кнопка «Снимок» в шапке главы сохранит текущий текст.");
     details.appendChild(empty);
     return details;
   }
@@ -1050,7 +1050,7 @@ function buildSnapshots(chapter) {
 
     const row = document.createElement("div");
     row.className = "snapshot-row";
-    row.title = i18n("Снимок — сохранённая копия текста главы на этот момент. «Просмотреть» покажет её, не трогая текущий текст; «Восстановить» заменит им текущий текст главы.");
+    row.title = i18n("Снимок – сохранённая копия текста главы на этот момент. «Просмотреть» покажет её, не трогая текущий текст; «Восстановить» заменит им текущий текст главы.");
 
     const date = document.createElement("span");
     date.className = "snapshot-date";

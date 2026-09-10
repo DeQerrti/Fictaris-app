@@ -80,7 +80,7 @@ function draw() {
   grid.className = "characters-grid";
 
   if (!factions.length) {
-    const empty = buildEmptyState(i18n("Фракций пока нет — добавь первую."), "shield");
+    const empty = buildEmptyState(i18n("Фракций пока нет – добавь первую."), "shield");
     empty.style.gridColumn = "1 / -1";
     grid.appendChild(empty);
   }
@@ -103,7 +103,7 @@ function draw() {
   const addCard = document.createElement("button");
   addCard.className = "char-card add-card";
   addCard.textContent = i18n("+ Добавить фракцию");
-  addCard.title = i18n("Правая кнопка — выбрать шаблон анкеты или завести новый");
+  addCard.title = i18n("Правая кнопка – выбрать шаблон анкеты или завести новый");
   addCard.addEventListener("click", () => {
     chooseTemplate(templates, addCard, addWithTemplate, { onCreateNew: addWithNewTemplate });
   });

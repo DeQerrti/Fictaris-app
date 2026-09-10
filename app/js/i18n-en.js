@@ -22,7 +22,7 @@ export const EN_DICT = {
   "Связи": "Relationships",
   "Карточки доски": "Board cards",
   "Метки на карте": "Map pins",
-  "Персонажей пока нет — добавь первого.": "No characters yet — add the first one.",
+  "Персонажей пока нет – добавь первого.": "No characters yet – add the first one.",
   "Без имени": "Unnamed",
   "+ Добавить персонажа": "+ Add character",
   "Родители": "Parents",
@@ -34,7 +34,7 @@ export const EN_DICT = {
   "Заметки": "Notes",
   "Новая локация": "New location",
   "{name} (штаб-квартира)": "{name} (headquarters)",
-  "Локаций пока нет — добавь первую.": "No locations yet — add the first one.",
+  "Локаций пока нет – добавь первую.": "No locations yet – add the first one.",
   "+ Добавить локацию": "+ Add location",
   "Тип": "Type",
   "Город / поселение": "City / settlement",
@@ -45,7 +45,7 @@ export const EN_DICT = {
 
   // ── Фракции (factions.js + icons.js FACTION_TYPES) ──
   "Новая фракция": "New faction",
-  "Фракций пока нет — добавь первую.": "No factions yet — add the first one.",
+  "Фракций пока нет – добавь первую.": "No factions yet – add the first one.",
   "+ Добавить фракцию": "+ Add faction",
   "Глава фракции": "Leader",
   "Не назначен": "Unassigned",
@@ -73,7 +73,7 @@ export const EN_DICT = {
   "карта": "map",
   "{shown} из {total} событий": "{shown} of {total} events",
   "Нет событий с таким фильтром.": "No events match this filter.",
-  "Событий пока нет — добавь первое.": "No events yet — add the first one.",
+  "Событий пока нет – добавь первое.": "No events yet – add the first one.",
   "+ Событие": "+ Event",
   "Дата": "Date",
   "например: год 214, день третий": "e.g.: year 214, third day",
@@ -111,7 +111,7 @@ export const EN_DICT = {
   "Без персонажа": "No character",
 
   // ── Карта (map.js) ──
-  "Карт пока нет — загрузи изображение, чтобы создать первую.": "No maps yet — upload an image to create the first one.",
+  "Карт пока нет – загрузи изображение, чтобы создать первую.": "No maps yet – upload an image to create the first one.",
   "{n} меток": "{n} pins",
   "Удалить карту со всеми вложенными под-картами": "Delete map along with all nested sub-maps",
   "Удалит карту со всем вложенным. Точно?": "This will delete the map with everything nested inside. Sure?",
@@ -133,7 +133,7 @@ export const EN_DICT = {
   // ── Граф (graph.js) ──
   "Добавь персонажей, локаций или фракций, чтобы увидеть граф проекта.":
     "Add characters, locations or factions to see the project graph.",
-  "Локации/фракции — цвет по типу": "Locations/factions — colored by type",
+  "Локации/фракции – цвет по типу": "Locations/factions – colored by type",
   "Размер шрифта в тексте главы": "Chapter text font size",
   "Тащи узлы мышью, крути колесо для зума, клик открывает карточку":
     "Drag nodes with your mouse, scroll to zoom, click a node to open its card",
@@ -141,17 +141,17 @@ export const EN_DICT = {
 
   // ── Проверка (continuity.js) ──
   "Связь «{label}» ссылается на несуществующего персонажа": "The relationship “{label}” refers to a character that doesn't exist",
-  "Фракция «{name}» — глава не найден": "Faction “{name}” — leader not found",
-  "Фракция «{name}» — штаб-квартира не найдена": "Faction “{name}” — headquarters not found",
-  "Фракция «{name}» — в составе несуществующий персонаж": "Faction “{name}” has a member that doesn't exist",
+  "Фракция «{name}» – глава не найден": "Faction “{name}” – leader not found",
+  "Фракция «{name}» – штаб-квартира не найдена": "Faction “{name}” – headquarters not found",
+  "Фракция «{name}» – в составе несуществующий персонаж": "Faction “{name}” has a member that doesn't exist",
   "Событие «{title}» ссылается на несуществующего персонажа": "Event “{title}” refers to a character that doesn't exist",
   "Событие «{title}» ссылается на несуществующую локацию": "Event “{title}” refers to a location that doesn't exist",
   "Карточка доски «{title}» ссылается на несуществующего персонажа": "Board card “{title}” refers to a character that doesn't exist",
   "Метка «{label}» на карте «{name}» ссылается на несуществующего персонажа": "Pin “{label}” on map “{name}” refers to a character that doesn't exist",
   "Метка «{label}» на карте «{name}» ссылается на несуществующую локацию": "Pin “{label}” on map “{name}” refers to a location that doesn't exist",
   "Метка «{label}» на карте «{name}» ссылается на несуществующую под-карту": "Pin “{label}” on map “{name}” refers to a sub-map that doesn't exist",
-  "Персонаж «{name}» нигде не упомянут — ни в связях, ни в таймлайне, ни во фракциях":
-    "Character “{name}” isn't mentioned anywhere — not in relationships, the timeline, or factions",
+  "Персонаж «{name}» нигде не упомянут – ни в связях, ни в таймлайне, ни во фракциях":
+    "Character “{name}” isn't mentioned anywhere – not in relationships, the timeline, or factions",
   "Локация «{name}» нигде не упомянута": "Location “{name}” isn't mentioned anywhere",
   "без даты": "no date",
   "Возможный дубль на таймлайне: «{title}» ({date})": "Possible timeline duplicate: “{title}” ({date})",
@@ -160,7 +160,7 @@ export const EN_DICT = {
   "Забытые сущности": "Forgotten entities",
   "Возможные дубли на таймлайне": "Possible timeline duplicates",
   "Главы «Готово» с пустым текстом": "“Done” chapters with no text",
-  "Всё чисто — проверка не нашла проблем.": "All clear — the check found no issues.",
+  "Всё чисто – проверка не нашла проблем.": "All clear – the check found no issues.",
 
   // ── Корзина (trash.js) ──
   "Связь": "Relationship",
@@ -181,13 +181,13 @@ export const EN_DICT = {
   "Правка": "Edit",
   "Просмотр": "Preview",
   "Выйти из фокус-режима (Esc)": "Exit focus mode (Esc)",
-  "Фокус-режим — скрыть сайдбар и список глав": "Focus mode — hide the sidebar and chapter list",
+  "Фокус-режим – скрыть сайдбар и список глав": "Focus mode – hide the sidebar and chapter list",
   "Снимок": "Snapshot",
   "Сохранить текущий текст как снимок версии (до 20 на главу)": "Save the current text as a version snapshot (up to 20 per chapter)",
   "{count} слов": "{count} words",
   "Глава пуста.": "The chapter is empty.",
-  "Пиши здесь… @имя вставит упоминание персонажа, @[Имя|нужный падеж] — если по тексту не «Надя», а «Наде»":
-    "Write here… @name inserts a character mention, @[Name|display text] — for a different grammatical form in the sentence",
+  "Пиши здесь… @имя вставит упоминание персонажа, @[Имя|нужный падеж] – если по тексту не «Надя», а «Наде»":
+    "Write here… @name inserts a character mention, @[Name|display text] – for a different grammatical form in the sentence",
   "📌 Стикер": "📌 Sticky note",
   "Вставить инлайн-заметку в текст": "Insert an inline note into the text",
   "Заметки автора": "Author's notes",
@@ -197,8 +197,8 @@ export const EN_DICT = {
   "Удалить стикер (маркер [[note:…]] в тексте останется как обычный текст)":
     "Delete sticky note (the [[note:…]] marker in the text stays as plain text)",
   "Снимки версий ({n})": "Version snapshots ({n})",
-  "Пока нет снимков — кнопка «Снимок» в шапке главы сохранит текущий текст.":
-    "No snapshots yet — the “Snapshot” button in the chapter header will save the current text.",
+  "Пока нет снимков – кнопка «Снимок» в шапке главы сохранит текущий текст.":
+    "No snapshots yet – the “Snapshot” button in the chapter header will save the current text.",
   "Заменит текущий текст. Точно?": "This will replace the current text. Sure?",
   "Просмотреть": "Preview",
   "Скрыть": "Hide",
@@ -208,7 +208,7 @@ export const EN_DICT = {
   "Название проекта": "Project name",
   "Создать": "Create",
   "Переименовать": "Rename",
-  "Удалить проект вместе с файлами — это необратимо": "Delete the project along with its files — this cannot be undone",
+  "Удалить проект вместе с файлами – это необратимо": "Delete the project along with its files – this cannot be undone",
   "Убрать из списка (файлы на диске не трогает)": "Remove from the list (leaves the files on disk untouched)",
   "+ Новый проект…": "+ New project…",
   "+ Другой проект…": "+ Another project…",
@@ -223,8 +223,8 @@ export const EN_DICT = {
   "Не удалось прочитать изображение": "Failed to read the image",
 
   // ── Родословная (family-tree.js) ──
-  "Пока пусто — укажи родителей в карточке персонажа, чтобы здесь появилось дерево.":
-    "Nothing here yet — set parents on a character card to see the tree appear.",
+  "Пока пусто – укажи родителей в карточке персонажа, чтобы здесь появилось дерево.":
+    "Nothing here yet – set parents on a character card to see the tree appear.",
 
   // ── Календарь (calendar.js) ──
   "Месяц {n}": "Month {n}",
@@ -249,7 +249,7 @@ export const EN_DICT = {
   "Персонажи по фракциям": "Characters by faction",
   "Слова по главам": "Words by chapter",
   "Чаще всего в таймлайне": "Most frequent in the timeline",
-  "Сколько раз персонаж указан участником события — топ-8.": "How many times a character is listed as an event participant — top 8.",
+  "Сколько раз персонаж указан участником события – топ-8.": "How many times a character is listed as an event participant – top 8.",
 
   // ── Словарь тегов (tags.js DEFAULT_TAGS_MAP) ──
   // Ключи словаря (сами имена тегов) остаются на русском — это
@@ -257,7 +257,7 @@ export const EN_DICT = {
   // и не должны меняться при смене языка интерфейса. Здесь переводится
   // только то, что показывается пользователю: имя тега и подсказка.
   "Свои": "Custom",
-  "Свой тег — Enter, чтобы добавить": "Custom tag — press Enter to add",
+  "Свой тег – Enter, чтобы добавить": "Custom tag – press Enter to add",
 
   "Герой": "Hero",
   "Центральная фигура, ведёт историю вперёд": "The central figure, drives the story forward",
@@ -290,7 +290,7 @@ export const EN_DICT = {
   "Пропал без вести": "Missing",
   "Статус неизвестен": "Status unknown",
   "Заброшено": "Abandoned",
-  "Про локацию или фракцию — больше не действует": "For a location or faction — no longer active",
+  "Про локацию или фракцию – больше не действует": "For a location or faction – no longer active",
 
   "Проклятие": "Curse",
   "Пророчество": "Prophecy",
@@ -300,22 +300,22 @@ export const EN_DICT = {
   "Запретная любовь": "Forbidden love",
   "Месть": "Revenge",
   "Наследие": "Legacy",
-  "Груз прошлого — рода, титула, преступления предков": "A burden of the past — of lineage, title, or ancestors' crimes",
+  "Груз прошлого – рода, титула, преступления предков": "A burden of the past – of lineage, title, or ancestors' crimes",
   "Двойная жизнь": "Double life",
   "Договор с силой": "Pact with a power",
-  "Сделка с богом, демоном или магией — не без цены": "A deal with a god, demon, or magic — not without a price",
+  "Сделка с богом, демоном или магией – не без цены": "A deal with a god, demon, or magic – not without a price",
 
   // ── Сохранение (save-badge.js) ──
   "Сохранение…": "Saving…",
   "Сохранено": "Saved",
 
   // ── Синхронизация — ошибки (sync.js) ──
-  "Не получилось достучаться до GitHub — проверь соединение с интернетом.":
-    "Couldn't reach GitHub — check your internet connection.",
-  "GitHub не принял токен — проверь, что он не истёк и не отозван.":
-    "GitHub rejected the token — check that it hasn't expired or been revoked.",
-  "GitHub временно ограничил число запросов — попробуй через несколько минут.":
-    "GitHub has temporarily rate-limited requests — try again in a few minutes.",
+  "Не получилось достучаться до GitHub – проверь соединение с интернетом.":
+    "Couldn't reach GitHub – check your internet connection.",
+  "GitHub не принял токен – проверь, что он не истёк и не отозван.":
+    "GitHub rejected the token – check that it hasn't expired or been revoked.",
+  "GitHub временно ограничил число запросов – попробуй через несколько минут.":
+    "GitHub has temporarily rate-limited requests – try again in a few minutes.",
   "У токена не хватает прав на этот репозиторий.": "The token doesn't have enough permissions for this repository.",
   "Не получилось проверить токен.": "Couldn't verify the token.",
   "Не получилось проверить репозиторий.": "Couldn't verify the repository.",
@@ -362,19 +362,19 @@ export const EN_DICT = {
   "Карточка": "Card",
 
   // ── Сайдбар (sidebar.js) ──
-  "Меню закреплено — нажми, чтобы сворачивать его и разворачивать по наведению":
-    "Menu is pinned — click to make it collapse and expand on hover",
-  "Меню сворачивается — нажми, чтобы закрепить его открытым":
-    "Menu auto-collapses — click to pin it open",
+  "Меню закреплено – нажми, чтобы сворачивать его и разворачивать по наведению":
+    "Menu is pinned – click to make it collapse and expand on hover",
+  "Меню сворачивается – нажми, чтобы закрепить его открытым":
+    "Menu auto-collapses – click to pin it open",
 
   // ── Первый запуск (onboarding.js) ──
   "Добро пожаловать в Fictaris": "Welcome to Fictaris",
-  "<b>Поиск</b> — клавиша <kbd>/</kbd> или кнопка в сайдбаре ищет сразу по всем модулям.":
-    "<b>Search</b> — the <kbd>/</kbd> key or the sidebar button searches across every module at once.",
-  "<b>Настройки</b> — тема, акцент, подписи меню, горячие клавиши, синхронизация между устройствами.":
-    "<b>Settings</b> — theme, accent color, menu labels, keyboard shortcuts, sync between devices.",
-  "<b>«Настройки» → «Данные» → «Заполнить примером»</b> — связный тестовый сюжет, чтобы сразу увидеть, как модули работают вместе.":
-    "<b>“Settings” → “Data” → “Fill with example”</b> — a connected sample story so you can see right away how the modules work together.",
+  "<b>Поиск</b> – клавиша <kbd>/</kbd> или кнопка в сайдбаре ищет сразу по всем модулям.":
+    "<b>Search</b> – the <kbd>/</kbd> key or the sidebar button searches across every module at once.",
+  "<b>Настройки</b> – тема, акцент, подписи меню, горячие клавиши, синхронизация между устройствами.":
+    "<b>Settings</b> – theme, accent color, menu labels, keyboard shortcuts, sync between devices.",
+  "<b>«Настройки» → «Данные» → «Заполнить примером»</b> – связный тестовый сюжет, чтобы сразу увидеть, как модули работают вместе.":
+    "<b>“Settings” → “Data” → “Fill with example”</b> – a connected sample story so you can see right away how the modules work together.",
   "Заполнить примером": "Fill with example",
   "Понятно, дальше сам": "Got it, I'll explore",
 
@@ -387,7 +387,7 @@ export const EN_DICT = {
 
   // ── Настройки (settings-panel.js) ──
   "Обновления": "Updates",
-  "Обновление {version} скачано — перезапусти, чтобы установить.": "Update {version} downloaded — restart to install.",
+  "Обновление {version} скачано – перезапусти, чтобы установить.": "Update {version} downloaded – restart to install.",
   "Не удалось скачать обновление: {message}": "Couldn't download the update: {message}",
   "О приложении": "About",
   "Репозиторий на GitHub": "GitHub repository",
@@ -402,13 +402,12 @@ export const EN_DICT = {
   "Установленная версия: {version}": "Installed version: {version}",
   "Инструмент для писателей и мастеров миров: данные лежат обычной папкой на твоём диске, без своего сервера и без привязки к аккаунту.":
     "A tool for writers and worldbuilders: your data lives as a plain folder on your disk, with no server of its own and no account required.",
-  "Не удалось проверить обновления — нет сети или GitHub недоступен.": "Couldn't check for updates — no network or GitHub is unavailable.",
+  "Не удалось проверить обновления – нет сети или GitHub недоступен.": "Couldn't check for updates – no network or GitHub is unavailable.",
   "Проверка недоступна в режиме разработки (npm start).": "Not available in development mode (npm start).",
 
   "Приложение": "App",
 
   "Оформление": "Appearance",
-  "Тема и акцентный цвет — применяются сразу, без перезагрузки.": "Theme and accent color — applied instantly, no reload.",
   "Тёмная": "Dark",
   "Стол писателя ночью": "A writer's desk at night",
   "Пергамент": "Parchment",
@@ -417,8 +416,6 @@ export const EN_DICT = {
   "Сбросить акцент": "Reset accent",
 
   "Язык": "Language",
-  "Язык интерфейса — применяется сразу после перезагрузки страницы. Общий на проект: открыв его с другого устройства через синхронизацию, увидишь тот же язык.":
-    "Interface language — applied right after the page reloads. Shared per project: opening it on another device via sync shows the same language.",
   "Русский": "Russian",
   "English": "English",
 
@@ -428,21 +425,15 @@ export const EN_DICT = {
   "100%": "100%",
 
   "Подписи интерфейса": "Interface labels",
-  "Переименуй пункты меню под свою терминологию — применяется сразу. Глазик слева прячет раздел из сайдбара, если он не нужен в этом проекте.":
-    "Rename menu items to match your own terminology — applied instantly. The eye icon on the left hides a section from the sidebar if you don't need it in this project.",
   "Показать раздел": "Show section",
   "Скрыть раздел": "Hide section",
   "Сбросить все подписи": "Reset all labels",
 
   "Горячие клавиши": "Keyboard shortcuts",
-  "Цифры 1–9 переключают модули по порядку в сайдбаре. Любой модуль можно назначить на свою клавишу — она сработает независимо от позиции в списке.":
-    "Digits 1–9 switch modules in sidebar order. Any module can be bound to its own key — it'll keep working regardless of position in the list.",
   "Сбросить на клавишу по умолчанию": "Reset to the default key",
   "Нажми клавишу…": "Press a key…",
 
   "Теги": "Tags",
-  "Спрячь ненужный встроенный тег или добавь свой — оба применяются сразу во всех модулях.":
-    "Hide a built-in tag you don't need, or add your own — both apply instantly across all modules.",
   "Архетип": "Archetype",
   "Роль в сюжете": "Story role",
   "Статус": "Status",
@@ -455,8 +446,8 @@ export const EN_DICT = {
   "Удалить тег навсегда": "Delete tag permanently",
 
   "Календарь": "Calendar",
-  "Своё летоисчисление для таймлайна — свои месяцы вместо реальных, произвольная длина года.":
-    "Your own calendar for the timeline — custom month names instead of real ones, any year length.",
+  "Своё летоисчисление для таймлайна – свои месяцы вместо реальных, произвольная длина года.":
+    "Your own calendar for the timeline – custom month names instead of real ones, any year length.",
   "Отключить свой календарь": "Turn off custom calendar",
   "Включить свой календарь": "Turn on custom calendar",
   "Название года": "Year label",
@@ -466,22 +457,22 @@ export const EN_DICT = {
   "дней": "days",
 
   "Синхронизация": "Sync",
-  "Свободно и без своего сервера: приватный репозиторий на GitHub как общее хранилище для всех твоих устройств — телефона, компьютера, ещё одного компьютера. Токен и служебные данные синхронизации остаются только на этом устройстве.":
-    "Free, no server of your own: a private GitHub repository as shared storage for all your devices — phone, computer, another computer. The token and sync bookkeeping stay only on this device.",
-  "Заведи аккаунт на github.com, если его ещё нет — бесплатно.": "Create a github.com account if you don't have one yet — it's free.",
-  "Создай токен доступа —": "Create an access token —",
+  "Свободно и без своего сервера: приватный репозиторий на GitHub как общее хранилище для всех твоих устройств – телефона, компьютера, ещё одного компьютера. Токен и служебные данные синхронизации остаются только на этом устройстве.":
+    "Free, no server of your own: a private GitHub repository as shared storage for all your devices – phone, computer, another computer. The token and sync bookkeeping stay only on this device.",
+  "Заведи аккаунт на github.com, если его ещё нет – бесплатно.": "Create a github.com account if you don't have one yet – it's free.",
+  "Создай токен доступа –": "Create an access token –",
   "по этой ссылке": "this link",
-  "галочка «repo» уже отмечена. Внизу страницы — «Generate token».": "the “repo” checkbox is pre-selected. At the bottom of the page — “Generate token”.",
+  "галочка «repo» уже отмечена. Внизу страницы – «Generate token».": "the “repo” checkbox is pre-selected. At the bottom of the page – “Generate token”.",
   "Скопируй токен (показывается один раз) и вставь сюда.": "Copy the token (shown only once) and paste it here.",
   "Токен доступа": "Access token",
   "Название репозитория": "Repository name",
-  "Если такого репозитория ещё нет на твоём GitHub — создадим сами, приватным. Если уже есть (например, второе устройство его уже завело) — подключимся к нему.":
-    "If this repository doesn't exist on your GitHub yet, we'll create it as private. If it already exists (say, another device set it up) — we'll connect to it.",
+  "Если такого репозитория ещё нет на твоём GitHub – создадим сами, приватным. Если уже есть (например, второе устройство его уже завело) – подключимся к нему.":
+    "If this repository doesn't exist on your GitHub yet, we'll create it as private. If it already exists (say, another device set it up) – we'll connect to it.",
   "Подключить": "Connect",
   "Заполни токен и название репозитория.": "Fill in the token and the repository name.",
   "Проверяем токен…": "Checking the token…",
   "Проверяем репозиторий…": "Checking the repository…",
-  "Репозитория ещё нет — создаём…": "Repository doesn't exist yet — creating…",
+  "Репозитория ещё нет – создаём…": "Repository doesn't exist yet – creating…",
   "Синхронизировать сейчас": "Sync now",
   "Отключить": "Disconnect",
   "Точно отключить?": "Really disconnect?",
@@ -491,20 +482,19 @@ export const EN_DICT = {
   "ещё не было": "never yet",
   "Подключено к": "Connected to",
   "Последняя синхронизация: {when}.": "Last sync: {when}.",
-  "Готово, но {n} файл(ов) изменились и здесь, и в репозитории — выбери, что оставить.":
-    "Done, but {n} file(s) changed both here and in the repository — pick what to keep.",
+  "Готово, но {n} файл(ов) изменились и здесь, и в репозитории – выбери, что оставить.":
+    "Done, but {n} file(s) changed both here and in the repository – pick what to keep.",
   "Готово: отправлено {pushed}, забрано {pulled}, без изменений {skipped}.":
     "Done: pushed {pushed}, pulled {pulled}, unchanged {skipped}.",
 
   // ── Данные (data-panel.js) ──
   "Экспорт проекта": "Export project",
-  "Один JSON-файл со всеми модулями: персонажи, локации, связи, фракции, таймлайн, доска, карта (только метки — картинки остаются файлами на диске), карта сюжета, знания, рукопись.":
-    "One JSON file with every module: characters, locations, relationships, factions, timeline, board, map (labels only — images stay as files on disk), story map, knowledge, manuscript.",
-  "Экспортировать": "Export",
+  "Один JSON-файл со всеми модулями: персонажи, локации, связи, фракции, таймлайн, доска, карта (только метки – картинки остаются файлами на диске), карта сюжета, знания, рукопись.":
+    "One JSON file with every module: characters, locations, relationships, factions, timeline, board, map (labels only – images stay as files on disk), story map, knowledge, manuscript.",
 
   "Импорт проекта": "Import project",
-  "Полностью заменяет текущие данные содержимым файла. Сохрани экспорт перед импортом, если сомневаешься — отменить нельзя.":
-    "Completely replaces current data with the file's contents. Save an export before importing if unsure — this can't be undone.",
+  "Полностью заменяет текущие данные содержимым файла. Сохрани экспорт перед импортом, если сомневаешься – отменить нельзя.":
+    "Completely replaces current data with the file's contents. Save an export before importing if unsure – this can't be undone.",
   "Импортировать…": "Import…",
   "Файл повреждён или это не JSON.": "The file is corrupted or isn't JSON.",
   "Заменить все текущие данные содержимым файла?": "Replace all current data with this file's contents?",
@@ -512,40 +502,38 @@ export const EN_DICT = {
   "Отмена": "Cancel",
 
   "Заполнить примером": "Fill with example",
-  "Связный тестовый сюжет — персонажи, локации, связи, фракции, таймлайн, доска, карта и две главы рукописи, чтобы сразу увидеть, как модули работают вместе.":
-    "A connected sample story — characters, locations, relationships, factions, timeline, board, map and two manuscript chapters, so you can see right away how the modules work together.",
+  "Связный тестовый сюжет – персонажи, локации, связи, фракции, таймлайн, доска, карта и две главы рукописи, чтобы сразу увидеть, как модули работают вместе.":
+    "A connected sample story – characters, locations, relationships, factions, timeline, board, map and two manuscript chapters, so you can see right away how the modules work together.",
   "Текущие данные будут заменены примером. Продолжить?": "Current data will be replaced with the example. Continue?",
 
   "История версий": "Version history",
   "Каждое сохранение оставляет прошлую версию файла в папке": "Every save keeps the previous version of the file in the",
   "Выбери модуль, чтобы увидеть его версии.": "Pick a module to see its versions.",
   "Выбери модуль…": "Pick a module…",
-  "Пока нет прошлых версий — история появляется со второго сохранения.": "No past versions yet — history starts from the second save.",
+  "Пока нет прошлых версий – история появляется со второго сохранения.": "No past versions yet – history starts from the second save.",
   "Восстановить": "Restore",
   "Заменит текущую версию. Точно?": "This will replace the current version. Sure?",
   "Заполнить примером…": "Fill with example…",
 
   "Текст с разделами (оглавление)": "Text with sections (table of contents)",
-  'Поле «Текст с разделами» — начни строку с "## " для раздела и с "### " для подраздела, и в карточке появится кликабельное оглавление.':
-    'The "Text with sections" field — start a line with "## " for a section and "### " for a subsection, and the card will get a clickable table of contents.',
-  'Строка с "## " — новый раздел, с "### " — подраздел. Соберётся оглавление.':
+  'Поле «Текст с разделами» – начни строку с "## " для раздела и с "### " для подраздела, и в карточке появится кликабельное оглавление.':
+    'The "Text with sections" field – start a line with "## " for a section and "### " for a subsection, and the card will get a clickable table of contents.',
+  'Строка с "## " – новый раздел, с "### " – подраздел. Соберётся оглавление.':
     'A line starting with "## " is a new section, "### " a subsection. The table of contents builds itself.',
 
   "Родительская локация": "Parent location",
-  "— нет (верхний уровень) —": "— none (top level) —",
+  "– нет (верхний уровень) –": "– none (top level) –",
   "в составе: {name}": "part of: {name}",
   "Локации внутри": "Locations inside",
 
   "Экспорт мира как сайта": "Export world as a site",
-  "Персонажи, локации, фракции и таймлайн — набором связанных HTML-страниц в архиве. Открывается в браузере у кого угодно, без интернета и без Fictaris — чтобы показать мир бета-ридеру или просто сохранить читаемый снимок.":
-    "Characters, locations, factions and the timeline — as a set of linked HTML pages in an archive. Opens in anyone's browser, no internet and no Fictaris needed — to show the world to a beta reader, or just keep a readable snapshot.",
-  "Экспортировать сайт": "Export site",
-  "Собираю…": "Building…",
+  "Персонажи, локации, фракции и таймлайн – набором связанных HTML-страниц в архиве. Открывается в браузере у кого угодно, без интернета и без Fictaris – чтобы показать мир бета-ридеру или просто сохранить читаемый снимок.":
+    "Characters, locations, factions and the timeline – as a set of linked HTML pages in an archive. Opens in anyone's browser, no internet and no Fictaris needed – to show the world to a beta reader, or just keep a readable snapshot.",
   "Мир Fictaris": "Fictaris World",
   "Обзор": "Overview",
   "Экспортировано из Fictaris": "Exported from Fictaris",
 
-  "Правая кнопка — выбрать шаблон анкеты или завести новый": "Right-click to pick a template or create a new one",
+  "Правая кнопка – выбрать шаблон анкеты или завести новый": "Right-click to pick a template or create a new one",
   "+ Новый шаблон…": "+ New template…",
   "Новый шаблон анкеты": "New form template",
   "Название шаблона": "Template name",
@@ -555,25 +543,23 @@ export const EN_DICT = {
   "Скрыть сравнение": "Hide comparison",
   "Считаю разницу…": "Computing the difference…",
   "Не получилось загрузить это сравнение.": "Couldn't load this comparison.",
-  "Файл слишком большой для построчного сравнения — воспользуйся «Восстановить», если нужно вернуть именно эту версию.":
-    "This file is too large to diff line by line — use \"Restore\" if you need to bring back exactly this version.",
+  "Файл слишком большой для построчного сравнения – воспользуйся «Восстановить», если нужно вернуть именно эту версию.":
+    "This file is too large to diff line by line – use \"Restore\" if you need to bring back exactly this version.",
   "Между этой версией и текущим состоянием нет отличий.": "There's no difference between this version and the current state.",
   "… ещё {count} неизменных строк …": "… {count} more unchanged lines …",
 
-  "пунктир — найдено по «@упоминанию» в тексте, не задано вручную": "dashed — found via an \"@mention\" in text, not set by hand",
+  "пунктир – найдено по «@упоминанию» в тексте, не задано вручную": "dashed – found via an \"@mention\" in text, not set by hand",
 
   "Писательская серия": "Writing streak",
-  "Дневная цель по словам — считается по автосохранениям рукописи, не нужно отмечать вручную.":
-    "Daily word goal — tracked from manuscript autosaves, nothing to mark by hand.",
+  "Дневная цель по словам – считается по автосохранениям рукописи, не нужно отмечать вручную.":
+    "Daily word goal – tracked from manuscript autosaves, nothing to mark by hand.",
   "дней подряд с целью": "days in a row hitting goal",
   "слов сегодня": "words today",
-  "Дневная цель, слов (0 — выключить)": "Daily goal, words (0 to turn off)",
+  "Дневная цель, слов (0 – выключить)": "Daily goal, words (0 to turn off)",
 
   "Экспорт мира в PDF": "Export world as PDF",
-  "Тот же материал, что и в экспорте сайта, — одним печатным документом: обложка, персонажи, локации, фракции, таймлайн, со ссылками внутри файла. Доступно в десктопной версии.":
-    "The same material as the site export — as one printable document: cover, characters, locations, factions, timeline, with links inside the file. Available in the desktop version.",
-  "Экспортировать PDF": "Export PDF",
-  "Готовлю…": "Preparing…",
+  "Тот же материал, что и в экспорте сайта, – одним печатным документом: обложка, персонажи, локации, фракции, таймлайн, со ссылками внутри файла. Доступно в десктопной версии.":
+    "The same material as the site export – as one printable document: cover, characters, locations, factions, timeline, with links inside the file. Available in the desktop version.",
   "Не получилось создать PDF. Доступно только в десктопной версии Fictaris.": "Couldn't create the PDF. Only available in the desktop version of Fictaris.",
   "Экспорт в PDF доступен только в десктопной версии Fictaris.": "PDF export is only available in the desktop version of Fictaris.",
 
@@ -584,13 +570,13 @@ export const EN_DICT = {
 
   "Карта сюжета": "Story map",
   "Новая точка": "New point",
-  "Пока нет ни одной точки сюжета — добавь первую.": "No plot points yet — add the first one.",
+  "Пока нет ни одной точки сюжета – добавь первую.": "No plot points yet – add the first one.",
   "+ Точка": "+ Point",
   "Соединить": "Connect",
   "Сбросить вид": "Reset view",
   "Выбери вторую точку, чтобы связать «{name}» с ней": "Pick a second point to connect it with \"{name}\"",
-  "Выбери первую точку связи (Esc — отмена)": "Pick the first point for a connection (Esc to cancel)",
-  "Тащи точки мышью, клик открывает редактирование, ПКМ по точке или связи — удалить":
+  "Выбери первую точку связи (Esc – отмена)": "Pick the first point for a connection (Esc to cancel)",
+  "Тащи точки мышью, клик открывает редактирование, ПКМ по точке или связи – удалить":
     "Drag points with the mouse, click to edit, right-click a point or connection to delete it",
   "Подпись связи (необязательно):": "Connection label (optional):",
   "Удалить связь": "Delete connection",
@@ -599,18 +585,16 @@ export const EN_DICT = {
   "например: Глава 7": "e.g. Chapter 7",
 
   "Знания": "Knowledge",
-  "Кто из персонажей что знает и с какой главы — свериться при редактуре, чтобы никто не знал того, что ещё не должен":
-    "Which character knows what, and from which chapter — check while editing, so no one knows something too soon",
-  "Факт мира и для каждого причастного персонажа — глава, с которой это стало ему известно. Свериться при редактуре: никто не должен знать раньше своей главы.":
+  "Факт мира и для каждого причастного персонажа – глава, с которой это стало ему известно. Свериться при редактуре: никто не должен знать раньше своей главы.":
     "A fact about the world, and for each involved character, the chapter from which they know it. Check while editing: no one should know before their own chapter.",
-  "Пока нет ни одного факта — добавь первый.": "No facts yet — add the first one.",
+  "Пока нет ни одного факта – добавь первый.": "No facts yet – add the first one.",
   "+ Факт": "+ Fact",
   "Новый факт": "New fact",
   "Удалить факт": "Delete fact",
   "Заметка о факте (необязательно)…": "Note about the fact (optional)…",
   "Пока ни один персонаж не отмечен.": "No character is marked yet.",
   "+ Персонаж": "+ Character",
-  "— глава не выбрана —": "— no chapter selected —",
+  "– глава не выбрана –": "– no chapter selected –",
   "С самого начала истории": "From the very start of the story",
   "(удалённый персонаж)": "(deleted character)",
   "Убрать персонажа из этого факта": "Remove this character from the fact",
@@ -619,14 +603,14 @@ export const EN_DICT = {
   "Факт «{label}»: у «{name}» не выбрана глава": "Fact \"{label}\": no chapter selected for \"{name}\"",
   "Факт «{label}»: у «{name}» указана удалённая глава": "Fact \"{label}\": \"{name}\" points to a deleted chapter",
 
-  "Скачать этот шаблон файлом — переслать или перенести в другой проект": "Download this template as a file — send it or move it to another project",
+  "Скачать этот шаблон файлом – переслать или перенести в другой проект": "Download this template as a file – send it or move it to another project",
   "Это не файл шаблона Fictaris.": "This isn't a Fictaris template file.",
-  "Загрузить шаблон из файла — добавится новой вкладкой": "Load a template from a file — it will appear as a new tab",
+  "Загрузить шаблон из файла – добавится новой вкладкой": "Load a template from a file – it will appear as a new tab",
 
   "Недавнее": "Recent",
   "Открыть родительскую локацию": "Open parent location",
   "Свернуть список разделов до одних иконок": "Collapse the section list to icons only",
-  "Список свёрнут до иконок — нажми, чтобы вернуть подписи": "List collapsed to icons — click to bring back labels",
+  "Список свёрнут до иконок – нажми, чтобы вернуть подписи": "List collapsed to icons – click to bring back labels",
 
   "Форматирование": "Formatting",
   "Жирный": "Bold",

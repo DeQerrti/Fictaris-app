@@ -370,7 +370,7 @@ function resetHighlight(lineByNode, nodeEls) {
 function buildHint() {
   const hint = document.createElement("div");
   hint.className = "rgraph-hint";
-  hint.textContent = i18n("Тащи узлы мышью, крути колесо для зума, клик открывает карточку — цвет и длина линии показывают знак и силу связи.");
+  hint.textContent = i18n("Тащи узлы мышью, крути колесо для зума, клик открывает карточку – цвет и длина линии показывают знак и силу связи.");
   return hint;
 }
 

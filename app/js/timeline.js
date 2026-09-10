@@ -161,7 +161,7 @@ function buildList() {
     // иконка нужна ровно для "здесь пока правда нечего показывать".
     const empty = events.length
       ? buildEmptyState(i18n("Нет событий с таким фильтром."))
-      : buildEmptyState(i18n("Событий пока нет — добавь первое."), "clock");
+      : buildEmptyState(i18n("Событий пока нет – добавь первое."), "clock");
     list.appendChild(empty);
   }
 
@@ -182,7 +182,7 @@ function buildList() {
     ].join("");
 
     item.innerHTML = `
-      <div class="timeline-date">${escapeHtml(ev.date || "—")}</div>
+      <div class="timeline-date">${escapeHtml(ev.date || "–")}</div>
       <div class="timeline-title">${escapeHtml(ev.title || i18n("Без названия"))}</div>
       <div class="timeline-chips">${chips}</div>
     `;

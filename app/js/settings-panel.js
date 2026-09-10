@@ -13,11 +13,12 @@ import {
   getGroupsConfig,
   setGroupLabel,
   deleteGroup,
+  createGroup,
   getTabGroupMap,
   setTabGroup,
 } from "./visibility.js";
 import { captureKey, saveShortcut, clearShortcut } from "./shortcuts.js";
-import { DEFAULT_TAGS_MAP, CATEGORY_LABELS, parseTags, stringifyTags } from "./tags.js";
+import { DEFAULT_TAGS_MAP, parseTags, stringifyTags, loadCategoryLabels, saveCategoryLabel, newCategoryId } from "./tags.js";
 import { KIND_LABELS, loadTemplates, saveTemplates, blankField } from "./templates.js";
 import { defaultMonths, loadCalendar, saveCalendar } from "./calendar.js";
 import {
@@ -110,13 +111,15 @@ export async function renderSettings(root, focusTab) {
 async function buildAppearanceSection() {
   const section = document.createElement("div");
   section.className = "data-section";
-  section.innerHTML = `<h3>${i18n("Оформление")}</h3><p>${i18n("Тема и акцентный цвет — применяются сразу, без перезагрузки.")}</p>`;
+  section.innerHTML = `<h3>${i18n("Оформление")}</h3>`;
 
   const settings = await apiGet("/api/site-settings").catch(() => ({}));
   const currentSkin = THEME_PRESETS[settings.theme] ? settings.theme : "dark";
 
   const swatches = document.createElement("div");
   swatches.className = "theme-swatches";
+
+  const paletteSection = buildPaletteSection(settings);
 
   const buttons = new Map();
   for (const [id, preset] of Object.entries(THEME_PRESETS)) {
@@ -128,6 +131,13 @@ async function buildAppearanceSection() {
       buttons.forEach((b) => b.classList.remove("active"));
       btn.classList.add("active");
       await saveTheme({ theme: id });
+      // Свотчи палитры ниже читали цвета один раз при отрисовке вкладки
+      // (getComputedStyle) — после переключения темы CSS-переменные уже
+      // новые, а эти <input type="color"> так и оставались со старыми,
+      // пока не открыть вкладку заново. saveTheme применяет тему сразу
+      // (theme.js, applyTheme) — здесь просто перечитываем то, что она
+      // уже поставила.
+      paletteSection.refreshPalette();
     });
     buttons.set(id, btn);
     swatches.appendChild(btn);
@@ -152,7 +162,7 @@ async function buildAppearanceSection() {
     location.reload(); // проще перечитать цвет темы по умолчанию, чем тянуть его сюда из style.css
   });
 
-  section.append(swatches, accentRow, resetBtn, buildPaletteSection(settings));
+  section.append(swatches, accentRow, resetBtn, paletteSection);
   return section;
 }
 
@@ -162,28 +172,40 @@ async function buildAppearanceSection() {
 // значения — то, что реально сейчас на экране (getComputedStyle), а не
 // значения по умолчанию из style.css: так свои правки одной темы не
 // сбрасываются при переключении на другую половину экрана.
+// wrap.refreshPalette — переключатель темы выше зовёт её же после
+// saveTheme(): без этого свотчи здесь держали цвета старой темы до
+// следующего открытия вкладки (getComputedStyle читался только один
+// раз, при первой отрисовке).
 function buildPaletteSection(settings) {
   const wrap = document.createElement("div");
   wrap.style.marginTop = "20px";
-  wrap.innerHTML = `<h4 style="margin:0 0 4px;">${i18n("Палитра")}</h4><p style="margin:0 0 10px;color:var(--text-dim);font-size:0.85rem;">${i18n("Свой цвет для каждого элемента интерфейса — поверх темы и акцента.")}</p>`;
+  wrap.innerHTML = `<h4 style="margin:0 0 10px;">${i18n("Палитра")}</h4>`;
 
   const custom = { ...(settings.customColors || {}) };
-  const cs = getComputedStyle(document.documentElement);
   const grid = document.createElement("div");
   grid.className = "palette-grid";
+  const inputs = new Map();
 
-  for (const [key, cssVar, label, hint] of CUSTOM_COLOR_TOKENS) {
+  function refreshPaletteInputs() {
+    const cs = getComputedStyle(document.documentElement);
+    for (const [key, cssVar] of CUSTOM_COLOR_TOKENS) {
+      const input = inputs.get(key);
+      const current = /^#[0-9a-f]{6}$/i.test(custom[key] || "") ? custom[key] : cs.getPropertyValue(cssVar).trim();
+      input.value = /^#[0-9a-f]{6}$/i.test(current) ? current : "#000000";
+    }
+  }
+
+  for (const [key, , label, hint] of CUSTOM_COLOR_TOKENS) {
     const row = document.createElement("label");
     row.className = "palette-row";
 
     const input = document.createElement("input");
     input.type = "color";
-    const current = /^#[0-9a-f]{6}$/i.test(custom[key] || "") ? custom[key] : cs.getPropertyValue(cssVar).trim();
-    input.value = /^#[0-9a-f]{6}$/i.test(current) ? current : "#000000";
     input.addEventListener("input", () => {
       custom[key] = input.value;
       saveTheme({ customColors: custom });
     });
+    inputs.set(key, input);
 
     const text = document.createElement("span");
     text.innerHTML = `${escapeHtml(i18n(label))}<small>${escapeHtml(i18n(hint))}</small>`;
@@ -191,6 +213,7 @@ function buildPaletteSection(settings) {
     row.append(input, text);
     grid.appendChild(row);
   }
+  refreshPaletteInputs();
 
   const resetBtn = document.createElement("button");
   resetBtn.className = "btn";
@@ -201,6 +224,7 @@ function buildPaletteSection(settings) {
   });
 
   wrap.append(grid, resetBtn);
+  wrap.refreshPalette = refreshPaletteInputs;
   return wrap;
 }
 
@@ -225,7 +249,7 @@ async function buildAppSection(info) {
 function buildLanguageSection() {
   const section = document.createElement("div");
   section.className = "data-section";
-  section.innerHTML = `<h3>${i18n("Язык")}</h3><p>${i18n("Язык интерфейса — применяется сразу после перезагрузки страницы. Общий на проект: открыв его с другого устройства через синхронизацию, увидишь тот же язык.")}</p>`;
+  section.innerHTML = `<h3>${i18n("Язык")}</h3>`;
 
   const row = document.createElement("div");
   row.className = "sync-actions";
@@ -313,7 +337,7 @@ const UNGROUPED = "__none__";
 async function buildLabelsSection() {
   const section = document.createElement("div");
   section.className = "data-section";
-  section.innerHTML = `<h3>${i18n("Подписи интерфейса")}</h3><p>${i18n("Переименуй пункты меню под свою терминологию — применяется сразу. Глазик слева прячет раздел из сайдбара. Перетаскивай за ⠿ внутри группы или в другую группу — так меняется и порядок, и сама группа. Название группы и мусорную корзину рядом с ним — переименовать или убрать подпись целиком.")}</p>`;
+  section.innerHTML = `<h3>${i18n("Подписи интерфейса")}</h3>`;
 
   const body = document.createElement("div");
   section.appendChild(body);
@@ -382,7 +406,7 @@ async function renderLabelsBody(body) {
     const nameSpan = document.createElement("span");
     nameSpan.className = "labels-group-name";
     nameSpan.textContent = groupLabels[id] || id;
-    nameSpan.title = i18n("Клик — переименовать группу");
+    nameSpan.title = i18n("Клик – переименовать группу");
     nameSpan.addEventListener("click", () => {
       const input = document.createElement("input");
       input.className = "labels-group-name-input";
@@ -476,6 +500,35 @@ async function renderLabelsBody(body) {
     ungroupedContainer.appendChild(row);
   }
   body.appendChild(ungroupedContainer);
+
+  // Стартовых групп («Сюжет»/«Мир»/«Инструменты»/«Обзор») четыре — не
+  // всем хватает, а удалить можно все разом (кнопка есть у каждой) и
+  // остаться совсем без группировки. "+ Группа" заводит свою (visibility.js,
+  // createGroup) тем же инлайн-полем, что и переименование существующей.
+  const addGroupRow = document.createElement("div");
+  addGroupRow.className = "labels-group-header";
+  const addGroupBtn = document.createElement("button");
+  addGroupBtn.className = "btn";
+  addGroupBtn.textContent = i18n("+ Группа");
+  addGroupBtn.addEventListener("click", () => {
+    const input = document.createElement("input");
+    input.className = "labels-group-name-input";
+    input.placeholder = i18n("Название группы");
+    addGroupBtn.replaceWith(input);
+    input.focus();
+    const commit = async () => {
+      const value = input.value.trim();
+      if (value) await createGroup(value);
+      renderLabelsBody(body);
+    };
+    input.addEventListener("blur", commit);
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") input.blur();
+      else if (e.key === "Escape") { input.value = ""; input.blur(); }
+    });
+  });
+  addGroupRow.appendChild(addGroupBtn);
+  body.appendChild(addGroupRow);
 }
 
 function buildLabelRow(key, defaultValue, currentValue, isHidden, onSave) {
@@ -491,13 +544,13 @@ function buildLabelRow(key, defaultValue, currentValue, isHidden, onSave) {
   const eyeBtn = document.createElement("button");
   eyeBtn.type = "button";
   eyeBtn.className = "label-row-eye";
-  eyeBtn.textContent = isHidden ? "🙈" : "👁";
+  eyeBtn.innerHTML = iconSvg(isHidden ? "eyeOff" : "eye", 15);
   eyeBtn.title = isHidden ? i18n("Показать раздел") : i18n("Скрыть раздел");
   eyeBtn.addEventListener("click", async () => {
     isHidden = !isHidden;
     await setTabHidden(key, isHidden);
     row.classList.toggle("label-row-hidden", isHidden);
-    eyeBtn.textContent = isHidden ? "🙈" : "👁";
+    eyeBtn.innerHTML = iconSvg(isHidden ? "eyeOff" : "eye", 15);
     eyeBtn.title = isHidden ? i18n("Показать раздел") : i18n("Скрыть раздел");
   });
 
@@ -517,7 +570,7 @@ function buildLabelRow(key, defaultValue, currentValue, isHidden, onSave) {
 async function buildShortcutsSection() {
   const section = document.createElement("div");
   section.className = "data-section";
-  section.innerHTML = `<h3>${i18n("Горячие клавиши")}</h3><p>${i18n("Цифры 1–9 переключают модули по порядку в сайдбаре. Любой модуль можно назначить на свою клавишу — она сработает независимо от позиции в списке.")}</p>`;
+  section.innerHTML = `<h3>${i18n("Горячие клавиши")}</h3>`;
 
   const settings = await apiGet("/api/site-settings").catch(() => ({}));
   const custom = settings.keyBindings?.nav || {};
@@ -536,7 +589,7 @@ async function buildShortcutsSection() {
 
     const keyBtn = document.createElement("button");
     keyBtn.className = "btn shortcut-key";
-    const defaultLabel = index < 9 ? String(index + 1) : "—";
+    const defaultLabel = index < 9 ? String(index + 1) : "–";
     keyBtn.textContent = custom[key] ? bindingLabel(custom[key]) : defaultLabel;
 
     const clearBtn = document.createElement("button");
@@ -580,16 +633,17 @@ function bindingLabel(binding) {
 async function buildTagsSection() {
   const section = document.createElement("div");
   section.className = "data-section";
-  section.innerHTML = `<h3>${i18n("Теги")}</h3><p>${i18n("Спрячь ненужный встроенный тег или добавь свой — оба применяются сразу во всех модулях.")}</p>`;
+  section.innerHTML = `<h3>${i18n("Теги")}</h3>`;
 
   const settings = await apiGet("/api/site-settings").catch(() => ({}));
   const hidden = new Set(settings.hiddenTags || []);
   const custom = settings.customTags || {};
   const merged = { ...DEFAULT_TAGS_MAP, ...custom };
+  const categoryLabels = await loadCategoryLabels();
 
   const list = document.createElement("div");
   list.className = "tags-manage-list";
-  renderTagsManageList(list, merged, hidden, custom);
+  renderTagsManageList(list, merged, hidden, custom, categoryLabels);
   section.appendChild(list);
 
   const addRow = document.createElement("div");
@@ -598,12 +652,52 @@ async function buildTagsSection() {
   nameInput.type = "text";
   nameInput.placeholder = i18n("Название тега");
   const catSelect = document.createElement("select");
-  for (const [cat, label] of Object.entries(CATEGORY_LABELS)) {
-    const opt = document.createElement("option");
-    opt.value = cat;
-    opt.textContent = i18n(label);
-    catSelect.appendChild(opt);
+  function fillCatSelect(labels, selected) {
+    catSelect.innerHTML = "";
+    for (const [cat, label] of Object.entries(labels)) {
+      const opt = document.createElement("option");
+      opt.value = cat;
+      opt.textContent = i18n(label);
+      catSelect.appendChild(opt);
+    }
+    if (selected) catSelect.value = selected;
   }
+  fillCatSelect(categoryLabels);
+
+  // Свой тип тега — не пункт того же <select> (внутри select нельзя
+  // ни вписать текст, ни позвать асинхронное сохранение до выбора),
+  // а отдельная кнопка рядом: то же инлайн-поле, что и у переименования
+  // типа ниже (renderTagsManageList).
+  const addCatBtn = document.createElement("button");
+  addCatBtn.className = "btn icon-btn";
+  addCatBtn.innerHTML = iconSvg("folderPlus", 14);
+  addCatBtn.title = i18n("Новый тип тега");
+  addCatBtn.addEventListener("click", () => {
+    const input = document.createElement("input");
+    input.type = "text";
+    input.className = "tags-manage-rename-input";
+    input.placeholder = i18n("Название типа");
+    addCatBtn.replaceWith(input);
+    input.focus();
+    let settled = false;
+    async function commit() {
+      if (settled) return;
+      settled = true;
+      const name = input.value.trim();
+      input.replaceWith(addCatBtn);
+      if (!name) return;
+      const id = newCategoryId();
+      await saveCategoryLabel(id, name);
+      const nextLabels = await loadCategoryLabels();
+      fillCatSelect(nextLabels, id);
+    }
+    input.addEventListener("blur", commit);
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") commit();
+      else if (e.key === "Escape") { settled = true; input.replaceWith(addCatBtn); }
+    });
+  });
+
   const addBtn = document.createElement("button");
   addBtn.className = "btn";
   addBtn.textContent = i18n("Добавить тег");
@@ -615,9 +709,10 @@ async function buildTagsSection() {
     await apiPost("/api/site-settings", { ...s, customTags: nextCustom });
     nameInput.value = "";
     const nextHidden = new Set(s.hiddenTags || []);
-    renderTagsManageList(list, { ...DEFAULT_TAGS_MAP, ...nextCustom }, nextHidden, nextCustom);
+    const nextLabels = await loadCategoryLabels();
+    renderTagsManageList(list, { ...DEFAULT_TAGS_MAP, ...nextCustom }, nextHidden, nextCustom, nextLabels);
   });
-  addRow.append(nameInput, catSelect, addBtn);
+  addRow.append(nameInput, catSelect, addCatBtn, addBtn);
   section.appendChild(addRow);
 
   return section;
@@ -645,7 +740,7 @@ async function renameTagEverywhere(oldName, newName) {
   }
 }
 
-function renderTagsManageList(list, merged, hidden, custom) {
+function renderTagsManageList(list, merged, hidden, custom, categoryLabels) {
   list.innerHTML = "";
   const byCategory = {};
   for (const [name, info] of Object.entries(merged)) {
@@ -655,10 +750,47 @@ function renderTagsManageList(list, merged, hidden, custom) {
   for (const [cat, names] of Object.entries(byCategory)) {
     const group = document.createElement("div");
     group.className = "tags-manage-group";
-    const title = document.createElement("div");
+    const titleRow = document.createElement("div");
+    titleRow.className = "tags-manage-group-title-row";
+    const title = document.createElement("span");
     title.className = "tags-manage-group-title";
-    title.textContent = i18n(CATEGORY_LABELS[cat] || cat);
-    group.appendChild(title);
+    title.textContent = i18n(categoryLabels[cat] || cat);
+    titleRow.appendChild(title);
+
+    // Тип тега (категория) — тоже можно переименовать, тем же инлайн-
+    // полем, что и сам тег ниже: и встроенный (архетип/роль/…), и свой
+    // (заведённый "+ тип" выше) хранятся в customCategories одинаково
+    // (tags.js, saveCategoryLabel) — какая разница, старый это тип или
+    // новый, для правки названия не важно.
+    const renameCatBtn = document.createElement("button");
+    renameCatBtn.className = "btn icon-btn tags-manage-group-rename";
+    renameCatBtn.innerHTML = iconSvg("pencil", 12);
+    renameCatBtn.title = i18n("Переименовать тип");
+    renameCatBtn.addEventListener("click", () => {
+      const input = document.createElement("input");
+      input.type = "text";
+      input.className = "tags-manage-rename-input";
+      input.value = categoryLabels[cat] || cat;
+      titleRow.replaceChild(input, title);
+      input.focus();
+      input.select();
+      let settled = false;
+      async function commit() {
+        if (settled) return;
+        settled = true;
+        const newLabel = input.value.trim();
+        if (newLabel) await saveCategoryLabel(cat, newLabel);
+        const nextLabels = await loadCategoryLabels();
+        renderTagsManageList(list, merged, hidden, custom, nextLabels);
+      }
+      input.addEventListener("blur", commit);
+      input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") commit();
+        else if (e.key === "Escape") { settled = true; renderTagsManageList(list, merged, hidden, custom, categoryLabels); }
+      });
+    });
+    titleRow.appendChild(renameCatBtn);
+    group.appendChild(titleRow);
     for (const name of names) {
       const row = document.createElement("div");
       row.className = "tags-manage-row";
@@ -686,7 +818,7 @@ function renderTagsManageList(list, merged, hidden, custom) {
           settled = true;
           const newName = input.value.trim();
           if (!newName || newName === name) {
-            renderTagsManageList(list, merged, hidden, custom);
+            renderTagsManageList(list, merged, hidden, custom, categoryLabels);
             return;
           }
           const s = (await apiGet("/api/site-settings").catch(() => ({}))) || {};
@@ -702,14 +834,14 @@ function renderTagsManageList(list, merged, hidden, custom) {
           await apiPost("/api/site-settings", { ...s, customTags: nextCustom, hiddenTags: [...nextHidden] });
           await renameTagEverywhere(name, newName);
           const nextMerged = { ...DEFAULT_TAGS_MAP, ...nextCustom };
-          renderTagsManageList(list, nextMerged, nextHidden, nextCustom);
+          renderTagsManageList(list, nextMerged, nextHidden, nextCustom, categoryLabels);
         }
 
         input.addEventListener("keydown", (e) => {
           if (e.key === "Enter") commit();
           else if (e.key === "Escape") {
             settled = true;
-            renderTagsManageList(list, merged, hidden, custom);
+            renderTagsManageList(list, merged, hidden, custom, categoryLabels);
           }
         });
         input.addEventListener("blur", commit);
@@ -733,7 +865,7 @@ function renderTagsManageList(list, merged, hidden, custom) {
           const nextHidden = new Set(s.hiddenTags || []);
           nextHidden.add(name);
           await apiPost("/api/site-settings", { ...s, customTags: nextCustom, hiddenTags: [...nextHidden] });
-          renderTagsManageList(list, { ...DEFAULT_TAGS_MAP, ...nextCustom }, nextHidden, nextCustom);
+          renderTagsManageList(list, { ...DEFAULT_TAGS_MAP, ...nextCustom }, nextHidden, nextCustom, categoryLabels);
           return;
         }
         delBtn.dataset.confirm = "1";
@@ -764,7 +896,7 @@ let activeTemplateId = null;
 async function buildTemplatesSection() {
   const section = document.createElement("div");
   section.className = "data-section";
-  section.innerHTML = `<h3>${i18n("Шаблоны анкет")}</h3><p>${i18n("Какие поля показывает карточка персонажа/локации/фракции — убери ненужное, переименуй, добавь своё. Можно завести несколько шаблонов и выбирать нужный при создании.")}</p><p>${i18n('Поле «Текст с разделами» — начни строку с "## " для раздела и с "### " для подраздела, и в карточке появится кликабельное оглавление.')}</p>`;
+  section.innerHTML = `<h3>${i18n("Шаблоны анкет")}</h3>`;
 
   const kindRow = document.createElement("div");
   kindRow.className = "sync-actions";
@@ -815,7 +947,7 @@ async function renderTemplatesBody(body, kind) {
   const addTemplateBtn = document.createElement("button");
   addTemplateBtn.className = "btn";
   addTemplateBtn.textContent = i18n("+ Шаблон");
-  addTemplateBtn.title = i18n("Новый шаблон — с полями текущего, дальше можно менять независимо");
+  addTemplateBtn.title = i18n("Новый шаблон – с полями текущего, дальше можно менять независимо");
   addTemplateBtn.addEventListener("click", async () => {
     const fresh = { id: `t_${Date.now().toString(36)}`, name: i18n("Новый шаблон"), fields: template.fields.map((f) => ({ ...f })) };
     const next = [...list, fresh];
@@ -833,7 +965,7 @@ async function renderTemplatesBody(body, kind) {
   // импортировать решает вкладка, на которой нажали "Импорт").
   const exportBtn = document.createElement("button");
   exportBtn.className = "btn";
-  exportBtn.title = i18n("Скачать этот шаблон файлом — переслать или перенести в другой проект");
+  exportBtn.title = i18n("Скачать этот шаблон файлом – переслать или перенести в другой проект");
   exportBtn.textContent = "⬇";
   exportBtn.addEventListener("click", () => {
     const payload = { fictarisTemplate: 1, name: template.name, fields: template.fields };
@@ -877,7 +1009,7 @@ async function renderTemplatesBody(body, kind) {
   });
   const importBtn = document.createElement("button");
   importBtn.className = "btn";
-  importBtn.title = i18n("Загрузить шаблон из файла — добавится новой вкладкой");
+  importBtn.title = i18n("Загрузить шаблон из файла – добавится новой вкладкой");
   importBtn.textContent = "⬆";
   importBtn.addEventListener("click", () => importInput.click());
   tabsRow.append(importBtn, importInput);
@@ -905,7 +1037,7 @@ async function renderTemplatesBody(body, kind) {
     const delTemplateBtn = document.createElement("button");
     delTemplateBtn.className = "btn danger";
     delTemplateBtn.innerHTML = iconSvg("trash", 14);
-    delTemplateBtn.title = i18n("Удалить шаблон (карточки, заведённые по нему, останутся — просто покажут первый оставшийся шаблон)");
+    delTemplateBtn.title = i18n("Удалить шаблон (карточки, заведённые по нему, останутся – просто покажут первый оставшийся шаблон)");
     delTemplateBtn.addEventListener("click", async () => {
       if (delTemplateBtn.dataset.confirm === "1") {
         const next = list.filter((t) => t.id !== template.id);
@@ -1000,7 +1132,7 @@ async function renderTemplatesBody(body, kind) {
 async function buildCalendarSection() {
   const section = document.createElement("div");
   section.className = "data-section";
-  section.innerHTML = `<h3>${i18n("Календарь")}</h3><p>${i18n("Своё летоисчисление для таймлайна — свои месяцы вместо реальных, произвольная длина года.")}</p>`;
+  section.innerHTML = `<h3>${i18n("Календарь")}</h3><p>${i18n("Своё летоисчисление для таймлайна – свои месяцы вместо реальных, произвольная длина года.")}</p>`;
 
   const calendar = await loadCalendar();
   const toggleBtn = document.createElement("button");
@@ -1134,14 +1266,14 @@ function buildSyncSetup(section) {
 
   const intro = document.createElement("p");
   intro.textContent = i18n(
-    "Свободно и без своего сервера: приватный репозиторий на GitHub как общее хранилище для всех твоих устройств — телефона, компьютера, ещё одного компьютера. Токен и служебные данные синхронизации остаются только на этом устройстве."
+    "Свободно и без своего сервера: приватный репозиторий на GitHub как общее хранилище для всех твоих устройств – телефона, компьютера, ещё одного компьютера. Токен и служебные данные синхронизации остаются только на этом устройстве."
   );
 
   const steps = document.createElement("ol");
   steps.className = "sync-steps";
   steps.innerHTML =
-    `<li>${i18n("Заведи аккаунт на github.com, если его ещё нет — бесплатно.")}</li>` +
-    `<li>${i18n("Создай токен доступа —")} <a href="https://github.com/settings/tokens/new?scopes=repo&description=Fictaris" target="_blank" rel="noopener">${i18n("по этой ссылке")}</a>, ${i18n('галочка «repo» уже отмечена. Внизу страницы — «Generate token».')}</li>` +
+    `<li>${i18n("Заведи аккаунт на github.com, если его ещё нет – бесплатно.")}</li>` +
+    `<li>${i18n("Создай токен доступа –")} <a href="https://github.com/settings/tokens/new?scopes=repo&description=Fictaris" target="_blank" rel="noopener">${i18n("по этой ссылке")}</a>, ${i18n('галочка «repo» уже отмечена. Внизу страницы – «Generate token».')}</li>` +
     `<li>${i18n("Скопируй токен (показывается один раз) и вставь сюда.")}</li>`;
 
   const tokenLabel = document.createElement("label");
@@ -1159,7 +1291,7 @@ function buildSyncSetup(section) {
   const repoHint = document.createElement("p");
   repoHint.className = "sync-hint";
   repoHint.textContent = i18n(
-    "Если такого репозитория ещё нет на твоём GitHub — создадим сами, приватным. Если уже есть (например, второе устройство его уже завело) — подключимся к нему."
+    "Если такого репозитория ещё нет на твоём GitHub – создадим сами, приватным. Если уже есть (например, второе устройство его уже завело) – подключимся к нему."
   );
 
   const btn = document.createElement("button");
@@ -1182,7 +1314,7 @@ function buildSyncSetup(section) {
       const config = { token, owner: user.login, repo };
       status.textContent = i18n("Проверяем репозиторий…");
       if (!(await repoExists(config))) {
-        status.textContent = i18n("Репозитория ещё нет — создаём…");
+        status.textContent = i18n("Репозитория ещё нет – создаём…");
         await createRepo(config);
       }
       saveSyncConfig(config);
@@ -1272,7 +1404,7 @@ async function startSync(config, btn, status, progress, conflictsBox) {
     }
 
     if (result.conflicts.length) {
-      status.textContent = i18n("Готово, но {n} файл(ов) изменились и здесь, и в репозитории — выбери, что оставить.", {
+      status.textContent = i18n("Готово, но {n} файл(ов) изменились и здесь, и в репозитории – выбери, что оставить.", {
         n: result.conflicts.length,
       });
       renderConflicts(conflictsBox, config, result.conflicts);
@@ -1327,17 +1459,17 @@ async function pickConflict(config, conflict, choice, row) {
 function updateStatusText(res) {
   if (res.status === "latest") return i18n("У тебя последняя версия.");
   if (res.status === "downloading") return i18n("Скачивается обновление {version}…", res);
-  if (res.status === "ready") return i18n("Обновление {version} скачано — перезапусти, чтобы установить.", res);
+  if (res.status === "ready") return i18n("Обновление {version} скачано – перезапусти, чтобы установить.", res);
   if (res.status === "available") return i18n("Доступно обновление {version}.", res);
   if (res.status === "dev") return i18n("Проверка недоступна в режиме разработки (npm start).");
   if (res.status === "error" && res.message) return i18n("Не удалось скачать обновление: {message}", res);
-  return i18n("Не удалось проверить обновления — нет сети или GitHub недоступен.");
+  return i18n("Не удалось проверить обновления – нет сети или GitHub недоступен.");
 }
 
 function buildUpdateSection(info) {
   const section = document.createElement("div");
   section.className = "data-section";
-  section.innerHTML = `<h3>${i18n("Обновления")}</h3><p>${i18n("Установленная версия: {version}", { version: info.version || "—" })}</p>`;
+  section.innerHTML = `<h3>${i18n("Обновления")}</h3><p>${i18n("Установленная версия: {version}", { version: info.version || "–" })}</p>`;
 
   const status = document.createElement("div");
   status.className = "update-check-status";

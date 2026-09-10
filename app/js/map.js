@@ -91,7 +91,7 @@ function buildMapsHome() {
   grid.className = "characters-grid";
 
   if (!map.rootIds.length) {
-    const empty = buildEmptyState(i18n("Карт пока нет — загрузи изображение, чтобы создать первую."), "map");
+    const empty = buildEmptyState(i18n("Карт пока нет – загрузи изображение, чтобы создать первую."), "map");
     empty.style.gridColumn = "1 / -1";
     grid.appendChild(empty);
   }

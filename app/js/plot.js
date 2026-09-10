@@ -91,8 +91,8 @@ function draw() {
   hint.textContent = connectMode
     ? connectFrom
       ? i18n("Выбери вторую точку, чтобы связать «{name}» с ней", { name: connectFrom.title || i18n("Без названия") })
-      : i18n("Выбери первую точку связи (Esc — отмена)")
-    : i18n("Тащи точки мышью, клик открывает редактирование, ПКМ по точке или связи — удалить");
+      : i18n("Выбери первую точку связи (Esc – отмена)")
+    : i18n("Тащи точки мышью, клик открывает редактирование, ПКМ по точке или связи – удалить");
   toolbar.appendChild(hint);
 
   const actions = document.createElement("div");
@@ -130,7 +130,7 @@ function draw() {
   view.appendChild(toolbar);
 
   if (!nodes.length) {
-    const empty = buildEmptyState(i18n("Пока нет ни одной точки сюжета — добавь первую."), "route");
+    const empty = buildEmptyState(i18n("Пока нет ни одной точки сюжета – добавь первую."), "route");
     view.appendChild(empty);
     container.appendChild(view);
     return;

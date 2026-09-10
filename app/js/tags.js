@@ -1,4 +1,4 @@
-import { apiGet } from "./api.js";
+import { apiGet, apiPost } from "./api.js";
 import { i18n } from "./i18n.js";
 
 // ══════════════════════════════════════════════
@@ -47,7 +47,7 @@ export const DEFAULT_TAGS_MAP = {
   "Погиб": { cat: "status", tip: "" },
   "Пропал без вести": { cat: "status", tip: "" },
   "Статус неизвестен": { cat: "status", tip: "" },
-  "Заброшено": { cat: "status", tip: "Про локацию или фракцию — больше не действует" },
+  "Заброшено": { cat: "status", tip: "Про локацию или фракцию – больше не действует" },
 
   // ── Троп / атмосфера ──────────────────────────
   "Проклятие": { cat: "trope", tip: "" },
@@ -57,9 +57,9 @@ export const DEFAULT_TAGS_MAP = {
   "Предательство": { cat: "trope", tip: "" },
   "Запретная любовь": { cat: "trope", tip: "" },
   "Месть": { cat: "trope", tip: "" },
-  "Наследие": { cat: "trope", tip: "Груз прошлого — рода, титула, преступления предков" },
+  "Наследие": { cat: "trope", tip: "Груз прошлого – рода, титула, преступления предков" },
   "Двойная жизнь": { cat: "trope", tip: "" },
-  "Договор с силой": { cat: "trope", tip: "Сделка с богом, демоном или магией — не без цены" },
+  "Договор с силой": { cat: "trope", tip: "Сделка с богом, демоном или магией – не без цены" },
 };
 
 export async function loadTagsMap() {
@@ -67,6 +67,30 @@ export async function loadTagsMap() {
   const map = { ...DEFAULT_TAGS_MAP, ...(settings.customTags || {}) };
   for (const name of settings.hiddenTags || []) delete map[name];
   return map;
+}
+
+// Типы тегов (категории) — по тому же принципу, что и сами теги выше:
+// четыре встроенных (CATEGORY_LABELS) можно переименовать, поверх них
+// можно завести свои. Ключ у своего типа — не то, что вводит человек
+// (иначе переименование позже теряло бы связь с уже расставленными
+// тегами) — сгенерированный id, settings.customCategories хранит
+// id → подпись что для переименованного встроенного, что для нового
+// своего типа одинаково: у встроенных "дефолтная" подпись всегда есть
+// в CATEGORY_LABELS, переопределить её — то же самое действие, что
+// завести отсутствующую подпись у нового.
+export async function loadCategoryLabels() {
+  const settings = await apiGet("/api/site-settings").catch(() => ({}));
+  return { ...CATEGORY_LABELS, ...(settings.customCategories || {}) };
+}
+
+export async function saveCategoryLabel(id, label) {
+  const settings = (await apiGet("/api/site-settings").catch(() => ({}))) || {};
+  const customCategories = { ...settings.customCategories, [id]: label };
+  await apiPost("/api/site-settings", { ...settings, customCategories });
+}
+
+export function newCategoryId() {
+  return `cat-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 }
 
 export function parseTags(str) {
@@ -120,10 +144,22 @@ export function buildTagsField(tagsMap, value, onChange) {
     return group;
   }
 
+  // Подписи типов — сперва дефолтные (синхронно, сразу видно что-то на
+  // экране), затем настоящие (с переименованиями/своими типами из
+  // Настроек → Теги) — как только промис разрешится, перерисовываем.
+  // buildTagsField сама по себе синхронная (её сразу же appendChild'ят
+  // в drawer, ждать асинхронно с этим местом неудобно), поэтому не
+  // await, а фоновое обновление.
+  let categoryLabels = CATEGORY_LABELS;
+  loadCategoryLabels().then((labels) => {
+    categoryLabels = labels;
+    render();
+  });
+
   function render() {
     chips.innerHTML = "";
     for (const [cat, names] of Object.entries(byCategory)) {
-      chips.appendChild(buildGroup(i18n(CATEGORY_LABELS[cat] || cat), names));
+      chips.appendChild(buildGroup(i18n(categoryLabels[cat] || cat), names));
     }
     // Свои теги — те, что выбраны, но не входят в известный словарь.
     const customNow = [...current].filter((t) => !tagsMap[t]);
@@ -135,7 +171,7 @@ export function buildTagsField(tagsMap, value, onChange) {
   addRow.className = "tags-add-row";
   const input = document.createElement("input");
   input.type = "text";
-  input.placeholder = i18n("Свой тег — Enter, чтобы добавить");
+  input.placeholder = i18n("Свой тег – Enter, чтобы добавить");
   input.addEventListener("keydown", (e) => {
     if (e.key !== "Enter") return;
     e.preventDefault();

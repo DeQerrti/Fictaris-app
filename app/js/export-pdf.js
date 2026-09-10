@@ -109,7 +109,7 @@ export async function exportWorldPdf() {
         for (const r of relRows) {
           const other = characters.find((ch) => ch.id === (r.charA === c.id ? r.charB : r.charA));
           if (!other) continue;
-          body += `<li><a href="${anchor("char", other.id)}">${escapeHtml(other.name || i18n("Без имени"))}</a>${r.label ? ` — ${escapeHtml(r.label)}` : ""}</li>`;
+          body += `<li><a href="${anchor("char", other.id)}">${escapeHtml(other.name || i18n("Без имени"))}</a>${r.label ? ` – ${escapeHtml(r.label)}` : ""}</li>`;
         }
         body += `</ul></div>`;
       }

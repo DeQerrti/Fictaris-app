@@ -173,11 +173,17 @@ async function useVaultPath(root, name) {
 
 function appRoutes() {
   return {
+    // platform — process.platform ("win32"/"darwin"/"linux") для
+    // "О приложении" (settings-panel.js, buildAboutSection): без этого
+    // поля его там просто не было, и тройной ?: там же молча падал в
+    // ветку "иначе" — Linux показывался всем, кто не macOS и не Windows,
+    // то есть в реальности вообще всем, раз поле никогда не приходило.
     "GET /api/app/info": async () => ({
       vaultPath: vault?.root || null,
       vaults: (config.vaults || []).map(({ id, name, path: p }) => ({ id, name, path: p })),
       currentVaultId: config.currentVaultId || null,
       version: app.getVersion(),
+      platform: process.platform,
     }),
 
     // Полоска обновления в интерфейсе (app/js/update-banner.js) не

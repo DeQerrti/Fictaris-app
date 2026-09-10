@@ -62,7 +62,7 @@ function buildWritingStreakSection(log) {
   const stats = computeStats(log);
   const section = buildSection(
     i18n("Писательская серия"),
-    i18n("Дневная цель по словам — считается по автосохранениям рукописи, не нужно отмечать вручную.")
+    i18n("Дневная цель по словам – считается по автосохранениям рукописи, не нужно отмечать вручную.")
   );
 
   const tiles = document.createElement("div");
@@ -77,7 +77,7 @@ function buildWritingStreakSection(log) {
   goalRow.className = "field";
   goalRow.style.maxWidth = "240px";
   const goalLabel = document.createElement("label");
-  goalLabel.textContent = i18n("Дневная цель, слов (0 — выключить)");
+  goalLabel.textContent = i18n("Дневная цель, слов (0 – выключить)");
   goalRow.appendChild(goalLabel);
   const goalInput = document.createElement("input");
   goalInput.type = "number";
@@ -199,7 +199,7 @@ export async function renderStats(root) {
     .slice(0, 8);
   const castMax = Math.max(1, ...castRows.map((r) => r.value));
 
-  const castSection = buildSection(i18n("Чаще всего в таймлайне"), i18n("Сколько раз персонаж указан участником события — топ-8."));
+  const castSection = buildSection(i18n("Чаще всего в таймлайне"), i18n("Сколько раз персонаж указан участником события – топ-8."));
   castSection.appendChild(buildBarList(castRows, castMax));
   wrap.appendChild(castSection);
 
@@ -244,7 +244,7 @@ export async function renderStats(root) {
     .slice(0, 8);
   const degreeMax = Math.max(1, ...degreeRows.map((r) => r.value));
 
-  const degreeSection = buildSection(i18n("Больше всего связей"), i18n("Сколько связей у персонажа в модуле «Связи» — топ-8."));
+  const degreeSection = buildSection(i18n("Больше всего связей"), i18n("Сколько связей у персонажа в модуле «Связи» – топ-8."));
   degreeSection.appendChild(buildBarList(degreeRows, degreeMax));
   wrap.appendChild(degreeSection);
 

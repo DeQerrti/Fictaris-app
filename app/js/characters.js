@@ -104,7 +104,7 @@ function reverseLinksFor(c) {
     .filter((r) => r.charA === c.id || r.charB === c.id)
     .map((r) => {
       const other = characters.find((x) => x.id === (r.charA === c.id ? r.charB : r.charA));
-      return other ? `${other.name}${r.label ? " — " + r.label : ""}` : null;
+      return other ? `${other.name}${r.label ? " – " + r.label : ""}` : null;
     })
     .filter(Boolean);
 
@@ -145,7 +145,7 @@ function draw() {
   grid.className = "characters-grid";
 
   if (!characters.length) {
-    const empty = buildEmptyState(i18n("Персонажей пока нет — добавь первого."), "user");
+    const empty = buildEmptyState(i18n("Персонажей пока нет – добавь первого."), "user");
     empty.style.gridColumn = "1 / -1";
     grid.appendChild(empty);
   }
@@ -167,7 +167,7 @@ function draw() {
   const addCard = document.createElement("button");
   addCard.className = "char-card add-card";
   addCard.textContent = i18n("+ Добавить персонажа");
-  addCard.title = i18n("Правая кнопка — выбрать шаблон анкеты или завести новый");
+  addCard.title = i18n("Правая кнопка – выбрать шаблон анкеты или завести новый");
   addCard.addEventListener("click", () => {
     chooseTemplate(templates, addCard, addWithTemplate, { onCreateNew: addWithNewTemplate });
   });
