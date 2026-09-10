@@ -1477,6 +1477,7 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
 .tags-manage-group-title-row { display: flex; align-items: center; gap: 4px; margin-bottom: 4px; }
 .tags-manage-group-title { color: var(--text-faint); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.03em; }
 .tags-manage-group-rename { width: 20px; height: 20px; color: var(--text-faint); }
+.tags-manage-group-delete { width: 20px; height: 20px; color: var(--text-faint); }
 .tags-manage-row { display: flex; align-items: center; gap: 8px; padding: 3px 0; }
 .tags-manage-row span { flex: 1; color: var(--text-dim); font-size: 0.85rem; }
 .tags-manage-rename-input {

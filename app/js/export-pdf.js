@@ -5,6 +5,7 @@ import { loadTemplates, templateFor } from "./templates.js";
 import { mentionsToLinkedHtml } from "./mentions.js";
 import { imageDataUri, safeName, renderFieldsHtml, galleryHtml } from "./entity-export.js";
 import { i18n } from "./i18n.js";
+import { applyInlineMarkupHtml } from "./text-format.js";
 
 // ══════════════════════════════════════════════
 //  ЭКСПОРТ МИРА В PDF ("справочник мира")
@@ -211,9 +212,11 @@ export async function exportWorldPdf() {
 //  та же пара "готовим HTML тут, печатаем в электроне" и та же проверка
 //  мобильного ok:true-без-path, что и у exportWorldPdf выше, просто
 //  вёрстка попроще: без справочных полей/оглавлений, только заголовок
-//  и текст главы — как и .md/.docx-экспорт, без разбора **жирного**/
-//  *курсива* и прочей условной разметки, которую вставляет ПКМ в
-//  редакторе (см. wrapSelection) — те тоже просто сохраняются буквально.
+//  и текст главы. **жирный**/*курсив* и прочие маркеры, которые
+//  расставляет ПКМ в редакторе (wrapSelection), разбираются тем же
+//  applyInlineMarkupHtml, что и режим "Просмотр" в самом приложении
+//  (text-format.js) — иначе здесь были бы видны сырые звёздочки, хотя
+//  в самом Fictaris текст уже жирный/курсивный.
 // ══════════════════════════════════════════════
 
 function chapterPdfHtml(chapters, title) {
@@ -221,7 +224,7 @@ function chapterPdfHtml(chapters, title) {
   for (const ch of chapters) {
     body += `<section class="kind"><h1>${escapeHtml(ch.title || i18n("Без названия"))}</h1>`;
     const paragraphs = (ch.content || "").split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
-    for (const p of paragraphs) body += `<p>${escapeHtml(p).replace(/\n/g, "<br>")}</p>`;
+    for (const p of paragraphs) body += `<p>${applyInlineMarkupHtml(escapeHtml(p).replace(/\n/g, "<br>"))}</p>`;
     body += `</section>`;
   }
   return pageHtml(title, body);

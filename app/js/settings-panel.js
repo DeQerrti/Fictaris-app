@@ -18,7 +18,7 @@ import {
   setTabGroup,
 } from "./visibility.js";
 import { captureKey, saveShortcut, clearShortcut } from "./shortcuts.js";
-import { DEFAULT_TAGS_MAP, parseTags, stringifyTags, loadCategoryLabels, saveCategoryLabel, newCategoryId } from "./tags.js";
+import { DEFAULT_TAGS_MAP, CATEGORY_LABELS, parseTags, stringifyTags, loadCategoryLabels, saveCategoryLabel, newCategoryId, deleteCategory } from "./tags.js";
 import { KIND_LABELS, loadTemplates, saveTemplates, blankField } from "./templates.js";
 import { defaultMonths, loadCalendar, saveCalendar } from "./calendar.js";
 import {
@@ -790,6 +790,36 @@ function renderTagsManageList(list, merged, hidden, custom, categoryLabels) {
       });
     });
     titleRow.appendChild(renameCatBtn);
+
+    // Удалить тип целиком можно только у своего (заведённого "+ тип") –
+    // у встроенных четырёх (архетип/роль/статус/троп) id всегда один из
+    // ключей CATEGORY_LABELS, даже после переименования подписи, так что
+    // проверка по id, не по текущей подписи. Подтверждение в два клика –
+    // тот же приём, что и «Удалить тег навсегда» в строке тега ниже.
+    if (!(cat in CATEGORY_LABELS)) {
+      const delCatBtn = document.createElement("button");
+      delCatBtn.className = "btn danger icon-btn tags-manage-group-delete";
+      delCatBtn.innerHTML = iconSvg("trash", 12);
+      delCatBtn.title = i18n("Удалить тип");
+      delCatBtn.addEventListener("click", async () => {
+        if (delCatBtn.dataset.confirm === "1") {
+          await deleteCategory(cat);
+          const s = (await apiGet("/api/site-settings").catch(() => ({}))) || {};
+          const nextCustom = s.customTags || {};
+          const nextHidden = new Set(s.hiddenTags || []);
+          const nextLabels = await loadCategoryLabels();
+          renderTagsManageList(list, { ...DEFAULT_TAGS_MAP, ...nextCustom }, nextHidden, nextCustom, nextLabels);
+          return;
+        }
+        delCatBtn.dataset.confirm = "1";
+        delCatBtn.textContent = i18n("Точно?");
+        setTimeout(() => {
+          delCatBtn.dataset.confirm = "";
+          delCatBtn.innerHTML = iconSvg("trash", 12);
+        }, 3000);
+      });
+      titleRow.appendChild(delCatBtn);
+    }
     group.appendChild(titleRow);
     for (const name of names) {
       const row = document.createElement("div");

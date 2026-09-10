@@ -93,6 +93,23 @@ export function newCategoryId() {
   return `cat-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 }
 
+// Удалить можно только свой тип (settings-panel.js это проверяет по id —
+// встроенных четырёх среди customCategories по построению нет). Вместе
+// с типом уходят и все свои теги этого типа – built-in-теги на чужой,
+// заведённый в рантайме id категории ссылаться не могут в принципе, а
+// оставлять свои теги висеть на удалённом типе было бы некуда девать в
+// списке управления (он группирует строго по типам).
+export async function deleteCategory(id) {
+  const settings = (await apiGet("/api/site-settings").catch(() => ({}))) || {};
+  const customCategories = { ...settings.customCategories };
+  delete customCategories[id];
+  const customTags = { ...settings.customTags };
+  for (const [name, info] of Object.entries(customTags)) {
+    if (info.cat === id) delete customTags[name];
+  }
+  await apiPost("/api/site-settings", { ...settings, customCategories, customTags });
+}
+
 export function parseTags(str) {
   return (str || "").split(",").map((t) => t.trim()).filter(Boolean);
 }

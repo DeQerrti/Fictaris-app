@@ -1,15 +1,35 @@
 import { buildZip } from "./zip-writer.js";
 import { i18n } from "./i18n.js";
+import { parseInlineSegments } from "./text-format.js";
 
 function escapeXml(s) {
   return String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
 }
 
+// Свойства прогона собираются из флагов сегмента (parseInlineSegments) —
+// у заголовка они заданы жёстко снаружи и с сегментами не смешиваются.
+function runProps(seg) {
+  let rPr = "";
+  if (seg.bold) rPr += "<w:b/>";
+  if (seg.italic) rPr += "<w:i/>";
+  if (seg.strike) rPr += "<w:strike/>";
+  if (seg.underline) rPr += '<w:u w:val="single"/>';
+  if (seg.highlight) rPr += '<w:highlight w:val="yellow"/>';
+  return rPr;
+}
+
+function run(text, rPr) {
+  return `<w:r>${rPr ? `<w:rPr>${rPr}</w:rPr>` : ""}<w:t xml:space="preserve">${escapeXml(text)}</w:t></w:r>`;
+}
+
 function paragraph(text, { heading = false } = {}) {
   if (!text) return "<w:p/>";
   const pPr = heading ? '<w:pPr><w:spacing w:before="240" w:after="120"/></w:pPr>' : "";
-  const rPr = heading ? '<w:rPr><w:b/><w:sz w:val="32"/></w:rPr>' : "";
-  return `<w:p>${pPr}<w:r>${rPr}<w:t xml:space="preserve">${escapeXml(text)}</w:t></w:r></w:p>`;
+  if (heading) return `<w:p>${pPr}${run(text, '<w:b/><w:sz w:val="32"/>')}</w:p>`;
+  const runs = parseInlineSegments(text)
+    .map((seg) => run(seg.text, runProps(seg)))
+    .join("");
+  return `<w:p>${pPr}${runs}</w:p>`;
 }
 
 // Заметки автора не входят — та же логика, что и у экспорта в .md

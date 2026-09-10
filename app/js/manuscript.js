@@ -8,6 +8,7 @@ import { openContextMenu, openPopover } from "./context-menu.js";
 import { loadStatuses, buildStatusDot, buildStatusManagePanel } from "./chapter-status.js";
 import { pushTrash } from "./trash.js";
 import { iconSvg } from "./icons.js";
+import { applyInlineMarkupHtml } from "./text-format.js";
 import { recordToday } from "./writing-goal.js";
 import { i18n } from "./i18n.js";
 
@@ -197,24 +198,6 @@ function wrapSelection(textarea, before, after) {
   textarea.dispatchEvent(new Event("input"));
 }
 
-// Превращает условные маркеры форматирования (wrapSelection выше их и
-// расставляет) в настоящие теги — только в режиме "Просмотр"
-// (buildEditor, viewMode), сама textarea режима "Правка" их не трогает,
-// как и не трогала раньше. Работает поверх уже готовой (экранированной,
-// с настоящими <span> упоминаний и стикеров) HTML-строки — **/~~/==
-// пережили html-экранирование как обычные символы, а <u> экранировался
-// в &lt;u&gt;, поэтому ищем именно так, а не сырые "<u>". Порядок важен:
-// **жирный** разбирается раньше одиночных *, иначе первая пара *…*
-// съела бы половину **жирного** как курсив.
-function applyInlineMarkup(html) {
-  return html
-    .replace(/\*\*([^\n]+?)\*\*/g, "<strong>$1</strong>")
-    .replace(/(?<!\*)\*([^\n*]+?)\*(?!\*)/g, "<em>$1</em>")
-    .replace(/~~([^\n]+?)~~/g, "<s>$1</s>")
-    .replace(/==([^\n]+?)==/g, "<mark>$1</mark>")
-    .replace(/&lt;u&gt;([\s\S]+?)&lt;\/u&gt;/g, "<u>$1</u>");
-}
-
 // Общая точка для смены размера шрифта — зовут и число в шапке
 // редактора, и подменю правого клика (см. attachEditorContextMenu),
 // чтобы оба места не разъезжались в логике сохранения/клампа.
@@ -251,8 +234,10 @@ function attachEditorContextMenu(textarea, chapter) {
         // Markdown/Obsidian для него нет своего значка, но в Word и
         // Google Docs оно есть на том же правом клике, и как раз о нём
         // отдельно спросили. В режиме "Просмотр" (viewMode ниже,
-        // applyInlineMarkup) все пять и правда становятся жирным/
-        // курсивом/и т.д., а не остаются условными маркерами как текст.
+        // text-format.js) все пять и правда становятся жирным/
+        // курсивом/и т.д., а не остаются условными маркерами как текст —
+        // и то же самое, тем же общим модулем, работает и в экспорте
+        // (export-pdf.js/docx.js).
         items: [
           { label: i18n("Жирный"), disabled: !hasSelection, action: () => wrapSelection(textarea, "**", "**") },
           { label: i18n("Курсив"), disabled: !hasSelection, action: () => wrapSelection(textarea, "*", "*") },
@@ -861,7 +846,7 @@ function buildEditor() {
   if (viewMode) {
     const view = document.createElement("div");
     view.className = "chapter-content chapter-content-view";
-    const formatted = applyInlineMarkup(mentionsToHtml(chapter.content, characters));
+    const formatted = applyInlineMarkupHtml(mentionsToHtml(chapter.content, characters));
     view.innerHTML = stickersToHtml(formatted, chapter.stickies || []) || `<span class="empty-state">${i18n("Глава пуста.")}</span>`;
     view.addEventListener("click", (e) => {
       const charId = e.target.dataset?.charId;
