@@ -98,10 +98,12 @@ export async function buildDemoBundle() {
     tags: L("союзница, ненадёжная", "ally, unreliable") };
 
   // Родители Астры (и ниже — отец Варна) — только для родословной
-  // (family-tree.js читает character.parentIds), сами не появляются
-  // больше нигде в сюжете: без них вкладка «Родословная» у демо-проекта
-  // оставалась бы пустой, а без второго, отдельного рода не было бы
-  // видно, что дерево умеет показывать несколько родов разом.
+  // (family-tree.js читает character.parentIds/partnerIds), сами не
+  // появляются больше нигде в сюжете: без них вкладка «Родословная» у
+  // демо-проекта оставалась бы пустой, а без второго, отдельного рода не
+  // было бы видно, что дерево умеет показывать несколько родов разом.
+  // Родители Астры вдобавок в браке (partnerIds) — демонстрирует черту
+  // союза между супругами, а не только линии к детям.
   const father = { id: "demo-c-father", name: L("Лорд Эдвин Вирен", "Lord Edwin Viren"), color: "#9a9250",
     role: L("Прежний глава Дома Вирен", "Former head of House Viren"), age: "†",
     appearance: L("Известен только по портретам", "Known only from portraits"),
@@ -113,6 +115,8 @@ export async function buildDemoBundle() {
     personality: "", motivation: "", goal: "", flaws: "",
     backstory: L("Убита во время переворота Варна", "Killed during Varn's coup"), tags: L("погиб", "deceased") };
   aster.parentIds = [father.id, mother.id];
+  father.partnerIds = [mother.id];
+  mother.partnerIds = [father.id];
 
   // Отец Варна — второй, отдельный род: не связан родителями ни с кем
   // из Дома Вирен выше, поэтому родословная показывает два разных рода

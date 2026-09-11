@@ -80,7 +80,6 @@ function moduleLabels() {
     manuscript: i18n("Глава"),
     board: i18n("Карточка"),
     relationships: i18n("Связь"),
-    plotgraph: i18n("Точка сюжета"),
     knowledge: i18n("Факт"),
   };
 }
@@ -91,7 +90,6 @@ function moduleLabels() {
 function sectionLabels() {
   return {
     board: i18n("Доска"),
-    plotgraph: i18n("Карта сюжета"),
     knowledge: i18n("Знания"),
   };
 }
@@ -109,7 +107,7 @@ function snippet(text, max = 90) {
 }
 
 async function buildIndex() {
-  const [characters, locations, factions, timeline, manuscript, board, relationships, plot, knowledge] = await Promise.all([
+  const [characters, locations, factions, timeline, manuscript, board, relationships, knowledge] = await Promise.all([
     apiGet("/api/characters"),
     apiGet("/api/locations"),
     apiGet("/api/factions"),
@@ -117,7 +115,6 @@ async function buildIndex() {
     apiGet("/api/manuscript"),
     apiGet("/api/board"),
     apiGet("/api/relationships"),
-    apiGet("/api/plot"),
     apiGet("/api/knowledge"),
   ]);
 
@@ -170,19 +167,10 @@ async function buildIndex() {
     });
   }
 
-  // Карта сюжета и Знания — как и Доска, без своего экрана с фокусом по
-  // id (renderPlot/renderKnowledge принимают только root, без второго
-  // аргумента) — переход просто открывает раздел целиком, найти нужную
-  // запись в нём — уже глазами.
-  for (const n of plot.nodes || []) {
-    entries.push({
-      module: "plotgraph",
-      id: null,
-      title: n.title || i18n("Без названия"),
-      subtitle: snippet(n.chapterLabel || n.note),
-      color: "#4f7d74",
-    });
-  }
+  // Знания — как и Доска, без своего экрана с фокусом по id
+  // (renderKnowledge принимает только root, без второго аргумента) —
+  // переход просто открывает раздел целиком, найти нужную запись в
+  // нём — уже глазами.
   for (const f of knowledge.facts || []) {
     entries.push({ module: "knowledge", id: null, title: f.label || i18n("Без названия"), subtitle: snippet(f.note), color: "#b5636b" });
   }
@@ -199,7 +187,7 @@ function ensureOverlay() {
   if (overlay) return;
   overlay = document.createElement("div");
   overlay.className = "search-overlay hidden";
-  overlay.innerHTML = `<div class="search-modal"><input type="text" class="search-input" placeholder="${i18n("Персонажи, локации, фракции, таймлайн, рукопись, связи, сюжет, знания…")}" /><div class="search-results"></div></div>`;
+  overlay.innerHTML = `<div class="search-modal"><input type="text" class="search-input" placeholder="${i18n("Персонажи, локации, фракции, таймлайн, рукопись, связи, знания…")}" /><div class="search-results"></div></div>`;
   document.body.appendChild(overlay);
   input = overlay.querySelector(".search-input");
   list = overlay.querySelector(".search-results");
@@ -227,9 +215,9 @@ function appendContentRow(m, labels) {
   row.style.setProperty("--result-color", m.color);
   row.innerHTML =
     // ?? а не || — renderRecent намеренно передаёт "" для разделов без
-    // карточек по id (Доска/Связи/Карта сюжета/Знания), чтобы не дублировать
-    // название раздела ещё и типом рядом ("Доска" + бейдж "Доска"); || бы
-    // счёл пустую строку отсутствующим значением и откатился к m.module.
+    // карточек по id (Доска/Знания), чтобы не дублировать название раздела
+    // ещё и типом рядом ("Доска" + бейдж "Доска"); || бы счёл пустую
+    // строку отсутствующим значением и откатился к m.module.
     `<span class="search-result-type">${labels[m.module] ?? m.module}</span>` +
     `<span class="search-result-title">${escapeHtml(m.title || i18n("Без названия"))}</span>` +
     (m.subtitle ? `<span class="search-result-sub">${escapeHtml(m.subtitle)}</span>` : "");

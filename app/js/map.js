@@ -107,14 +107,18 @@ function buildMapsHome() {
     const m = map.maps[id];
     if (!m) continue;
     const card = document.createElement("div");
-    card.className = "char-card map-home-card";
+    card.className = "entity-card map-home-card";
 
     const open = document.createElement("button");
     open.className = "map-home-open";
     open.innerHTML = `
-      <div class="char-avatar" style="background:#6a8fae">${iconSvg("pin", 20)}</div>
-      <div class="char-name">${escapeHtml(m.name || i18n("Без названия"))}</div>
-      <div class="char-role">${i18n("{n} меток", { n: (m.pins || []).length })}</div>
+      <div class="map-card-thumb"${m.imageRelPath ? ` style="background-image:url('/${m.imageRelPath}')"` : ""}>
+        ${m.imageRelPath ? "" : iconSvg("map", 30)}
+      </div>
+      <div class="map-card-footer">
+        <div class="char-name">${escapeHtml(m.name || i18n("Без названия"))}</div>
+        <div class="char-role">${i18n("{n} меток", { n: (m.pins || []).length })}</div>
+      </div>
     `;
     open.addEventListener("click", () => {
       stack = [id];
@@ -151,7 +155,7 @@ function buildMapsHome() {
   }
 
   const addCard = document.createElement("button");
-  addCard.className = "char-card add-card";
+  addCard.className = "entity-card add-card";
   addCard.textContent = i18n("+ Новая карта");
   addCard.addEventListener("click", createRootMap);
   grid.appendChild(addCard);

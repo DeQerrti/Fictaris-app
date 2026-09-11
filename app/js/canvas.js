@@ -1,20 +1,28 @@
 import { apiGet, apiPost, uid } from "./api.js";
 import { debounceSave } from "./save-badge.js";
 import { escapeHtml, buildEmptyState } from "./chips.js";
-import { openContextMenu } from "./context-menu.js";
+import { openContextMenu, openPopover, closeMenu } from "./context-menu.js";
 import { iconSvg } from "./icons.js";
 import { i18n } from "./i18n.js";
 
 // ══════════════════════════════════════════════
 //  ХОЛСТ
 //
-//  По духу Obsidian Canvas: свободные текстовые карточки на
-//  бесконечном панорамируемом и масштабируемом поле, которые можно
-//  тянуть, менять размер и соединять стрелками — не привязано к
-//  сущностям мира (для этого уже есть Граф/Родословная/Связи),
-//  свободное место для черновых идей, схем сюжета, набросков сцен.
-//  Несколько холстов — как несколько карт в map.js: домашний экран со
-//  списком, вход по клику, свой набор карточек/связей у каждого.
+//  По духу Obsidian Canvas и Scapple: свободные карточки на бесконечном
+//  панорамируемом и масштабируемом поле, которые можно тянуть, менять
+//  размер и соединять подписанными стрелками — не привязано к сущностям
+//  мира (для этого уже есть Граф/Родословная/Связи). Раньше это было два
+//  отдельных, но механически одинаковых инструмента — «Холст» (вольная
+//  заметка) и «Карта сюжета» (структурная точка с главой и подписанными
+//  стрелками, по образцу Story Map в Twine) — один и тот же холст с
+//  перетаскиванием/зумом/стрелками, просто с разным набором полей на
+//  карточке. Слиты в один: заголовок и привязка к главе — необязательные
+//  поля обычной карточки (через ПКМ → «Заголовок…»/«Привязать к главе…»),
+//  а не отдельный тип узла — можно как обойтись голой заметкой, так и
+//  выстроить полноценную сюжетную схему на том же холсте.
+//
+//  Несколько холстов — домашний экран со списком (как в map.js), вход по
+//  клику, свой набор карточек/связей у каждого.
 //
 //  Панорамирование/зум/перетаскивание — тот же приём, что и в graph.js
 //  (view = {x,y,scale}, transform на общий контейнер, пересчёт клика
@@ -23,6 +31,7 @@ import { i18n } from "./i18n.js";
 // ══════════════════════════════════════════════
 
 let data = { order: [], canvases: {} };
+let chapters = [];
 let activeId = null;
 let container = null;
 const save = debounceSave((d) => apiPost("/api/canvas", d));
@@ -36,7 +45,7 @@ function blankCanvas() {
 }
 
 function blankCard(x, y) {
-  return { id: uid(), x, y, w: 220, h: 130, text: "", color: null };
+  return { id: uid(), x, y, w: 220, h: 130, text: "", title: "", chapterId: null, color: null };
 }
 
 function currentCanvas() {
@@ -47,12 +56,59 @@ const CARD_COLORS = [null, "#c9944a", "#4f7d74", "#a4483c", "#7d6a9e", "#6a8fae"
 const MIN_W = 140;
 const MIN_H = 80;
 
+// Старая «Карта сюжета» (app/js/plot.js, удалён) — один общий граф,
+// без нескольких досок, с прямоугольными точками (title/note/
+// chapterLabel — свободный текст) вместо произвольного размера. Раз
+// вкладки для неё больше нет, а данные в /api/plot у части пользователей
+// уже накоплены — при первом открытии «Холста» после обновления её узлы
+// становятся отдельной, новой доской «Карта сюжета» здесь; повторно не
+// импортируется (data.plotImported), чтобы не плодить копии при каждом
+// открытии вкладки.
+async function importLegacyPlotOnce() {
+  if (data.plotImported) return;
+  data.plotImported = true;
+  const plot = await apiGet("/api/plot").catch(() => null);
+  const nodes = Array.isArray(plot?.nodes) ? plot.nodes : [];
+  if (!nodes.length) return;
+
+  const cv = blankCanvas();
+  cv.name = i18n("Карта сюжета");
+  cv.cards = nodes.map((n) => ({
+    id: n.id,
+    x: n.x ?? 0,
+    y: n.y ?? 0,
+    w: 220,
+    h: 130,
+    text: n.note || "",
+    title: n.title || "",
+    // chapterLabel у старой карты — свободный текст ("Глава 7"), не id
+    // главы — автоматически сверить с настоящими главами ненадёжно
+    // (могли переименовать/переставить), поэтому переносится как есть,
+    // просто подписью, без перехода по клику, пока не перепривязано
+    // вручную через ПКМ → «Привязать к главе…».
+    chapterId: null,
+    chapterLabel: n.chapterLabel || "",
+    color: null,
+  }));
+  cv.edges = (Array.isArray(plot?.edges) ? plot.edges : [])
+    .filter((e) => nodes.some((n) => n.id === e.from) && nodes.some((n) => n.id === e.to))
+    .map((e) => ({ id: e.id, fromId: e.from, toId: e.to, label: e.label || "" }));
+
+  data.canvases[cv.id] = cv;
+  data.order.push(cv.id);
+  persist();
+}
+
 export async function renderCanvas(root) {
   container = root;
-  data = await apiGet("/api/canvas");
+  [data, chapters] = await Promise.all([
+    apiGet("/api/canvas"),
+    apiGet("/api/manuscript").then((m) => m.chapters || []),
+  ]);
   if (!Array.isArray(data.order)) data.order = [];
   if (!data.canvases || typeof data.canvases !== "object") data.canvases = {};
   if (activeId && !data.canvases[activeId]) activeId = null;
+  await importLegacyPlotOnce();
   draw();
 }
 
@@ -70,7 +126,7 @@ function buildHome() {
 
   if (!data.order.length) {
     const empty = buildEmptyState(
-      i18n("Холстов пока нет – создай первый для свободных заметок и схем, не привязанных к конкретным персонажам или локациям."),
+      i18n("Холстов пока нет – создай первый для свободных заметок, схем или сюжетных точек, не привязанных к конкретным персонажам или локациям."),
       "frame"
     );
     empty.style.gridColumn = "1 / -1";
@@ -180,7 +236,9 @@ function buildCanvasView() {
 
   const hint = document.createElement("span");
   hint.className = "graph-hint";
-  hint.textContent = i18n("Тащи фон – панорама, колесо – зум, ⠿⠿ тянет карточку, точки по краям – тянут связь к другой карточке.");
+  hint.textContent = i18n(
+    "Тащи фон – панорама, колесо – зум, ⠿⠿ тянет карточку, точки по краям – тянут связь к другой карточке. ПКМ по карточке – заголовок, привязка к главе, цвет."
+  );
   toolbar.appendChild(hint);
 
   const holder = document.createElement("div");
@@ -271,19 +329,74 @@ function buildCanvasView() {
   // ── Связи (рёбра) ──
   function renderEdges() {
     svg.innerHTML = "";
+    ensureArrowMarker();
     for (const e of cv.edges) {
       const a = cv.cards.find((c) => c.id === e.fromId);
       const b = cv.cards.find((c) => c.id === e.toId);
       if (!a || !b) continue;
+      const g = document.createElementNS(svgNS, "g");
+      g.classList.add("canvas-edge");
       const line = document.createElementNS(svgNS, "line");
-      line.setAttribute("x1", a.x + a.w / 2);
-      line.setAttribute("y1", a.y + a.h / 2);
-      line.setAttribute("x2", b.x + b.w / 2);
-      line.setAttribute("y2", b.y + b.h / 2);
+      const x1 = a.x + a.w / 2;
+      const y1 = a.y + a.h / 2;
+      const x2 = b.x + b.w / 2;
+      const y2 = b.y + b.h / 2;
+      line.setAttribute("x1", x1);
+      line.setAttribute("y1", y1);
+      line.setAttribute("x2", x2);
+      line.setAttribute("y2", y2);
       line.setAttribute("stroke", "var(--accent)");
       line.setAttribute("stroke-width", "2");
       line.setAttribute("marker-end", "url(#canvas-arrow)");
-      svg.appendChild(line);
+      g.appendChild(line);
+      // Полоса-приёмник шире видимой линии — сама .canvas-edges-svg
+      // держит pointer-events:none (чтобы не мешать панораме фона под
+      // рёбрами), .canvas-edge включает их обратно только на себе.
+      const hit = document.createElementNS(svgNS, "line");
+      hit.setAttribute("x1", x1);
+      hit.setAttribute("y1", y1);
+      hit.setAttribute("x2", x2);
+      hit.setAttribute("y2", y2);
+      hit.setAttribute("stroke", "transparent");
+      hit.setAttribute("stroke-width", "14");
+      hit.classList.add("canvas-edge-hit");
+      g.appendChild(hit);
+      if (e.label) {
+        const label = document.createElementNS(svgNS, "text");
+        label.setAttribute("x", (x1 + x2) / 2);
+        label.setAttribute("y", (y1 + y2) / 2 - 6);
+        label.setAttribute("text-anchor", "middle");
+        label.setAttribute("fill", "var(--text-dim)");
+        label.setAttribute("font-size", "11");
+        label.setAttribute("font-family", "Inter,sans-serif");
+        label.textContent = e.label;
+        g.appendChild(label);
+      }
+      g.addEventListener("contextmenu", (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        openContextMenu(ev.clientX, ev.clientY, [
+          {
+            label: i18n("Подпись связи…"),
+            action: () => {
+              const label = window.prompt(i18n("Подпись связи (необязательно):"), e.label || "") ?? e.label;
+              e.label = (label || "").trim();
+              persist();
+              renderEdges();
+            },
+          },
+          {
+            label: i18n("Удалить связь"),
+            danger: true,
+            action: () => {
+              cv.edges = cv.edges.filter((x) => x.id !== e.id);
+              persist();
+              renderEdges();
+            },
+          },
+        ]);
+      });
+      svg.appendChild(g);
     }
   }
 
@@ -294,10 +407,9 @@ function buildCanvasView() {
       `<path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"></path></marker>`;
     svg.appendChild(defs);
   }
-  ensureArrowMarker();
 
   function edgeLabel(card) {
-    return (card.text || "").trim().slice(0, 24) || i18n("Без текста");
+    return (card.title || card.text || "").trim().slice(0, 24) || i18n("Без текста");
   }
 
   function connectionsMenuItems(card) {
@@ -318,6 +430,40 @@ function buildCanvasView() {
     });
   }
 
+  // ── Привязка к главе (попап со списком глав рукописи) ──
+  function openChapterPopover(card, x, y, onDone) {
+    const wrapEl = document.createElement("div");
+    wrapEl.className = "canvas-chapter-popover";
+
+    const label = document.createElement("div");
+    label.className = "canvas-chapter-popover-title";
+    label.textContent = i18n("Привязать к главе");
+    wrapEl.appendChild(label);
+
+    const select = document.createElement("select");
+    const noneOpt = document.createElement("option");
+    noneOpt.value = "";
+    noneOpt.textContent = i18n("– не привязано –");
+    select.appendChild(noneOpt);
+    for (const ch of chapters) {
+      const opt = document.createElement("option");
+      opt.value = ch.id;
+      opt.textContent = ch.title || i18n("Без названия");
+      if (card.chapterId === ch.id) opt.selected = true;
+      select.appendChild(opt);
+    }
+    select.addEventListener("change", () => {
+      card.chapterId = select.value || null;
+      card.chapterLabel = ""; // новая привязка вытесняет унаследованный свободный текст
+      persist();
+      closeMenu();
+      onDone();
+    });
+    wrapEl.appendChild(select);
+
+    openPopover(x, y, wrapEl, "canvas-chapter-popover-menu");
+  }
+
   // ── Карточки ──
   let connectDrag = null; // { fromId, line }
 
@@ -335,6 +481,31 @@ function buildCanvasView() {
     head.className = "canvas-card-head";
     head.textContent = "⠿⠿";
     el.appendChild(head);
+
+    // Заголовок и привязка к главе — необязательные, показываются только
+    // когда заданы (ПКМ на карточке ниже): голая заметка остаётся такой
+    // же голой заметкой, как и раньше, без пустых полей на виду.
+    if (card.title) {
+      const titleEl = document.createElement("div");
+      titleEl.className = "canvas-card-title";
+      titleEl.textContent = card.title;
+      el.appendChild(titleEl);
+    }
+    const chapterText = card.chapterId ? chapters.find((c) => c.id === card.chapterId)?.title : card.chapterLabel;
+    if (chapterText) {
+      const chip = document.createElement(card.chapterId ? "button" : "div");
+      chip.className = "canvas-card-chapter" + (card.chapterId ? " canvas-card-chapter-link" : "");
+      chip.textContent = chapterText;
+      if (card.chapterId) {
+        chip.title = i18n("Открыть главу");
+        chip.addEventListener("pointerdown", (e) => e.stopPropagation());
+        chip.addEventListener("click", (e) => {
+          e.stopPropagation();
+          document.dispatchEvent(new CustomEvent("fictaris:open-chapter", { detail: { id: card.chapterId } }));
+        });
+      }
+      el.appendChild(chip);
+    }
 
     const area = document.createElement("textarea");
     area.className = "canvas-card-text";
@@ -422,6 +593,19 @@ function buildCanvasView() {
       e.preventDefault();
       openContextMenu(e.clientX, e.clientY, [
         {
+          label: i18n("Заголовок…"),
+          action: () => {
+            const title = window.prompt(i18n("Заголовок карточки (необязательно):"), card.title || "") ?? card.title;
+            card.title = (title || "").trim();
+            persist();
+            renderCards();
+          },
+        },
+        {
+          label: i18n("Привязать к главе…"),
+          action: () => openChapterPopover(card, e.clientX, e.clientY, renderCards),
+        },
+        {
           label: i18n("Цвет"),
           items: CARD_COLORS.map((c) => ({
             label: c ? "" : i18n("Без цвета"),
@@ -468,7 +652,8 @@ function buildCanvasView() {
     const fromId = connectDrag.fromId;
     connectDrag = null;
     if (toId && toId !== fromId && !cv.edges.some((ed) => ed.fromId === fromId && ed.toId === toId)) {
-      cv.edges.push({ id: uid(), fromId, toId });
+      const label = window.prompt(i18n("Подпись связи (необязательно):"), "") || "";
+      cv.edges.push({ id: uid(), fromId, toId, label: label.trim() });
       persist();
       renderEdges();
     }

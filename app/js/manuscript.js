@@ -4,12 +4,13 @@ import { mentionsToHtml, attachMentionAutocomplete, attachMentionHoverPreview, b
 import { stickersToHtml, attachStickyPopover } from "./stickies.js";
 import { buildManuscriptDocx } from "./docx.js";
 import { exportChaptersPdf } from "./export-pdf.js";
-import { openContextMenu, openPopover } from "./context-menu.js";
+import { openContextMenu, openPopover, closeMenu } from "./context-menu.js";
 import { loadStatuses, buildStatusDot, buildStatusManagePanel } from "./chapter-status.js";
 import { pushTrash } from "./trash.js";
 import { iconSvg } from "./icons.js";
 import { applyInlineMarkupHtml } from "./text-format.js";
 import { recordToday } from "./writing-goal.js";
+import { openEntityModal } from "./entity-modal.js";
 import { i18n } from "./i18n.js";
 
 // Список статусов — настраиваемый (chapter-status.js; править —
@@ -210,6 +211,96 @@ async function setFontSize(size) {
   return clamped;
 }
 
+// «Отметить как известный факт…» (ПКМ по тексту главы) — короткий путь
+// к тому, что раньше требовало ухода на отдельную вкладку «Знания»
+// (теперь модалка, см. кнопку «Знания» в меню «⋯» выше): не листать
+// список фактов в поисках нужного, а прямо в момент, когда факт
+// раскрывается в тексте, отметить его здесь же — с какой главы такой-то
+// персонаж об этом знает. Название нового факта по умолчанию —
+// выделенный текст (если есть), можно поправить перед сохранением.
+async function openMarkFactPopover(x, y, chapter, selectedText) {
+  const data = (await apiGet("/api/knowledge").catch(() => null)) || { facts: [] };
+  const facts = Array.isArray(data.facts) ? data.facts : [];
+
+  const wrap = document.createElement("div");
+  wrap.className = "mark-fact-popover";
+
+  const title = document.createElement("div");
+  title.className = "mark-fact-popover-title";
+  title.textContent = i18n("Отметить как известный факт");
+  wrap.appendChild(title);
+
+  const factField = document.createElement("div");
+  factField.className = "field";
+  const factLabel = document.createElement("label");
+  factLabel.textContent = i18n("Факт");
+  factField.appendChild(factLabel);
+  const factSelect = document.createElement("select");
+  const newOpt = document.createElement("option");
+  newOpt.value = "__new__";
+  newOpt.textContent = i18n("+ новый факт");
+  factSelect.appendChild(newOpt);
+  for (const f of facts) {
+    const opt = document.createElement("option");
+    opt.value = f.id;
+    opt.textContent = f.label || i18n("Без названия");
+    factSelect.appendChild(opt);
+  }
+  factField.appendChild(factSelect);
+  wrap.appendChild(factField);
+
+  const newLabelInput = document.createElement("input");
+  newLabelInput.type = "text";
+  newLabelInput.placeholder = i18n("Название нового факта");
+  newLabelInput.value = (selectedText || "").trim().slice(0, 60);
+  wrap.appendChild(newLabelInput);
+  function syncNewInputVisibility() {
+    newLabelInput.hidden = factSelect.value !== "__new__";
+  }
+  factSelect.addEventListener("change", syncNewInputVisibility);
+  syncNewInputVisibility();
+
+  const charField = document.createElement("div");
+  charField.className = "field";
+  const charLabel = document.createElement("label");
+  charLabel.textContent = i18n("Персонаж");
+  charField.appendChild(charLabel);
+  const charSelect = document.createElement("select");
+  for (const c of characters) {
+    const opt = document.createElement("option");
+    opt.value = c.id;
+    opt.textContent = c.name || i18n("Без имени");
+    charSelect.appendChild(opt);
+  }
+  charField.appendChild(charSelect);
+  wrap.appendChild(charField);
+
+  const confirmBtn = document.createElement("button");
+  confirmBtn.className = "btn";
+  confirmBtn.textContent = i18n("Отметить с этой главы");
+  confirmBtn.disabled = !characters.length;
+  confirmBtn.addEventListener("click", async () => {
+    let fact;
+    if (factSelect.value === "__new__") {
+      const label = newLabelInput.value.trim();
+      if (!label) return;
+      fact = { id: uid(), label, note: "", entries: {} };
+      facts.push(fact);
+    } else {
+      fact = facts.find((f) => f.id === factSelect.value);
+      if (!fact) return;
+    }
+    const charId = charSelect.value;
+    if (!charId) return;
+    fact.entries = { ...fact.entries, [charId]: chapter.id };
+    await apiPost("/api/knowledge", { facts });
+    closeMenu();
+  });
+  wrap.appendChild(confirmBtn);
+
+  openPopover(x, y, wrap, "mark-fact-popover-menu");
+}
+
 // Правый клик в тексте главы раньше не делал ничего — берём набор,
 // привычный по Obsidian/Word: форматирование выделения, вставка стикера
 // и счётчик слов у самого выделения (полезнее, чем общий по главе,
@@ -248,6 +339,14 @@ function attachEditorContextMenu(textarea, chapter) {
       },
       { separator: true },
       { label: i18n("Вставить стикер-заметку"), action: () => insertSticky(textarea, chapter) },
+      {
+        label: i18n("Отметить как известный факт…"),
+        icon: "lightbulb",
+        action: () => {
+          const selected = hasSelection ? textarea.value.slice(textarea.selectionStart, textarea.selectionEnd) : "";
+          openMarkFactPopover(e.clientX, e.clientY, chapter, selected);
+        },
+      },
       { separator: true },
       {
         label: i18n("Размер шрифта: {n}px", { n: editorFontSize }),
@@ -827,6 +926,12 @@ function buildEditor() {
           extrasOpen = !extrasOpen;
           draw();
         },
+      },
+      { separator: true },
+      {
+        label: i18n("Знания"),
+        icon: "lightbulb",
+        action: () => openEntityModal("knowledge"),
       },
       { separator: true },
       {

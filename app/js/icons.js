@@ -90,8 +90,6 @@ const NAV_ICONS = {
   graph: "network",
   familytree: "tree",
   canvas: "frame",
-  plotgraph: "route",
-  knowledge: "lightbulb",
   continuity: "checkShield",
   trash: "trash",
 };

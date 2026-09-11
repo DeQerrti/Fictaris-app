@@ -31,8 +31,6 @@ export const HIDEABLE_TABS = [
   "graph",
   "familytree",
   "canvas",
-  "plotgraph",
-  "knowledge",
 ];
 
 // Смысловые группы для подписей в сайдбаре (applyTabOrder ниже) и для
@@ -63,8 +61,6 @@ const DEFAULT_TAB_GROUP = {
   graph: "tools",
   familytree: "tools",
   canvas: "tools",
-  plotgraph: "tools",
-  knowledge: "tools",
 };
 
 export async function getHiddenTabs() {

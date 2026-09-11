@@ -341,7 +341,7 @@ export const EN_DICT = {
 
   // ── Поиск (search.js) ──
   "Поиск": "Search",
-  "Персонажи, локации, фракции, таймлайн, рукопись, связи, сюжет, знания…": "Characters, locations, factions, timeline, manuscript, relationships, plot, knowledge…",
+  "Персонажи, локации, фракции, таймлайн, рукопись, связи, знания…": "Characters, locations, factions, timeline, manuscript, relationships, knowledge…",
   "Точка сюжета": "Plot point",
   "Факт": "Fact",
   "Найдено": "Found",
@@ -568,26 +568,20 @@ export const EN_DICT = {
   "Добавить упоминание": "Add mention",
 
   "Карта сюжета": "Story map",
-  "Новая точка": "New point",
-  "Пока нет ни одной точки сюжета – добавь первую.": "No plot points yet – add the first one.",
-  "+ Точка": "+ Point",
-  "Соединить": "Connect",
   "Сбросить вид": "Reset view",
-  "Выбери вторую точку, чтобы связать «{name}» с ней": "Pick a second point to connect it with \"{name}\"",
-  "Выбери первую точку связи (Esc – отмена)": "Pick the first point for a connection (Esc to cancel)",
-  "Тащи точки мышью, клик открывает редактирование, ПКМ по точке или связи – удалить":
-    "Drag points with the mouse, click to edit, right-click a point or connection to delete it",
   "Подпись связи (необязательно):": "Connection label (optional):",
   "Удалить связь": "Delete connection",
-  "Удалить точку": "Delete point",
-  "Глава / место в рукописи (необязательно)": "Chapter / place in the manuscript (optional)",
-  "например: Глава 7": "e.g. Chapter 7",
 
   "Знания": "Knowledge",
   "Факт мира и для каждого причастного персонажа – глава, с которой это стало ему известно. Свериться при редактуре: никто не должен знать раньше своей главы.":
     "A fact about the world, and for each involved character, the chapter from which they know it. Check while editing: no one should know before their own chapter.",
   "Пока нет ни одного факта – добавь первый.": "No facts yet – add the first one.",
   "+ Факт": "+ Fact",
+  "Отметить как известный факт…": "Mark as a known fact…",
+  "Отметить как известный факт": "Mark as a known fact",
+  "+ новый факт": "+ new fact",
+  "Название нового факта": "New fact name",
+  "Отметить с этой главы": "Mark from this chapter",
   "Новый факт": "New fact",
   "Удалить факт": "Delete fact",
   "Заметка о факте (необязательно)…": "Note about the fact (optional)…",
@@ -661,8 +655,8 @@ export const EN_DICT = {
   "Пиши здесь свободно – правый клик даёт цвет и связи…": "Write freely here – right-click gives color and links…",
 
   "Новый холст": "New canvas",
-  "Холстов пока нет – создай первый для свободных заметок и схем, не привязанных к конкретным персонажам или локациям.":
-    "No canvases yet – create the first one for free-form notes and diagrams not tied to specific characters or locations.",
+  "Холстов пока нет – создай первый для свободных заметок, схем или сюжетных точек, не привязанных к конкретным персонажам или локациям.":
+    "No canvases yet – create the first one for free-form notes, diagrams, or plot points not tied to specific characters or locations.",
   "{n} карточек": "{n} cards",
   "Удалить холст": "Delete canvas",
   "Точно удалить холст со всеми карточками?": "Delete the canvas with all its cards for good?",
@@ -670,13 +664,20 @@ export const EN_DICT = {
   "← Все холсты": "← All canvases",
   "Название холста": "Canvas name",
   "+ Заметка": "+ Note",
-  "Тащи фон – панорама, колесо – зум, ⠿⠿ тянет карточку, точки по краям – тянут связь к другой карточке.":
-    "Drag the background to pan, scroll to zoom, ⠿⠿ drags a card, the dots on its edges drag a link to another card.",
+  "Тащи фон – панорама, колесо – зум, ⠿⠿ тянет карточку, точки по краям – тянут связь к другой карточке. ПКМ по карточке – заголовок, привязка к главе, цвет.":
+    "Drag the background to pan, scroll to zoom, ⠿⠿ drags a card, the dots on its edges drag a link to another card. Right-click a card for title, chapter link, color.",
   "Без текста": "No text",
   "Связей нет": "No links",
   "Текст…": "Text…",
   "Цвет": "Color",
   "Без цвета": "No color",
+  "Подпись связи…": "Connection label…",
+  "Заголовок…": "Title…",
+  "Заголовок карточки (необязательно):": "Card title (optional):",
+  "Привязать к главе…": "Link to a chapter…",
+  "Привязать к главе": "Link to a chapter",
+  "– не привязано –": "– not linked –",
+  "Открыть главу": "Open the chapter",
 
   "Цвет (используется, если не задан смайлик)": "Color (used if no emoji is set)",
   "Смайлик вместо цветного кружка (необязательно)": "Emoji instead of the colored dot (optional)",

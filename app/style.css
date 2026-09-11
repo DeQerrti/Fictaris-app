@@ -553,6 +553,25 @@ body.focus-mode .sidebar { display: none; }
   padding: 12px;
   min-width: 260px;
 }
+
+/* Попап «Привязать к главе…» (canvas.js, openChapterPopover) — просто
+   подпись и выпадающий список глав, той же плавающей карточкой. */
+.context-menu.canvas-chapter-popover-menu {
+  padding: 12px;
+  min-width: 220px;
+}
+.canvas-chapter-popover { display: flex; flex-direction: column; gap: 8px; }
+.canvas-chapter-popover-title { font-weight: 600; color: var(--text); font-size: 0.85rem; }
+
+/* Попап «Отметить как известный факт…» (ПКМ по тексту главы,
+   manuscript.js) — короткий путь к тому же, что и вкладка «Знания»,
+   теперь модалка. */
+.context-menu.mark-fact-popover-menu {
+  padding: 12px;
+  min-width: 260px;
+}
+.mark-fact-popover { display: flex; flex-direction: column; gap: 10px; }
+.mark-fact-popover-title { font-weight: 600; color: var(--text); font-size: 0.85rem; }
 .export-options-list { display: flex; flex-direction: column; }
 .export-option-row {
   display: block;
@@ -998,6 +1017,10 @@ button.btn.icon-btn.gallery-nav:hover { background: rgba(0, 0, 0, 0.6); }
 
 .add-card:hover { color: var(--accent-hover); border-color: var(--accent); }
 
+/* Карточка карты (map.js, buildMapsHome) — .entity-card (та же сетка,
+   что у персонажей/локаций/фракций), но вместо шапки-аватарки+полей —
+   превью самого изображения карты во всю верхнюю часть, имя и число
+   меток снизу: карту узнают по картинке быстрее, чем по подписи. */
 .map-home-card {
   position: relative;
   padding: 0;
@@ -1005,14 +1028,38 @@ button.btn.icon-btn.gallery-nav:hover { background: rgba(0, 0, 0, 0.6); }
 }
 
 .map-home-open {
+  display: flex;
+  flex-direction: column;
   width: 100%;
+  height: 100%;
   text-align: left;
   background: none;
   border: none;
   color: inherit;
   cursor: pointer;
-  padding: 14px;
+  padding: 0;
   font-family: inherit;
+}
+
+.map-card-thumb {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--panel-alt);
+  background-size: cover;
+  background-position: center;
+  color: var(--text-faint);
+  border-bottom: 1px solid var(--border);
+}
+
+.map-card-footer {
+  flex-shrink: 0;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .map-home-card .board-column-del {
@@ -2124,6 +2171,20 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
   color: var(--text-faint);
 }
 
+/* Строка "приёмный от …" под выбранными родителями (characters.js,
+   buildParentsField) — мельче и тише самих фишек-переключателей выше,
+   это уточнение к уже сделанному выбору, а не отдельное решение. */
+.parent-adopt-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 6px; }
+.parent-adopt-chip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.76rem;
+  color: var(--text-faint);
+  cursor: pointer;
+}
+.parent-adopt-chip input { margin: 0; }
+
 /* Визуальная шкала времени (timeline.js, buildScale) — точки кладутся по
    event.order пропорционально (тот же order, что и у drag-and-drop
    реордера списка ниже), с минимальным отступом между соседями, поэтому
@@ -2829,7 +2890,8 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 16px;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: visible;
 }
 .pgraph-view {
   flex: 1;
@@ -2921,14 +2983,6 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
 .knowledge-row select { flex: 1; }
 .knowledge-empty-row { color: var(--text-faint); font-size: 0.85rem; }
 
-/* Карта сюжета (app/js/plot.js) — прямоугольные узлы вместо кружков
-   графа персонажей (graph.js): у точки сюжета есть заголовок и
-   опциональная подпись главы, кружок под текст не годится. */
-.plot-node rect { fill: var(--card); stroke: var(--border); stroke-width: 1.5; transition: stroke 0.15s; }
-.plot-node:hover rect { stroke: var(--accent); }
-.plot-node-pending rect { stroke: var(--accent); stroke-width: 2.5; }
-.plot-edge text { pointer-events: none; }
-
 .legend-dot {
   display: inline-block;
   width: 9px;
@@ -2972,6 +3026,25 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
 
 .ftree-node circle { transition: opacity 0.15s; }
 .ftree-node:hover circle { opacity: 0.8; }
+
+/* Аватарка узла (foreignObject поверх круга, family-tree.js) — картинка
+   персонажа, если есть (та же .char-avatar-img, что и на карточках), а
+   без неё просто инициал по центру. */
+.ftree-node-avatar {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: Inter, sans-serif;
+  font-weight: 600;
+  font-size: 1rem;
+  color: #14110d;
+  pointer-events: none;
+}
+.ftree-node-avatar .char-avatar-img { width: 100%; height: 100%; object-fit: cover; display: block; }
 
 /* ── Холст (app/js/canvas.js) ──────────────────
    Свободные текстовые карточки на панорамируемом/масштабируемом поле —
@@ -3032,6 +3105,14 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
   pointer-events: none;
 }
 
+/* ПКМ по связи (canvas.js, renderEdges) — подпись/удаление. Сама svg
+   держит pointer-events:none (не мешать панораме фона), здесь включаем
+   обратно только на самом ребре — .canvas-edge-hit шире видимой линии,
+   иначе попасть кликом в 2px линию мышью почти нереально. */
+.canvas-edge { pointer-events: none; }
+.canvas-edge-hit { pointer-events: stroke; cursor: context-menu; }
+.canvas-edge text { pointer-events: none; }
+
 .canvas-card-layer { position: absolute; left: 0; top: 0; }
 
 .canvas-card {
@@ -3058,6 +3139,39 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
 }
 
 .canvas-card-head:active { cursor: grabbing; }
+
+/* Заголовок и привязка к главе — необязательные поля карточки (ПКМ →
+   «Заголовок…»/«Привязать к главе…», canvas.js), показываются только
+   когда заданы. То, что раньше отличало «Карту сюжета» от голого
+   «Холста» (см. шапку canvas.js) — теперь просто необязательная часть
+   одной и той же карточки. */
+.canvas-card-title {
+  flex-shrink: 0;
+  padding: 6px 8px 0;
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--text);
+}
+
+.canvas-card-chapter {
+  flex-shrink: 0;
+  align-self: flex-start;
+  margin: 4px 8px 0;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--text-faint);
+  font-size: 0.72rem;
+  font-family: inherit;
+}
+
+.canvas-card-chapter-link {
+  cursor: pointer;
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.canvas-card-chapter-link:hover { background: var(--panel-alt); }
 
 .canvas-card-text {
   flex: 1;

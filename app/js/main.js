@@ -11,7 +11,6 @@ import { renderGraph } from "./graph.js";
 import { renderStats } from "./stats.js";
 import { renderFamilyTree } from "./family-tree.js";
 import { renderCanvas } from "./canvas.js";
-import { renderPlot } from "./plot.js";
 import { renderKnowledge } from "./knowledge.js";
 import { renderContinuity } from "./continuity.js";
 import { fillWithDemoData, maybeRunHistoryCleanup } from "./data-panel.js";
@@ -42,7 +41,6 @@ const MODULES = {
   graph: renderGraph,
   familytree: renderFamilyTree,
   canvas: renderCanvas,
-  plotgraph: renderPlot,
   knowledge: renderKnowledge,
   stats: renderStats,
   continuity: renderContinuity,
@@ -112,8 +110,15 @@ sidebarBackdrop.addEventListener("click", () => appEl.classList.remove("sidebar-
 // Связь (search.js) больше не отдельный раздел — переход к найденной
 // связи открывает персонажа charA, у которого она правится в дровере
 // (characters.js, мини-редактор связей); search.js кладёт этот id в
-// entry.id и не должен ничего знать про то, что раздел удалён.
-initSearch((module, focusId) => openModule(module === "relationships" ? "characters" : module, focusId));
+// entry.id и не должен ничего знать про то, что раздел удалён. «Знания» —
+// тоже больше не раздел, а модалка (см. MODAL_ONLY_MODULES ниже) —
+// переход туда из поиска открывает её тем же способом, что и кнопка
+// «Знания» в рукописи, а не разворачивает во весь #content.
+initSearch((module, focusId) => {
+  if (module === "relationships") return openModule("characters", focusId);
+  if (module === "knowledge") return openEntityModal("knowledge", focusId);
+  return openModule(module, focusId);
+});
 initShortcuts((module) => openModule(module));
 
 initEntityModal(MODULES);
@@ -143,6 +148,14 @@ document.addEventListener("fictaris:open-entity", (e) => {
   else openEntityModal(module, e.detail.id);
 });
 
+// Карточка холста, привязанная к главе (canvas.js, «Привязать к
+// главе…») — клик открывает саму главу, тем же приёмом, что и открытие
+// карточки персонажа выше.
+document.addEventListener("fictaris:open-chapter", (e) => {
+  if (currentModuleName === "manuscript") openModule("manuscript", e.detail.id);
+  else openEntityModal("manuscript", e.detail.id);
+});
+
 const trashBadge = document.getElementById("trashBadge");
 async function refreshTrashBadge() {
   const n = await trashCount().catch(() => 0);
@@ -165,12 +178,14 @@ async function boot() {
     return;
   }
   const hidden = await getHiddenTabs();
-  // "stats" в MODULES только для модалки (statsBtn выше, entity-modal.js) —
-  // своего пункта в сайдбаре у него нет, так что как запасной модуль по
-  // умолчанию он не годится: незачем открывать эту заглушку без
-  // возможности с неё куда-то переключиться кликом.
+  // "stats"/"knowledge" в MODULES только для модалки (statsBtn выше,
+  // «Знания» в меню «⋯» рукописи, entity-modal.js) — своего пункта в
+  // сайдбаре у них нет, так что как запасной модуль по умолчанию они не
+  // годятся: незачем открывать такую заглушку без возможности с неё
+  // куда-то переключиться кликом.
+  const MODAL_ONLY_MODULES = ["stats", "knowledge"];
   const defaultModule = hidden.includes("manuscript")
-    ? Object.keys(MODULES).find((key) => key !== "settings" && key !== "stats" && !hidden.includes(key)) || "settings"
+    ? Object.keys(MODULES).find((key) => key !== "settings" && !MODAL_ONLY_MODULES.includes(key) && !hidden.includes(key)) || "settings"
     : "manuscript";
   openModule(defaultModule);
   refreshTrashBadge();

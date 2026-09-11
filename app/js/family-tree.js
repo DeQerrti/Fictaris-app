@@ -1,30 +1,35 @@
 import { apiGet, apiPost, uid } from "./api.js";
 import { i18n } from "./i18n.js";
 import { openEntityModal } from "./entity-modal.js";
-import { buildEmptyState } from "./chips.js";
+import { buildEmptyState, escapeHtml } from "./chips.js";
+import { avatarInnerHtml } from "./avatars.js";
 
 // ══════════════════════════════════════════════
 //  РОДОСЛОВНАЯ
 //
-//  Отдельно от общего графа связей (graph.js — все сущности разом,
-//  без направления): здесь только персонажи и только связь
-//  «родитель → ребёнок» (character.parentIds, задаётся в карточке
-//  персонажа), уложенная по поколениям сверху вниз, как и положено
-//  генеалогическому дереву.
+//  Отдельно от общего графа связей (graph.js — все сущности разом, без
+//  направления, force-layout): здесь только персонажи, только
+//  «родитель → ребёнок» (character.parentIds) и «партнёр ↔ партнёр»
+//  (character.partnerIds, симметрично — правится в дровере персонажа
+//  вместе с родителями, characters.js), уложенные по поколениям сверху
+//  вниз, как в настоящем генеалогическом дереве:
+//   — пара стоит в ряду рядом, соединённая горизонтальной чертой брака,
+//     а не двумя расползающимися к детям диагоналями по отдельности;
+//   — партнёр с более короткой цепочкой предков подтягивается на ряд
+//     ниже (партнёр разного "поколения" — обычное дело) вниз, к более
+//     "старшему" партнёру — пара всегда на одном ряду, дети всегда
+//     строго ниже обоих;
+//   — приёмный родитель (character.adoptiveParentIds, подмножество
+//     parentIds) рисует связь пунктиром, а не сплошной линией;
+//   — тёти/дяди/внуки/двоюродные — не отдельные данные, а то, что само
+//     проступает на достаточно большом дереве из тех же parentIds/
+//     partnerIds несколько поколений подряд.
 //
-//  Раньше это была голая витрина — только чтение, нельзя было ни
-//  добавить, ни отредактировать персонажа прямо тут. Теперь можно:
-//  «+ Добавить персонажа» заводит нового и сразу открывает его
-//  карточку модалкой (entity-modal.js) для имени/родителей, клик по
-//  уже существующему узлу открывает ту же модалку на нём — дерево
-//  перерисовывается сразу после закрытия (см. onClose).
-//
-//  Несколько родов — не отдельная сущность в данных, а отдельные
-//  связные компоненты графа parentIds (два рода, между которыми нет ни
-//  одной связи «родитель-ребёнок», технически и есть два разных рода):
-//  раньше все они рисовались вперемешку в одной координатной сетке,
-//  теперь каждый — отдельная подписанная карточка с собственной
-//  раскладкой.
+//  Несколько родов — не отдельная сущность в данных, а отдельные связные
+//  компоненты графа parentIds+partnerIds (два рода, между которыми нет
+//  ни одной связи «родитель-ребёнок» и ни одного брака — технически и
+//  есть два разных рода): каждый — отдельная подписанная карточка со
+//  своей раскладкой.
 // ══════════════════════════════════════════════
 
 let root = null;
@@ -35,13 +40,24 @@ const PALETTE = [
   "#6a8fae", "#9a9250", "#b5636b", "#5a8a5f",
 ];
 
-function computeDepths(list) {
-  const byId = new Map(list.map((c) => [c.id, c]));
-  const depth = new Map();
+const NODE_R = 20;
+const SLOT_W = 100;
+const UNIT_GAP = 46;
+const ROW_H = 150;
+const TOP = 60;
+const MARGIN = 60;
 
+// ── Данные ────────────────────────────────────
+
+// Глубина (поколение) — самый длинный путь от предка без родителей в
+// дереве. Пара после этого выравнивается по большей из двух глубин —
+// иначе партнёр с более долгой родословной оказался бы на своём ряду
+// отдельно от супруга.
+function computeDepths(list, byId) {
+  const depth = new Map();
   function depthOf(id, stack) {
     if (depth.has(id)) return depth.get(id);
-    if (stack.has(id)) return 0; // цикл в данных (ошиблись при выборе родителя) — не зависать
+    if (stack.has(id)) return 0; // цикл в данных — не зависать
     stack.add(id);
     const c = byId.get(id);
     const parents = (c?.parentIds || []).filter((p) => byId.has(p));
@@ -50,19 +66,36 @@ function computeDepths(list) {
     depth.set(id, d);
     return d;
   }
-
   for (const c of list) depthOf(c.id, new Set());
+
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const c of list) {
+      for (const pid of c.partnerIds || []) {
+        if (!byId.has(pid)) continue;
+        const max = Math.max(depth.get(c.id), depth.get(pid));
+        if (depth.get(c.id) !== max) { depth.set(c.id, max); changed = true; }
+        if (depth.get(pid) !== max) { depth.set(pid, max); changed = true; }
+      }
+    }
+  }
   return depth;
 }
 
-// Связные компоненты по parentIds — отдельный род, если ни один
-// персонаж одной группы не является родителем/ребёнком персонажа
-// другой (напрямую или через цепочку).
+// Связные компоненты по parentIds И partnerIds — женитьба объединяет два
+// рода в один точно так же, как общий ребёнок: цепочку читаем и вверх
+// (родители), и вбок (партнёры), не только вниз.
 function connectedComponents(list) {
   const byId = new Map(list.map((c) => [c.id, c]));
   const adj = new Map(list.map((c) => [c.id, new Set()]));
   for (const c of list) {
     for (const p of c.parentIds || []) {
+      if (!byId.has(p)) continue;
+      adj.get(c.id).add(p);
+      adj.get(p).add(c.id);
+    }
+    for (const p of c.partnerIds || []) {
       if (!byId.has(p)) continue;
       adj.get(c.id).add(p);
       adj.get(p).add(c.id);
@@ -91,11 +124,128 @@ function connectedComponents(list) {
   return groups;
 }
 
-// Модалка (characters.js) правит и сохраняет свой собственный, отдельный
-// от этого модуля список персонажей — после закрытия нужно перечитать
-// его заново с диска, а не просто перерисовать дерево по уже устаревшим
-// characters, иначе правки в модалке (имя, родители) не появятся здесь
-// до следующего полного открытия вкладки.
+// Взаимные пары ("муж считает жену партнёром" И наоборот — иначе не
+// отличить настоящую пару от одностороннего недосмотра при выборе).
+function mutualUnions(list, byId) {
+  const seen = new Set();
+  const unions = [];
+  for (const c of list) {
+    for (const pid of c.partnerIds || []) {
+      const other = byId.get(pid);
+      if (!other || !(other.partnerIds || []).includes(c.id)) continue;
+      const key = [c.id, pid].sort().join("|");
+      if (seen.has(key)) continue;
+      seen.add(key);
+      unions.push({ a: c.id, b: pid });
+    }
+  }
+  return unions;
+}
+
+// Каждому персонажу — не больше одного "соседа по ряду" для раскладки:
+// при нескольких браках подряд в ряду окажется только первый по порядку
+// данных партнёр, остальные браки всё равно нарисуются линией (см.
+// unionsForChild ниже), просто без места рядом в сетке — рисовать двух
+// и более "соседей" в одномерном ряду одновременно физически некуда.
+function primaryPartnerOf(unions) {
+  const primary = new Map();
+  for (const u of unions) {
+    if (!primary.has(u.a)) primary.set(u.a, u.b);
+    if (!primary.has(u.b)) primary.set(u.b, u.a);
+  }
+  return primary;
+}
+
+// ── Раскладка ─────────────────────────────────
+
+function buildUnits(list, depth, primary) {
+  const rows = new Map(); // depth -> unit[]
+  const placed = new Set();
+  for (const c of list) {
+    if (placed.has(c.id)) continue;
+    const d = depth.get(c.id);
+    const partnerId = primary.get(c.id);
+    let members;
+    if (partnerId && !placed.has(partnerId) && depth.get(partnerId) === d && list.some((x) => x.id === partnerId)) {
+      members = [c.id, partnerId];
+      placed.add(partnerId);
+    } else {
+      members = [c.id];
+    }
+    placed.add(c.id);
+    if (!rows.has(d)) rows.set(d, []);
+    rows.get(d).push({ members });
+  }
+  return rows;
+}
+
+function barycenter(unit, byId, pos) {
+  const xs = [];
+  for (const m of unit.members) {
+    for (const pid of byId.get(m)?.parentIds || []) {
+      const p = pos.get(pid);
+      if (p) xs.push(p.x);
+    }
+  }
+  return xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : Infinity;
+}
+
+// pos: id -> {x,y}px.
+function layout(rows, byId) {
+  const maxDepth = Math.max(...rows.keys());
+  const pos = new Map();
+
+  for (let d = 0; d <= maxDepth; d++) {
+    const units = rows.get(d) || [];
+    if (d > 0) units.sort((u1, u2) => barycenter(u1, byId, pos) - barycenter(u2, byId, pos));
+
+    let cursor = 0;
+    const y = TOP + d * ROW_H;
+    for (const unit of units) {
+      const width = unit.members.length === 2 ? SLOT_W * 2 : SLOT_W;
+      const unitX = cursor + width / 2;
+      if (unit.members.length === 2) {
+        pos.set(unit.members[0], { x: unitX - SLOT_W / 2, y });
+        pos.set(unit.members[1], { x: unitX + SLOT_W / 2, y });
+      } else {
+        pos.set(unit.members[0], { x: unitX, y });
+      }
+      cursor += width + UNIT_GAP;
+    }
+  }
+  return { pos, maxDepth };
+}
+
+// Для ребёнка — какими "пучками" рисовать связи к родителям: пара из
+// unions, оба входящих в parentIds, схлопывается в одну линию от
+// середины брака, а не в две отдельные от каждого родителя порознь;
+// родитель вне признанного брака (одиночное усыновление, неизвестный
+// второй родитель) — как раньше, отдельной линией от себя самого.
+function edgesForChild(child, unions) {
+  const parentIds = new Set(child.parentIds || []);
+  const covered = new Set();
+  const bundles = [];
+  for (const u of unions) {
+    if (parentIds.has(u.a) && parentIds.has(u.b)) {
+      bundles.push({ kind: "union", a: u.a, b: u.b });
+      covered.add(u.a);
+      covered.add(u.b);
+    }
+  }
+  for (const pid of parentIds) {
+    if (!covered.has(pid)) bundles.push({ kind: "solo", a: pid });
+  }
+  return bundles;
+}
+
+function isAdoptiveEdge(child, bundle) {
+  const adoptive = new Set(child.adoptiveParentIds || []);
+  if (bundle.kind === "solo") return adoptive.has(bundle.a);
+  return adoptive.has(bundle.a) || adoptive.has(bundle.b);
+}
+
+// ── Данные/действия ───────────────────────────
+
 async function refresh() {
   characters = await apiGet("/api/characters");
   draw();
@@ -112,39 +262,34 @@ async function addCharacter() {
     color: PALETTE[characters.length % PALETTE.length],
     role: "", age: "", appearance: "", personality: "",
     motivation: "", goal: "", flaws: "", backstory: "", tags: "",
-    parentIds: [],
+    parentIds: [], adoptiveParentIds: [], partnerIds: [],
   };
   characters.push(c);
   await apiPost("/api/characters", characters);
   openCharacter(c.id);
 }
 
+// ── Отрисовка одной карточки рода ─────────────
+
 function buildTreeCard(list, index) {
-  const depth = computeDepths(list);
-  const rows = new Map();
-  for (const c of list) {
-    const d = depth.get(c.id);
-    if (!rows.has(d)) rows.set(d, []);
-    rows.get(d).push(c);
-  }
-  const maxDepth = Math.max(...rows.keys());
+  const byId = new Map(list.map((c) => [c.id, c]));
+  const depth = computeDepths(list, byId);
+  const unions = mutualUnions(list, byId);
+  const primary = primaryPartnerOf(unions);
+  const rows = buildUnits(list, depth, primary);
+  const { pos, maxDepth } = layout(rows, byId);
 
-  const ROW_H = 130;
-  const COL_W = 150;
-  const TOP = 50;
-  const rowWidths = [...rows.values()].map((r) => r.length * COL_W);
-  const width = Math.max(400, Math.max(...rowWidths) + COL_W);
+  // Общий bounding box — по всем узлам сразу, плюс запас слева под
+  // подпись поколения и справа/снизу под подписи имён.
+  let minX = Infinity, maxX = -Infinity;
+  for (const p of pos.values()) {
+    minX = Math.min(minX, p.x);
+    maxX = Math.max(maxX, p.x);
+  }
+  const shiftX = MARGIN - minX;
+  for (const p of pos.values()) p.x += shiftX;
+  const width = maxX - minX + MARGIN * 2;
   const height = TOP + (maxDepth + 1) * ROW_H;
-  const centerX = width / 2;
-
-  const pos = {};
-  for (const [d, rowList] of rows) {
-    const rowWidth = rowList.length * COL_W;
-    const startX = centerX - rowWidth / 2 + COL_W / 2;
-    rowList.forEach((c, i) => {
-      pos[c.id] = { x: startX + i * COL_W, y: TOP + d * ROW_H };
-    });
-  }
 
   const svgNS = "http://www.w3.org/2000/svg";
   const svg = document.createElementNS(svgNS, "svg");
@@ -152,10 +297,52 @@ function buildTreeCard(list, index) {
   svg.setAttribute("height", height);
   svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
 
+  // Подписи поколений — слева от самого левого узла своего ряда, внутри
+  // того же SVG (едет вместе с рядом при горизонтальном скролле, а не
+  // остаётся приклеенной к краю пустого места).
+  for (let d = 0; d <= maxDepth; d++) {
+    const rowXs = [...pos.entries()].filter(([id]) => depth.get(id) === d).map(([, p]) => p.x);
+    if (!rowXs.length) continue;
+    const label = document.createElementNS(svgNS, "text");
+    label.setAttribute("x", Math.min(...rowXs) - NODE_R - 14);
+    label.setAttribute("y", TOP + d * ROW_H + 5);
+    label.setAttribute("text-anchor", "end");
+    label.setAttribute("fill", "var(--text-faint)");
+    label.setAttribute("font-size", "11");
+    label.setAttribute("font-family", "Inter,sans-serif");
+    label.textContent = i18n("Поколение {n}", { n: d + 1 });
+    svg.appendChild(label);
+  }
+
+  // Черта брака — между обоими партнёрами одного признанного союза, где
+  // бы они в итоге ни оказались (у второстепенного брака при нескольких
+  // партнёрах это может быть не соседняя пара в ряду, а через пробел).
+  for (const u of unions) {
+    const a = pos.get(u.a);
+    const b = pos.get(u.b);
+    if (!a || !b || a.y !== b.y) continue;
+    const line = document.createElementNS(svgNS, "line");
+    line.setAttribute("x1", a.x);
+    line.setAttribute("y1", a.y);
+    line.setAttribute("x2", b.x);
+    line.setAttribute("y2", b.y);
+    line.setAttribute("stroke", "var(--accent)");
+    line.setAttribute("stroke-width", "2");
+    svg.appendChild(line);
+  }
+
+  // Связи к детям — пучками (см. edgesForChild): один плавный путь от
+  // середины брака или от одиночного родителя, пунктир — если это
+  // усыновление (adoptiveParentIds).
   for (const c of list) {
-    const to = pos[c.id];
-    for (const parentId of c.parentIds || []) {
-      const from = pos[parentId];
+    if (!(c.parentIds || []).length) continue;
+    const to = pos.get(c.id);
+    if (!to) continue;
+    for (const bundle of edgesForChild(c, unions)) {
+      const from =
+        bundle.kind === "union"
+          ? { x: (pos.get(bundle.a).x + pos.get(bundle.b).x) / 2, y: pos.get(bundle.a).y }
+          : pos.get(bundle.a);
       if (!from) continue;
       const path = document.createElementNS(svgNS, "path");
       const midY = (from.y + to.y) / 2;
@@ -163,12 +350,15 @@ function buildTreeCard(list, index) {
       path.setAttribute("fill", "none");
       path.setAttribute("stroke", "var(--border)");
       path.setAttribute("stroke-width", "1.5");
+      if (isAdoptiveEdge(c, bundle)) path.setAttribute("stroke-dasharray", "5 4");
       svg.appendChild(path);
     }
   }
 
+  // Узлы — аватарка (или инициал, если изображения нет) в круге, имя
+  // подписью снизу, клик открывает карточку модалкой.
   for (const c of list) {
-    const p = pos[c.id];
+    const p = pos.get(c.id);
     const g = document.createElementNS(svgNS, "g");
     g.classList.add("ftree-node");
     g.style.cursor = "pointer";
@@ -176,29 +366,30 @@ function buildTreeCard(list, index) {
     const circle = document.createElementNS(svgNS, "circle");
     circle.setAttribute("cx", p.x);
     circle.setAttribute("cy", p.y);
-    circle.setAttribute("r", 18);
+    circle.setAttribute("r", NODE_R);
     circle.setAttribute("fill", c.color || "#7c7157");
     g.appendChild(circle);
 
-    const initial = document.createElementNS(svgNS, "text");
-    initial.setAttribute("x", p.x);
-    initial.setAttribute("y", p.y + 5);
-    initial.setAttribute("text-anchor", "middle");
-    initial.setAttribute("fill", "#14110d");
-    initial.setAttribute("font-size", "13");
-    initial.setAttribute("font-weight", "600");
-    initial.setAttribute("font-family", "Inter,sans-serif");
-    initial.textContent = (c.name || "?").trim().slice(0, 1).toUpperCase();
-    g.appendChild(initial);
+    const fo = document.createElementNS(svgNS, "foreignObject");
+    fo.setAttribute("x", p.x - NODE_R);
+    fo.setAttribute("y", p.y - NODE_R);
+    fo.setAttribute("width", NODE_R * 2);
+    fo.setAttribute("height", NODE_R * 2);
+    const initial = (c.name || "?").trim().slice(0, 1).toUpperCase();
+    fo.innerHTML = `<div xmlns="http://www.w3.org/1999/xhtml" class="ftree-node-avatar">${avatarInnerHtml(
+      c,
+      `<span>${escapeHtml(initial)}</span>`
+    )}</div>`;
+    g.appendChild(fo);
 
     const text = document.createElementNS(svgNS, "text");
     text.setAttribute("x", p.x);
-    text.setAttribute("y", p.y + 34);
+    text.setAttribute("y", p.y + NODE_R + 16);
     text.setAttribute("text-anchor", "middle");
     text.setAttribute("fill", "#a99977");
     text.setAttribute("font-size", "11");
     text.setAttribute("font-family", "Inter,sans-serif");
-    text.textContent = c.name || "?";
+    text.textContent = c.name || i18n("Без имени");
     g.appendChild(text);
 
     g.addEventListener("click", () => openCharacter(c.id));
@@ -207,13 +398,12 @@ function buildTreeCard(list, index) {
 
   const holder = document.createElement("div");
   holder.className = "graph-holder";
-  holder.style.overflowX = "auto";
   holder.appendChild(svg);
 
   const card = document.createElement("div");
   card.className = "ftree-card";
 
-  const roots = (rows.get(0) || []).map((c) => c.name || i18n("Без имени"));
+  const roots = (rows.get(0) || []).flatMap((u) => u.members).map((id) => byId.get(id)?.name || i18n("Без имени"));
   const title = document.createElement("div");
   title.className = "ftree-card-title";
   title.textContent = list.length > 1 ? roots.join(" · ") : i18n("Род {n}", { n: index + 1 });
@@ -237,17 +427,21 @@ function draw() {
   addBtn.addEventListener("click", addCharacter);
   const hint = document.createElement("span");
   hint.className = "ftree-hint";
-  hint.textContent = i18n("Клик по узлу открывает карточку – родителей назначают там же.");
+  hint.textContent = i18n(
+    "Клик по узлу открывает карточку – родителей и партнёров назначают там же. Пунктир – усыновление."
+  );
   toolbar.append(addBtn, hint);
   wrap.appendChild(toolbar);
 
   const hasChild = new Set();
   for (const c of characters) for (const p of c.parentIds || []) hasChild.add(p);
-  const inTree = characters.filter((c) => (c.parentIds || []).length || hasChild.has(c.id));
+  const inTree = characters.filter(
+    (c) => (c.parentIds || []).length || hasChild.has(c.id) || (c.partnerIds || []).length
+  );
 
   if (!inTree.length) {
     const empty = buildEmptyState(
-      i18n("Пока пусто – укажи родителей в карточке персонажа (или добавь нового прямо здесь), чтобы здесь появилось дерево."),
+      i18n("Пока пусто – укажи родителей/партнёров в карточке персонажа (или добавь нового прямо здесь), чтобы здесь появилось дерево."),
       "tree"
     );
     wrap.appendChild(empty);
