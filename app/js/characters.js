@@ -1,6 +1,6 @@
 import { apiGet, apiPost, uid } from "./api.js";
 import { debounceSave } from "./save-badge.js";
-import { escapeHtml, buildToggleGroup, characterSelect, centerGridIfSparse, buildEmptyState } from "./chips.js";
+import { escapeHtml, buildToggleGroup, characterSelect, centerGridIfSparse, buildEmptyState, buildCardFieldsHtml } from "./chips.js";
 import { pushTrash } from "./trash.js";
 import { buildReverseLinks } from "./reverse-links.js";
 import { loadTagsMap, buildTagsField } from "./tags.js";
@@ -8,7 +8,6 @@ import { buildNameGeneratorButton } from "./name-generator.js";
 import { avatarInnerHtml, buildAvatarsField } from "./avatars.js";
 import { iconSvg } from "./icons.js";
 import { loadTemplates, saveTemplates, templateFor, buildFieldHint } from "./templates.js";
-import { openEntitySheet } from "./entity-sheet.js";
 import { chooseTemplate } from "./template-choice.js";
 import { openTemplateEditorModal } from "./template-editor-modal.js";
 import { i18n } from "./i18n.js";
@@ -151,21 +150,26 @@ function draw() {
   }
 
   for (const c of characters) {
+    const template = templateFor(templates, c.templateId);
+    const fields = (template?.fields || []).map((f) => ({ label: f.label, value: c[f.key] }));
     const card = document.createElement("button");
-    card.className = "char-card";
+    card.className = "entity-card";
     card.innerHTML = `
-      <div class="char-avatar" style="background:${c.color}">${avatarInnerHtml(c, initials(c.name))}</div>
-      <div class="char-card-body">
-        <div class="char-name">${escapeHtml(c.name || i18n("Без имени"))}</div>
-        <div class="char-role">${escapeHtml(c.role || "")}</div>
+      <div class="entity-card-header">
+        <div class="entity-card-avatar" style="background:${c.color}">${avatarInnerHtml(c, initials(c.name))}</div>
+        <div class="entity-card-heading">
+          <div class="char-name">${escapeHtml(c.name || i18n("Без имени"))}</div>
+          <div class="char-role">${escapeHtml(c.role || "")}</div>
+        </div>
       </div>
+      <div class="entity-card-fields">${buildCardFieldsHtml(fields)}</div>
     `;
-    card.addEventListener("click", () => openSheet(c));
+    card.addEventListener("click", () => { activeId = c.id; draw(); });
     grid.appendChild(card);
   }
 
   const addCard = document.createElement("button");
-  addCard.className = "char-card add-card";
+  addCard.className = "entity-card add-card";
   addCard.textContent = i18n("+ Добавить персонажа");
   addCard.title = i18n("Правая кнопка – выбрать шаблон анкеты или завести новый");
   addCard.addEventListener("click", () => {
@@ -185,43 +189,15 @@ function draw() {
   const active = characters.find((c) => c.id === activeId);
   if (active) view.appendChild(buildDrawer(active));
 
+  // Дровер теперь модальное окно по центру экрана (style.css, .drawer) —
+  // клик по затемнению вокруг него (не по самой панели) закрывает его,
+  // как и у обычных модалок в приложении.
+  view.addEventListener("click", (e) => {
+    if (e.target === view) { activeId = null; draw(); }
+  });
+
   container.appendChild(view);
   centerGridIfSparse(grid);
-}
-
-function buildFamilySection(c) {
-  const kids = childrenOf(c);
-  if (!kids.length) return null;
-  const wrap = document.createElement("div");
-  wrap.className = "sheet-fields";
-  const row = document.createElement("div");
-  row.className = "sheet-field";
-  const lab = document.createElement("div");
-  lab.className = "sheet-field-label";
-  lab.textContent = i18n("Дети");
-  const val = document.createElement("div");
-  val.className = "sheet-field-value";
-  val.textContent = kids.map((k) => k.name || i18n("Без имени")).join(", ");
-  row.append(lab, val);
-  wrap.appendChild(row);
-  return wrap;
-}
-
-function openSheet(c) {
-  const template = templateFor(templates, c.templateId);
-  openEntitySheet({
-    entity: c,
-    avatarColor: c.color,
-    avatarHtml: avatarInnerHtml(c, initials(c.name)),
-    title: c.name || i18n("Без имени"),
-    subtitle: c.role || "",
-    fields: (template?.fields || []).map((f) => ({ label: f.label, value: c[f.key], type: f.type })),
-    extraSections: [buildFamilySection(c), reverseLinksFor(c)],
-    onEdit: () => {
-      activeId = c.id;
-      draw();
-    },
-  });
 }
 
 // Мини-редактор связей прямо в карточке персонажа — та же коллекция

@@ -50,6 +50,25 @@ export function buildEmptyState(text, iconKey) {
   return el;
 }
 
+// Тело карточки персонажа/локации/фракции (entity-card) — раньше это
+// были только имя и подзаголовок, а вся анкета пряталась за отдельной
+// модалкой-просмотром; теперь модалки нет – те же поля прямо на
+// карточке (см. .entity-card-fields в style.css, скролл по наведению
+// на случай переполнения). fields: [{label, value}], пустые пропускаем.
+export function buildCardFieldsHtml(fields) {
+  return (fields || [])
+    .filter((f) => f.value)
+    .map(
+      (f) => `
+        <div class="entity-card-field">
+          <div class="entity-card-field-label">${escapeHtml(f.label)}</div>
+          <div class="entity-card-field-value">${escapeHtml(String(f.value))}</div>
+        </div>
+      `
+    )
+    .join("");
+}
+
 export function characterSelect(list, selectedId, placeholder) {
   const select = document.createElement("select");
   if (placeholder) {

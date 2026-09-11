@@ -78,6 +78,13 @@ function draw() {
   const pin = currentMap()?.pins.find((p) => p.id === activePinId);
   if (pin) view.appendChild(buildDrawer(pin));
 
+  // Дровер теперь модальное окно по центру экрана (style.css, .drawer) —
+  // клик по затемнению вокруг него (не по самой панели) закрывает его,
+  // как и у обычных модалок в приложении.
+  view.addEventListener("click", (e) => {
+    if (e.target === view) { activePinId = null; draw(); }
+  });
+
   container.appendChild(view);
 }
 

@@ -1,12 +1,11 @@
 import { apiGet, apiPost, uid } from "./api.js";
 import { debounceSave } from "./save-badge.js";
-import { escapeHtml, characterSelect, buildToggleGroup, centerGridIfSparse, buildEmptyState } from "./chips.js";
+import { escapeHtml, characterSelect, buildToggleGroup, centerGridIfSparse, buildEmptyState, buildCardFieldsHtml } from "./chips.js";
 import { FACTION_TYPES, factionTypeInfo, iconSvg } from "./icons.js";
 import { pushTrash } from "./trash.js";
 import { loadTagsMap, buildTagsField } from "./tags.js";
 import { avatarInnerHtml, buildAvatarsField } from "./avatars.js";
 import { loadTemplates, saveTemplates, templateFor, buildFieldHint } from "./templates.js";
-import { openEntitySheet } from "./entity-sheet.js";
 import { chooseTemplate } from "./template-choice.js";
 import { openTemplateEditorModal } from "./template-editor-modal.js";
 import { i18n } from "./i18n.js";
@@ -87,21 +86,32 @@ function draw() {
 
   for (const f of factions) {
     const [, typeLabel, iconName, color] = factionTypeInfo(f.type);
+    const leader = characters.find((c) => c.id === f.leaderId);
+    const hq = locations.find((l) => l.id === f.headquartersId);
+    const template = templateFor(templates, f.templateId);
+    const fields = [
+      { label: i18n("Глава фракции"), value: leader?.name },
+      { label: i18n("Штаб-квартира"), value: hq?.name },
+      ...(template?.fields || []).map((fl) => ({ label: fl.label, value: f[fl.key] })),
+    ];
     const card = document.createElement("button");
-    card.className = "char-card";
+    card.className = "entity-card";
     card.innerHTML = `
-      <div class="char-avatar" style="background:${color}">${avatarInnerHtml(f, iconSvg(iconName, 30))}</div>
-      <div class="char-card-body">
-        <div class="char-name">${escapeHtml(f.name || i18n("Без имени"))}</div>
-        <div class="char-role">${escapeHtml(i18n(typeLabel))}</div>
+      <div class="entity-card-header">
+        <div class="entity-card-avatar" style="background:${color}">${avatarInnerHtml(f, iconSvg(iconName, 30))}</div>
+        <div class="entity-card-heading">
+          <div class="char-name">${escapeHtml(f.name || i18n("Без имени"))}</div>
+          <div class="char-role">${escapeHtml(i18n(typeLabel))}</div>
+        </div>
       </div>
+      <div class="entity-card-fields">${buildCardFieldsHtml(fields)}</div>
     `;
-    card.addEventListener("click", () => openSheet(f));
+    card.addEventListener("click", () => { activeId = f.id; draw(); });
     grid.appendChild(card);
   }
 
   const addCard = document.createElement("button");
-  addCard.className = "char-card add-card";
+  addCard.className = "entity-card add-card";
   addCard.textContent = i18n("+ Добавить фракцию");
   addCard.title = i18n("Правая кнопка – выбрать шаблон анкеты или завести новый");
   addCard.addEventListener("click", () => {
@@ -118,31 +128,15 @@ function draw() {
   const active = factions.find((f) => f.id === activeId);
   if (active) view.appendChild(buildDrawer(active));
 
+  // Дровер теперь модальное окно по центру экрана (style.css, .drawer) —
+  // клик по затемнению вокруг него (не по самой панели) закрывает его,
+  // как и у обычных модалок в приложении.
+  view.addEventListener("click", (e) => {
+    if (e.target === view) { activeId = null; draw(); }
+  });
+
   container.appendChild(view);
   centerGridIfSparse(grid);
-}
-
-function openSheet(f) {
-  const [, typeLabel, iconName, color] = factionTypeInfo(f.type);
-  const template = templateFor(templates, f.templateId);
-  const leader = characters.find((c) => c.id === f.leaderId);
-  const hq = locations.find((l) => l.id === f.headquartersId);
-  openEntitySheet({
-    entity: f,
-    avatarColor: color,
-    avatarHtml: avatarInnerHtml(f, iconSvg(iconName, 30)),
-    title: f.name || i18n("Без имени"),
-    subtitle: i18n(typeLabel),
-    fields: [
-      { label: i18n("Глава фракции"), value: leader?.name },
-      { label: i18n("Штаб-квартира"), value: hq?.name },
-      ...(template?.fields || []).map((fl) => ({ label: fl.label, value: f[fl.key], type: fl.type })),
-    ],
-    onEdit: () => {
-      activeId = f.id;
-      draw();
-    },
-  });
 }
 
 function buildDrawer(f) {

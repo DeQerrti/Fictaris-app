@@ -1,6 +1,6 @@
 import { apiGet, apiPost, uid } from "./api.js";
 import { debounceSave } from "./save-badge.js";
-import { escapeHtml, centerGridIfSparse, buildEmptyState } from "./chips.js";
+import { escapeHtml, centerGridIfSparse, buildEmptyState, buildCardFieldsHtml } from "./chips.js";
 import { pushTrash } from "./trash.js";
 import { LOCATION_TYPES, locationTypeInfo, iconSvg } from "./icons.js";
 import { buildReverseLinks } from "./reverse-links.js";
@@ -8,7 +8,6 @@ import { loadTagsMap, buildTagsField } from "./tags.js";
 import { buildNameGeneratorButton } from "./name-generator.js";
 import { avatarInnerHtml, buildAvatarsField } from "./avatars.js";
 import { loadTemplates, saveTemplates, templateFor, buildFieldHint } from "./templates.js";
-import { openEntitySheet } from "./entity-sheet.js";
 import { chooseTemplate } from "./template-choice.js";
 import { openTemplateEditorModal } from "./template-editor-modal.js";
 import { i18n } from "./i18n.js";
@@ -79,47 +78,6 @@ function descendantIds(id) {
   }
   walk(id);
   return ids;
-}
-
-// Цепочка предков от корня до непосредственного родителя (не включая
-// саму локацию) — для хлебных крошек в анкете (buildBreadcrumb ниже).
-// Защита от цикла та же, что и в orderedTree: испорченный parentId
-// (ручная правка JSON, гонка удаления) не должен уйти в бесконечный
-// цикл, просто обрывает цепочку на этом месте.
-function ancestorChain(loc) {
-  const chain = [];
-  const seen = new Set([loc.id]);
-  let current = loc.parentId && locations.find((l) => l.id === loc.parentId);
-  while (current && !seen.has(current.id)) {
-    chain.unshift(current);
-    seen.add(current.id);
-    current = current.parentId && locations.find((l) => l.id === current.parentId);
-  }
-  return chain;
-}
-
-function buildBreadcrumb(loc) {
-  const chain = ancestorChain(loc);
-  if (!chain.length) return null;
-  const wrap = document.createElement("div");
-  wrap.className = "sheet-breadcrumb";
-  chain.forEach((anc, i) => {
-    const link = document.createElement("button");
-    link.className = "sheet-breadcrumb-link";
-    link.textContent = anc.name || i18n("Без имени");
-    link.addEventListener("click", (e) => {
-      e.stopPropagation();
-      openSheet(anc);
-    });
-    wrap.appendChild(link);
-    if (i < chain.length - 1) {
-      const sep = document.createElement("span");
-      sep.className = "sheet-breadcrumb-sep";
-      sep.textContent = "/";
-      wrap.appendChild(sep);
-    }
-  });
-  return wrap;
 }
 
 // Порядок обхода для сетки: сначала локация, сразу за ней — все её
@@ -202,29 +160,35 @@ function draw() {
   for (const { loc, depth } of orderedTree()) {
     const [, , iconName, color] = locationTypeInfo(loc.type);
     const parent = loc.parentId && locations.find((l) => l.id === loc.parentId);
+    const template = templateFor(templates, loc.templateId);
+    const fields = (template?.fields || []).map((f) => ({ label: f.label, value: loc[f.key] }));
     const card = document.createElement("button");
-    card.className = "char-card loc-card" + (depth ? " loc-child" : "");
+    card.className = "entity-card loc-card" + (depth ? " loc-child" : "");
     if (depth) card.style.setProperty("--loc-depth", depth);
     card.innerHTML = `
-      <div class="char-avatar" style="background:${color}">${avatarInnerHtml(loc, iconSvg(iconName, 30))}</div>
-      <div class="char-card-body">
-        <div class="char-name">${escapeHtml(loc.name || i18n("Без имени"))}</div>
-        <div class="char-role">${escapeHtml(i18n(locationTypeInfo(loc.type)[1]))}</div>
-        ${parent ? `<div class="loc-parent-badge" title="${escapeHtml(i18n("Открыть родительскую локацию"))}">${escapeHtml(i18n("в составе: {name}", { name: parent.name || i18n("Без имени") }))}</div>` : ""}
+      <div class="entity-card-header">
+        <div class="entity-card-avatar" style="background:${color}">${avatarInnerHtml(loc, iconSvg(iconName, 30))}</div>
+        <div class="entity-card-heading">
+          <div class="char-name">${escapeHtml(loc.name || i18n("Без имени"))}</div>
+          <div class="char-role">${escapeHtml(i18n(locationTypeInfo(loc.type)[1]))}</div>
+          ${parent ? `<div class="loc-parent-badge" title="${escapeHtml(i18n("Открыть родительскую локацию"))}">${escapeHtml(i18n("в составе: {name}", { name: parent.name || i18n("Без имени") }))}</div>` : ""}
+        </div>
       </div>
+      <div class="entity-card-fields">${buildCardFieldsHtml(fields)}</div>
     `;
     // Бейдж родителя — часть той же кликабельной карточки (вложенный
     // <button> внутри <button> — не валидный HTML), поэтому переход к
     // предку решается здесь же, по цели клика, а не отдельным элементом.
     card.addEventListener("click", (e) => {
-      if (parent && e.target.closest(".loc-parent-badge")) { openSheet(parent); return; }
-      openSheet(loc);
+      if (parent && e.target.closest(".loc-parent-badge")) { activeId = parent.id; draw(); return; }
+      activeId = loc.id;
+      draw();
     });
     grid.appendChild(card);
   }
 
   const addCard = document.createElement("button");
-  addCard.className = "char-card add-card";
+  addCard.className = "entity-card add-card";
   addCard.textContent = i18n("+ Добавить локацию");
   addCard.title = i18n("Правая кнопка – выбрать шаблон анкеты или завести новый");
   addCard.addEventListener("click", () => {
@@ -241,52 +205,15 @@ function draw() {
   const active = locations.find((l) => l.id === activeId);
   if (active) view.appendChild(buildDrawer(active));
 
+  // Дровер теперь модальное окно по центру экрана (style.css, .drawer) —
+  // клик по затемнению вокруг него (не по самой панели) закрывает его,
+  // как и у обычных модалок в приложении.
+  view.addEventListener("click", (e) => {
+    if (e.target === view) { activeId = null; draw(); }
+  });
+
   container.appendChild(view);
   centerGridIfSparse(grid);
-}
-
-// Дочерние локации — тем же приёмом, что buildFamilySection у детей
-// персонажа (characters.js): просто список имён, без отдельной кнопки
-// перехода — щёлкнуть по нужной проще прямо в сетке (она уже стоит
-// рядом, отступом ниже).
-function childrenSection(loc) {
-  const kids = locations.filter((l) => l.parentId === loc.id);
-  if (!kids.length) return null;
-  const wrap = document.createElement("div");
-  wrap.className = "sheet-fields";
-  const row = document.createElement("div");
-  row.className = "sheet-field";
-  const lab = document.createElement("div");
-  lab.className = "sheet-field-label";
-  lab.textContent = i18n("Локации внутри");
-  const val = document.createElement("div");
-  val.className = "sheet-field-value";
-  val.textContent = kids.map((k) => k.name || i18n("Без имени")).join(", ");
-  row.append(lab, val);
-  wrap.appendChild(row);
-  return wrap;
-}
-
-function openSheet(loc) {
-  const [, typeLabel, iconName, color] = locationTypeInfo(loc.type);
-  const template = templateFor(templates, loc.templateId);
-  openEntitySheet({
-    entity: loc,
-    avatarColor: color,
-    avatarHtml: avatarInnerHtml(loc, iconSvg(iconName, 30)),
-    title: loc.name || i18n("Без имени"),
-    subtitle: i18n(typeLabel),
-    // Полная цепочка предков (breadcrumb) заменяет собой прежнее плоское
-    // поле "Родительская локация" — при вложенности глубже одного уровня
-    // оно всё равно показывало только ближайшего родителя.
-    breadcrumb: buildBreadcrumb(loc),
-    fields: (template?.fields || []).map((f) => ({ label: f.label, value: loc[f.key], type: f.type })),
-    extraSections: [childrenSection(loc), reverseLinksFor(loc)],
-    onEdit: () => {
-      activeId = loc.id;
-      draw();
-    },
-  });
 }
 
 function buildDrawer(loc) {
@@ -389,6 +316,24 @@ function buildDrawer(loc) {
       persist();
     })
   );
+
+  // Дочерние локации — тем же приёмом, что у детей персонажа
+  // (characters.js): просто список имён, без отдельной кнопки перехода —
+  // щёлкнуть по нужной проще прямо в сетке (она уже стоит рядом, отступом
+  // ниже).
+  const kids = locations.filter((l) => l.parentId === loc.id);
+  if (kids.length) {
+    const kidsField = document.createElement("div");
+    kidsField.className = "field";
+    const kidsLabel = document.createElement("label");
+    kidsLabel.textContent = i18n("Локации внутри");
+    kidsField.appendChild(kidsLabel);
+    const kidsValue = document.createElement("div");
+    kidsValue.className = "readonly-value";
+    kidsValue.textContent = kids.map((k) => k.name || i18n("Без имени")).join(", ");
+    kidsField.appendChild(kidsValue);
+    drawer.appendChild(kidsField);
+  }
 
   const reverse = reverseLinksFor(loc);
   if (reverse) drawer.appendChild(reverse);

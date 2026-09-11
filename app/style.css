@@ -719,7 +719,7 @@ body.focus-mode .sidebar { display: none; }
   overflow-y: auto;
   padding: 24px;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
   gap: 14px;
   align-content: start;
 }
@@ -730,10 +730,6 @@ body.focus-mode .sidebar { display: none; }
    оставшийся экран под ней. */
 .characters-grid.grid-sparse { align-content: center; }
 
-/* Карточка — раньше маленький кружок-аватарка сверху и подпись снизу,
-   с кучей пустого места вокруг; теперь аватарка — во всю левую сторону
-   карточки (изображение видно куда лучше, крупнее, чем раньше), имя и
-   роль — справа, по вертикали посередине. */
 .char-card {
   display: flex;
   align-items: stretch;
@@ -762,17 +758,89 @@ body.focus-mode .sidebar { display: none; }
 
 .char-avatar-img { width: 100%; height: 100%; object-fit: cover; display: block; }
 
-.char-card-body {
-  flex: 1;
-  min-width: 0;
-  padding: 12px 14px;
+.add-card { align-items: center; justify-content: center; text-align: center; padding: 14px; }
+
+/* Карточка персонажа/локации/фракции (characters.js/locations.js/
+   factions.js) — раньше короткая строка "имя + роль", а вся анкета
+   пряталась за отдельной модалкой-просмотром (открыть — прочитать —
+   закрыть — открыть редактор, три шага ради одного взгляда на поля).
+   Теперь то же содержимое анкеты сразу на карточке: шапка с аватаркой
+   не тянется на всю карточку, как у .char-card, а просто строка сверху,
+   ниже — поля шаблона. Высота карточки фиксирована (ровная сетка), кто
+   не поместился — скрыт до наведения (.entity-card-fields ниже), а не
+   обрезан навсегда. Клик по карточке сразу открывает редактор (.drawer) —
+   отдельного режима "только посмотреть" больше нет. */
+.entity-card {
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  gap: 2px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0;
+  overflow: hidden;
+  cursor: pointer;
+  text-align: left;
+  height: 230px;
 }
 
-.add-card { align-items: center; justify-content: center; text-align: center; padding: 14px; }
+.entity-card:hover { border-color: var(--accent); }
+
+.entity-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.entity-card-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-family: Inter, sans-serif;
+  font-weight: 600;
+  font-size: 1.05rem;
+  color: #14110d;
+  overflow: hidden;
+}
+
+.entity-card-heading { min-width: 0; }
+
+/* Поля шаблона прямо на карточке — не всегда влезают в фиксированную
+   высоту (.entity-card), особенно у анкеты персонажа с 6-8 полями.
+   overflow: hidden по умолчанию (карточка не "разъезжается" в сетке
+   под соседей), а прокрутка появляется только когда навёл мышь и
+   явно собрался читать дальше, а не листать сетку глазами. */
+.entity-card-fields {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  padding: 10px 14px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.entity-card:hover .entity-card-fields { overflow-y: auto; }
+
+.entity-card-field-label {
+  font-size: 0.68rem;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-bottom: 2px;
+}
+
+.entity-card-field-value {
+  font-size: 0.85rem;
+  color: var(--text);
+  white-space: pre-wrap;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
 
 /* Галерея изображений в дровере (app/js/avatars.js) — первое становится
    .char-avatar-img на лицевой стороне карточки (см. выше), остальные —
@@ -911,29 +979,6 @@ button.btn.icon-btn.gallery-nav:hover { background: rgba(0, 0, 0, 0.6); }
 }
 .loc-parent-badge:hover { color: var(--accent-hover); text-decoration: underline; }
 
-/* Хлебные крошки предков в анкете локации (entity-sheet.js, breadcrumb) —
-   над заголовком, тем же по духу приёмом, что и путь к файлу в Обсидиане:
-   вся цепочка сразу, а не только ближайший родитель. */
-.sheet-breadcrumb {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px;
-  margin-bottom: 4px;
-  font-size: 0.78rem;
-}
-.sheet-breadcrumb-link {
-  background: none;
-  border: none;
-  padding: 0;
-  color: var(--text-faint);
-  font-family: inherit;
-  font-size: inherit;
-  cursor: pointer;
-}
-.sheet-breadcrumb-link:hover { color: var(--accent-hover); text-decoration: underline; }
-.sheet-breadcrumb-sep { color: var(--text-faint); opacity: 0.6; }
-
 .add-card {
   border: 1px dashed var(--border);
   background: none;
@@ -969,13 +1014,43 @@ button.btn.icon-btn.gallery-nav:hover { background: rgba(0, 0, 0, 0.6); }
   right: 8px;
 }
 
+/* Редактор карточки (characters/locations/factions/timeline/map.js) —
+   раньше прижат к правому краю экрана как боковая панель (обычный
+   flex-сосед сетки в .characters-view и т.п.), из-за чего на широком
+   экране редактирование велось в узкой полоске справа, а вся остальная
+   ширина простаивала. Теперь модальное окно по центру, поверх
+   затемнения экрана (::before у самого .characters-view/.timeline-view/
+   .map-view ниже, через :has — тот же приём без лишнего DOM-узла под
+   каждый вызов). Один и тот же .drawer используется и когда экран открыт
+   как основная вкладка, и когда он всплыл поверх другого места
+   (entity-modal.js, клик по @упоминанию или узлу графа) — во втором
+   случае centered-модалка редактора просто перекрывает и её тоже, что и
+   должно быть: редактор — самое "верхнее" окно в любой момент. */
 .drawer {
-  width: 380px;
-  flex-shrink: 0;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 15060;
+  width: 560px;
+  max-width: calc(100vw - 48px);
+  max-height: calc(100vh - 48px);
   background: var(--panel);
-  border-left: 1px solid var(--border);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
   padding: 20px;
   overflow-y: auto;
+}
+
+.characters-view:has(.drawer)::before,
+.timeline-view:has(.drawer)::before,
+.map-view:has(.drawer)::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 15050;
+  background: rgba(0, 0, 0, 0.55);
 }
 
 .drawer h2 {
@@ -1725,65 +1800,12 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
 }
 .entity-modal-close:hover { color: var(--text); border-color: var(--accent); }
 
-/* Анкета персонажа/локации/фракции для просмотра — первый уровень
-   модалки карточки (app/js/entity-sheet.js), поверх .entity-modal-*. */
+/* .sheet-panel/.sheet-body — общая column-раскладка и внутренний отступ
+   для compact-модалок с произвольной формой (plot.js, точка карты
+   сюжета; template-editor-modal.js, редактор шаблона на лету), поверх
+   .entity-modal-*. */
 .sheet-panel { flex-direction: column; }
-
-.sheet-edit-btn {
-  position: absolute;
-  top: 8px;
-  right: 46px;
-  z-index: 1;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 50%;
-}
-.sheet-edit-btn:hover { color: var(--accent); border-color: var(--accent); }
-
 .sheet-body { padding: 40px; }
-
-.sheet-header { display: flex; align-items: center; gap: 24px; margin-bottom: 28px; }
-
-.sheet-avatar {
-  width: 140px;
-  height: 140px;
-  flex-shrink: 0;
-  border-radius: 12px;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 2.4rem;
-  color: #fff;
-}
-.sheet-avatar img { width: 100%; height: 100%; object-fit: cover; }
-
-.sheet-header-text { min-width: 0; }
-.sheet-title { font-size: 1.7rem; font-weight: 600; color: var(--text); }
-.sheet-subtitle { margin-top: 6px; color: var(--text-dim); font-size: 1rem; }
-
-.sheet-fields { display: flex; flex-direction: column; gap: 18px; }
-.sheet-field-label { font-size: 0.8rem; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 4px; }
-.sheet-field-value { color: var(--text); white-space: pre-wrap; line-height: 1.5; }
-
-/* Поле "richtext" (entity-sheet.js, buildRichtextField) — оглавление по
-   заголовкам "## "/"### " внутри текста, см. templates.js/parseRichSections. */
-.sheet-richtext-toc {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 10px 12px;
-  margin-bottom: 12px;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-}
-.sheet-richtext-toc a { color: var(--accent); text-decoration: none; font-size: 0.9rem; }
-.sheet-richtext-toc a:hover { text-decoration: underline; }
-.sheet-richtext-toc a.sheet-toc-sub { padding-left: 16px; color: var(--text-dim); font-size: 0.85rem; }
-.sheet-richtext-body h4 { margin: 16px 0 6px; font-size: 1.05rem; color: var(--text); }
-.sheet-richtext-body h5 { margin: 12px 0 4px; font-size: 0.95rem; color: var(--text-dim); }
-.sheet-richtext-body > .sheet-field-value:first-child { margin-top: 0; }
 
 .readonly-value { color: var(--text-dim); padding: 6px 0; }
 
@@ -3121,13 +3143,20 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
   #content { padding-top: 44px; }
 
   /* .drawer используют персонажи, локации, фракции, таймлайн, карта —
-     на компьютере это узкая боковая панель редактирования, на
-     телефоне под форму с десятком полей нужен весь экран. */
+     на компьютере это модалка по центру экрана (см. .drawer выше), на
+     телефоне под форму с десятком полей нужен весь экран, а не
+     460px-окошко посреди него — тот же z-index поверх собственного
+     затемнения (.characters-view и т.п.:has(.drawer)::before), просто
+     без центрирования/отступов вокруг. */
   .drawer {
     position: fixed;
     inset: 0;
-    z-index: 45;
+    z-index: 15060;
+    transform: none;
     width: 100%;
+    max-width: 100%;
+    max-height: 100%;
+    border-radius: 0;
     padding-top: 54px;
   }
 

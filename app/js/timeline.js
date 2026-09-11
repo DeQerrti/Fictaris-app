@@ -85,6 +85,13 @@ function draw() {
   const active = events.find((e) => e.id === activeId);
   if (active) view.appendChild(buildDrawer(active));
 
+  // Дровер теперь модальное окно по центру экрана (style.css, .drawer) —
+  // клик по затемнению вокруг него (не по самой панели) закрывает его,
+  // как и у обычных модалок в приложении.
+  view.addEventListener("click", (e) => {
+    if (e.target === view) { activeId = null; draw(); }
+  });
+
   container.appendChild(view);
 }
 
