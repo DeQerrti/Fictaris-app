@@ -23,7 +23,6 @@ export function defaultLabels() {
       manuscript: i18n("Рукопись"),
       characters: i18n("Персонажи"),
       locations: i18n("Локации"),
-      relationships: i18n("Связи"),
       factions: i18n("Фракции"),
       timeline: i18n("Таймлайн"),
       board: i18n("Доска"),

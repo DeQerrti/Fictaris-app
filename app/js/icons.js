@@ -85,7 +85,6 @@ const NAV_ICONS = {
   characters: "user",
   locations: "pin",
   factions: "shield",
-  relationships: "link",
   timeline: "clock",
   map: "map",
   graph: "network",

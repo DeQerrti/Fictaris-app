@@ -59,9 +59,8 @@ export const EN_DICT = {
   "Военная организация": "Military organization",
   "Синдикат": "Syndicate",
 
-  // ── Связи (relationships.js) ──
-  "Нужно как минимум два персонажа, чтобы связать их между собой.":
-    "You need at least two characters to connect them.",
+  // ── Связи (мини-редактор в дровере персонажа, characters.js; редактор
+  //    ребра по клику в графе, graph.js) ──
   "+ Добавить связь": "+ Add relationship",
   "Метка (наставник, вражда…)": "Label (mentor, rivalry…)",
   "Заметка о связи…": "Note about the relationship…",
@@ -135,8 +134,8 @@ export const EN_DICT = {
     "Add characters, locations or factions to see the project graph.",
   "Локации/фракции – цвет по типу": "Locations/factions – colored by type",
   "Размер шрифта в тексте главы": "Chapter text font size",
-  "Тащи узлы мышью, крути колесо для зума, клик открывает карточку":
-    "Drag nodes with your mouse, scroll to zoom, click a node to open its card",
+  "Тащи узлы мышью, крути колесо для зума, клик по узлу открывает карточку, по связи между персонажами – редактирует её":
+    "Drag nodes with your mouse, scroll to zoom, click a node to open its card, click a relationship line between characters to edit it",
   "Сбросить вид": "Reset view",
 
   // ── Проверка (continuity.js) ──
@@ -733,10 +732,6 @@ export const EN_DICT = {
   "Удалить стикер вместе с его маркером в тексте главы": "Delete the sticky note along with its marker in the chapter text",
   "Снимок – сохранённая копия текста главы на этот момент. «Просмотреть» покажет её, не трогая текущий текст; «Восстановить» заменит им текущий текст главы.":
     "A snapshot – a saved copy of the chapter text at that moment. \"Preview\" shows it without touching the current text; \"Restore\" replaces the current chapter text with it.",
-
-  "Тащи узлы мышью, крути колесо для зума, клик открывает карточку – цвет и длина линии показывают знак и силу связи.":
-    "Drag nodes with the mouse, scroll to zoom, click opens the card – line color and length show the relationship's sign and strength.",
-  "Список связей": "Relationship list",
 
   "Шаблоны анкет": "Form templates",
   "Палитра": "Palette",

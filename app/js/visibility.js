@@ -26,7 +26,6 @@ export const HIDEABLE_TABS = [
   "characters",
   "locations",
   "factions",
-  "relationships",
   "timeline",
   "map",
   "graph",
@@ -39,7 +38,7 @@ export const HIDEABLE_TABS = [
 
 // Смысловые группы для подписей в сайдбаре (applyTabOrder ниже) и для
 // того же деления в «Подписи интерфейса» (settings-panel.js) — черновик
-// и доска про сам текст, персонажи/локации/фракции/связи/таймлайн про
+// и доска про сам текст, персонажи/локации/фракции/таймлайн про
 // сам мир, карта/граф/родословная/холст — визуальные инструменты по
 // миру, статистика — отдельно, обзорная. Группа — не просто ярлык:
 // у неё стабильный id (id группы неизменен даже после переименования —
@@ -60,7 +59,6 @@ const DEFAULT_TAB_GROUP = {
   characters: "world",
   locations: "world",
   factions: "world",
-  relationships: "world",
   timeline: "world",
   map: "tools",
   graph: "tools",

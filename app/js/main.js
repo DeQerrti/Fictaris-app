@@ -3,7 +3,6 @@ import { apiGet } from "./api.js";
 import { renderManuscript } from "./manuscript.js";
 import { renderCharacters } from "./characters.js";
 import { renderLocations } from "./locations.js";
-import { renderRelationships } from "./relationships.js";
 import { renderFactions } from "./factions.js";
 import { renderTimeline } from "./timeline.js";
 import { renderBoard } from "./board.js";
@@ -36,7 +35,6 @@ const MODULES = {
   manuscript: renderManuscript,
   characters: renderCharacters,
   locations: renderLocations,
-  relationships: renderRelationships,
   factions: renderFactions,
   timeline: renderTimeline,
   board: renderBoard,
@@ -106,7 +104,11 @@ settingsBtn.addEventListener("click", () => openModule("settings"));
 sidebarToggle.addEventListener("click", () => appEl.classList.toggle("sidebar-open"));
 sidebarBackdrop.addEventListener("click", () => appEl.classList.remove("sidebar-open"));
 
-initSearch((module, focusId) => openModule(module, focusId));
+// Связь (search.js) больше не отдельный раздел — переход к найденной
+// связи открывает персонажа charA, у которого она правится в дровере
+// (characters.js, мини-редактор связей); search.js кладёт этот id в
+// entry.id и не должен ничего знать про то, что раздел удалён.
+initSearch((module, focusId) => openModule(module === "relationships" ? "characters" : module, focusId));
 initShortcuts((module) => openModule(module));
 
 initEntityModal(MODULES);

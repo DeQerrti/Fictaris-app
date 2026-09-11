@@ -1,8 +1,11 @@
-import { apiGet } from "./api.js";
+import { apiGet, apiPost } from "./api.js";
 import { locationTypeInfo, factionTypeInfo, iconSvg } from "./icons.js";
 import { loadTemplates, templateFor } from "./templates.js";
 import { findMentionedIds } from "./mentions.js";
 import { buildEmptyState } from "./chips.js";
+import { debounceSave } from "./save-badge.js";
+import { pushTrash } from "./trash.js";
+import { openPopover, closeMenu } from "./context-menu.js";
 import { i18n } from "./i18n.js";
 
 // ══════════════════════════════════════════════
@@ -27,6 +30,14 @@ let raf = null;
 let simWidth = 0;
 let simHeight = 0;
 let simPositionAll = null;
+
+// Персонажи и сами связи — нужны только для редактора ребра (см.
+// openEdgeEditor): buildNodes/buildEdges уже переварили их в узлы/рёбра
+// для отрисовки, но чтобы поправить метку/силу/заметку конкретной связи
+// или удалить её, нужны исходные записи и имена персонажей по id.
+let relationshipsData = [];
+let charactersData = [];
+const saveRelationships = debounceSave((list) => apiPost("/api/relationships", list));
 
 // Было 2600 — с подписями узлов (не только их кружками) это позволяло
 // плотным кластерам сходиться настолько тесно, что текст соседних точек
@@ -84,15 +95,21 @@ function mentionEdgesFor(entity, template, characters, add) {
 function buildEdges({ relationships, factions, timeline, locations, characters, manuscript, charTemplates, locTemplates, factionTemplates }) {
   const seen = new Set();
   const list = [];
-  const add = (a, b, kind = "explicit") => {
+  const add = (a, b, kind = "explicit", relId = null) => {
     if (!a || !b || a === b) return;
     const key = [a, b].sort().join("|");
     if (seen.has(key)) return;
     seen.add(key);
-    list.push({ a, b, kind });
+    list.push({ a, b, kind, relId });
   };
 
-  for (const r of relationships) add(r.charA, r.charB);
+  // kind "relationship" (а не просто "explicit", как у рёбер из состава
+  // фракции/вложенности локации ниже) — единственный вид ребра, у
+  // которого relId ведёт на настоящую запись в relationships.json:
+  // только по клику на такое ребро есть что редактировать (см.
+  // openEdgeEditor в draw()). Раз связь заведена явно первой — seen
+  // не даст более позднему @упоминанию понизить её до пунктирной.
+  for (const r of relationships) add(r.charA, r.charB, "relationship", r.id);
 
   for (const f of factions) {
     if (f.leaderId) add(f.id, f.leaderId);
@@ -152,6 +169,8 @@ export async function renderGraph(root) {
     loadTemplates("locations"),
     loadTemplates("factions"),
   ]);
+  relationshipsData = relationships;
+  charactersData = characters;
   nodes = buildNodes(characters, locations, factions);
   edges = buildEdges({ relationships, factions, timeline, locations, characters, manuscript, charTemplates, locTemplates, factionTemplates });
   draw();
@@ -215,6 +234,7 @@ function draw() {
 
   const lineByNode = new Map();
   const lineEls = new Map();
+  const hitEls = new Map();
   for (const e of edges) {
     const line = document.createElementNS(svgNS, "line");
     line.setAttribute("stroke", "var(--border)");
@@ -227,6 +247,24 @@ function draw() {
     for (const id of [e.a, e.b]) {
       if (!lineByNode.has(id)) lineByNode.set(id, []);
       lineByNode.get(id).push(line);
+    }
+
+    // Только у явной связи (relId ведёт на запись в relationships.json)
+    // есть что редактировать по клику — у рёбер из состава фракции,
+    // вложенности локации или @упоминания своей формы нет, их правят на
+    // самой карточке. Полоса-приёмник шире видимой линии (14px против
+    // 1.5px) — иначе попасть кликом в тонкую линию мышью почти нереально.
+    if (e.kind === "relationship") {
+      const hit = document.createElementNS(svgNS, "line");
+      hit.setAttribute("stroke", "transparent");
+      hit.setAttribute("stroke-width", "14");
+      hit.classList.add("graph-edge-hit");
+      hit.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        openEdgeEditor(e, ev.clientX, ev.clientY);
+      });
+      viewport.appendChild(hit);
+      hitEls.set(e, hit);
     }
   }
 
@@ -298,6 +336,13 @@ function draw() {
       line.setAttribute("y1", a.y);
       line.setAttribute("x2", b.x);
       line.setAttribute("y2", b.y);
+      const hit = hitEls.get(e);
+      if (hit) {
+        hit.setAttribute("x1", a.x);
+        hit.setAttribute("y1", a.y);
+        hit.setAttribute("x2", b.x);
+        hit.setAttribute("y2", b.y);
+      }
     }
   }
   positionAll();
@@ -425,7 +470,9 @@ function attachInteraction(svg, viewport, width, height, nodeEls, lineByNode) {
 
   let panStart = null;
   svg.addEventListener("pointerdown", (e) => {
-    if (e.target.closest(".graph-node")) return; // узлы обрабатывают своё перетаскивание отдельно
+    // узлы обрабатывают своё перетаскивание отдельно, полоса-приёмник
+    // ребра (.graph-edge-hit) — свой click на редактор связи, не пан.
+    if (e.target.closest(".graph-node") || e.target.closest(".graph-edge-hit")) return;
     panStart = { x: e.clientX, y: e.clientY, vx: view.x, vy: view.y };
     svg.setPointerCapture(e.pointerId);
     svg.classList.add("panning");
@@ -513,13 +560,94 @@ function resetHighlight(lineByNode, nodeEls) {
   for (const g of nodeEls.values()) g.style.opacity = "1";
 }
 
+// ── Редактор связи по клику на ребро ────────────
+// Вкладки «Связи» больше нет (её список и мини-граф целиком задваивали
+// то, что уже есть на карточке персонажа и здесь, в общем графе) —
+// вместо неё правка прямо по клику на ребро, тем же приёмом, что и в
+// articy:draft: холст остаётся единственным местом, где видно все связи
+// сразу, а форма всплывает по месту, а не уводит на отдельный экран.
+// Метка/сила/заметка — те же поля и те же CSS-классы, что и у
+// мини-редактора в дровере персонажа (characters.js) — общий взгляд на
+// одни и те же данные, просто с другой стороны.
+function openEdgeEditor(edge, x, y) {
+  const rel = relationshipsData.find((r) => r.id === edge.relId);
+  if (!rel) return;
+  const charName = (id) => charactersData.find((c) => c.id === id)?.name || i18n("?");
+
+  const wrap = document.createElement("div");
+  wrap.className = "graph-edge-editor";
+
+  const title = document.createElement("div");
+  title.className = "graph-edge-editor-title";
+  title.textContent = `${charName(rel.charA)} ↔ ${charName(rel.charB)}`;
+  wrap.appendChild(title);
+
+  const label = document.createElement("input");
+  label.className = "field-inline-control field-inline-control-bright";
+  label.placeholder = i18n("Метка (наставник, вражда…)");
+  label.value = rel.label || "";
+  label.addEventListener("input", () => {
+    rel.label = label.value;
+    saveRelationships(relationshipsData);
+  });
+  wrap.appendChild(label);
+
+  const sliderRow = document.createElement("div");
+  sliderRow.className = "rel-sliders";
+  const scoreLabel = document.createElement("span");
+  scoreLabel.className = "rel-score-label";
+  scoreLabel.textContent = rel.score || 0;
+  const slider = document.createElement("input");
+  slider.type = "range";
+  slider.className = "rel-slider";
+  slider.min = -100;
+  slider.max = 100;
+  slider.value = rel.score || 0;
+  slider.addEventListener("input", () => {
+    rel.score = Number(slider.value);
+    scoreLabel.textContent = rel.score;
+    saveRelationships(relationshipsData);
+  });
+  sliderRow.append(scoreLabel, slider);
+  wrap.appendChild(sliderRow);
+
+  const note = document.createElement("textarea");
+  note.className = "field-inline-control rel-note";
+  note.placeholder = i18n("Заметка о связи…");
+  note.value = rel.note || "";
+  note.addEventListener("input", () => {
+    rel.note = note.value;
+    saveRelationships(relationshipsData);
+  });
+  wrap.appendChild(note);
+
+  const delBtn = document.createElement("button");
+  delBtn.className = "btn danger graph-edge-editor-del";
+  delBtn.textContent = i18n("Удалить связь");
+  delBtn.addEventListener("click", async () => {
+    await pushTrash("relationship", rel);
+    relationshipsData = relationshipsData.filter((r) => r.id !== rel.id);
+    await apiPost("/api/relationships", relationshipsData);
+    // Прямая правка edges/draw(), а не полный renderGraph() — тот заново
+    // спросил бы сервер и мог обогнать debounce-сохранение остальных
+    // полей (см. saveRelationships), draw() просто перерисовывает уже
+    // обновлённый в памяти список рёбер, ничего не пересчитывая заново.
+    edges = edges.filter((e) => e !== edge);
+    closeMenu();
+    draw();
+  });
+  wrap.appendChild(delBtn);
+
+  openPopover(x, y, wrap, "graph-edge-popover");
+}
+
 function buildToolbar() {
   const bar = document.createElement("div");
   bar.className = "graph-toolbar";
 
   const hint = document.createElement("span");
   hint.className = "graph-hint";
-  hint.textContent = i18n("Тащи узлы мышью, крути колесо для зума, клик открывает карточку");
+  hint.textContent = i18n("Тащи узлы мышью, крути колесо для зума, клик по узлу открывает карточку, по связи между персонажами – редактирует её");
   bar.appendChild(hint);
 
   const resetBtn = document.createElement("button");

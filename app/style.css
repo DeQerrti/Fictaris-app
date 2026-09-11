@@ -57,11 +57,11 @@
 svg { flex-shrink: 0; }
 
 /* ── Базовые стили нативных элементов ──
-   Подложка для select/range без отдельного класса (см. relationships.js,
-   единственное место, где им взяться неоткуда) — раньше они рисовались
-   голым браузерным стилем поверх тёмной темы и сильно из неё выпадали.
-   Любой более специфичный класс (.field select и т.п.) по-прежнему
-   приоритетнее этих правил. */
+   Подложка для select/range без отдельного класса (мини-редактор связей
+   в дровере персонажа, characters.js; редактор ребра в графе, graph.js) —
+   раньше они рисовались голым браузерным стилем поверх тёмной темы и
+   сильно из неё выпадали. Любой более специфичный класс (.field select
+   и т.п.) по-прежнему приоритетнее этих правил. */
 select {
   background: var(--panel-alt);
   border: 1px solid var(--border);
@@ -545,6 +545,13 @@ body.focus-mode .sidebar { display: none; }
   padding: 6px;
   min-width: 320px;
   max-width: 380px;
+}
+
+/* Попап редактора связи по клику на ребро в графе проекта (graph.js,
+   openEdgeEditor) — форма вместо списка пунктов, шире обычного меню. */
+.context-menu.graph-edge-popover {
+  padding: 12px;
+  min-width: 260px;
 }
 .export-options-list { display: flex; flex-direction: column; }
 .export-option-row {
@@ -1810,11 +1817,24 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
 .readonly-value { color: var(--text-dim); padding: 6px 0; }
 
 /* Мини-редактор связей внутри дровера персонажа (characters.js) — те же
-   ряды/ползунки, что в списке на вкладке "Связи" (rel-row и т.п. в
-   relationships.js), просто без графа и в узкой колонке дровера. */
+   .rel-row/.rel-sliders и т.п., просто без графа и в узкой колонке
+   дровера. Второе место с теми же полями — редактор ребра по клику в
+   графе проекта (graph.js, .graph-edge-editor ниже), общий .rel-note
+   там и там. */
 .rel-mini-list { display: flex; flex-direction: column; gap: 10px; }
 .rel-mini-row { padding: 10px; background: var(--panel); border-radius: 8px; }
 .rel-mini-add { margin-top: 10px; width: 100%; }
+.rel-note { width: 100%; margin-top: 8px; resize: vertical; min-height: 36px; }
+
+/* Отдельной вкладки "Связи" больше нет — правка конкретной связи теперь
+   по клику на ребро между персонажами прямо в графе проекта (graph.js,
+   openEdgeEditor), всплывающим попапом того же вида, что и обычное
+   контекстное меню (openPopover, context-menu.js), просто с формой
+   вместо списка пунктов. */
+.graph-edge-hit { cursor: pointer; }
+.graph-edge-editor { display: flex; flex-direction: column; gap: 10px; }
+.graph-edge-editor-title { font-weight: 600; color: var(--text); margin-bottom: 2px; }
+.graph-edge-editor-del { width: 100%; }
 
 /* ── Рукопись ──────────────────────────────── */
 
@@ -2776,34 +2796,11 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
   width: 100%;
 }
 
-/* ── Граф связей (app/js/relationships.js) ────
-   Свой интерактивный граф — не общий ни с .graph-*/.pgraph-* (граф
-   проекта), ни с family-tree — там только персонажи, и длина пружины у
-   ребра зависит от score, чего у остальных графов нет. */
-.rgraph-outer { display: flex; flex-direction: column; gap: 6px; }
-
-.rgraph-holder {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  overflow: hidden;
-}
-
-.rgraph-svg { display: block; width: 100%; height: 100%; cursor: grab; touch-action: none; }
-.rgraph-svg.panning { cursor: grabbing; }
-.rgraph-svg text { pointer-events: none; user-select: none; }
-.rgraph-node { cursor: pointer; transition: opacity 0.15s; }
-
-.rgraph-hint { font-size: 0.78rem; color: var(--text-faint); }
-
-.rel-view { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 24px; }
-.rel-list { display: flex; flex-direction: column; gap: 10px; max-width: 640px; }
-.rel-list-title { margin: 0; font-family: Fraunces, serif; font-size: 1.05rem; color: var(--text); }
-.rel-list-add { align-self: flex-start; }
-
+/* .rel-row/.rel-row-top/.rel-row-label/.rel-sliders/.rel-score-label/
+   .rel-slider — общие с мини-редактором связей в дровере персонажа
+   (characters.js, .rel-mini-row = "rel-row rel-mini-row"), см. ниже. */
 .rel-row { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
 .rel-row-top { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-.rel-row-arrow { color: var(--text-faint); }
 .rel-row-label { flex: 1; }
 
 .rel-sliders { display: flex; align-items: center; gap: 10px; }
@@ -2815,7 +2812,6 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
   text-align: right;
 }
 .rel-slider { flex: 1; }
-.rel-note { width: 100%; margin-top: 8px; resize: vertical; min-height: 36px; }
 
 .graph-hint {
   font-size: 0.78rem;

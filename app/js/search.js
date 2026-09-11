@@ -91,7 +91,6 @@ function moduleLabels() {
 function sectionLabels() {
   return {
     board: i18n("Доска"),
-    relationships: i18n("Связи"),
     plotgraph: i18n("Карта сюжета"),
     knowledge: i18n("Знания"),
   };
@@ -156,20 +155,25 @@ async function buildIndex() {
     }
   }
 
-  // Связи, Карта сюжета и Знания — как и Доска, без своего экрана с
-  // фокусом по id (renderRelationships/renderPlot/renderKnowledge
-  // принимают только root, без второго аргумента) — переход просто
-  // открывает раздел целиком, найти нужную запись в нём — уже глазами.
+  // У связи нет своего раздела (мини-редактор — прямо в дровере
+  // персонажа, characters.js) — переход открывает charA, там она и
+  // правится; main.js подменяет module "relationships" на "characters"
+  // при навигации, здесь же id — сразу нужного персонажа, не null.
   const charName = (id) => characters.find((c) => c.id === id)?.name || i18n("?");
   for (const r of relationships) {
     entries.push({
       module: "relationships",
-      id: null,
+      id: r.charA,
       title: `${charName(r.charA)} ↔ ${charName(r.charB)}`,
       subtitle: snippet(r.label || r.note),
       color: "#5a8a5f",
     });
   }
+
+  // Карта сюжета и Знания — как и Доска, без своего экрана с фокусом по
+  // id (renderPlot/renderKnowledge принимают только root, без второго
+  // аргумента) — переход просто открывает раздел целиком, найти нужную
+  // запись в нём — уже глазами.
   for (const n of plot.nodes || []) {
     entries.push({
       module: "plotgraph",
