@@ -763,7 +763,7 @@ export const EN_DICT = {
   "Главы по статусу.": "Chapters by status.",
   "Локации по типу": "Locations by type",
   "Больше всего связей": "Most connections",
-  "Сколько связей у персонажа в модуле «Связи» – топ-8.": "How many relationships a character has in the \"Relationships\" module – top 8.",
+  "Сколько связей у персонажа – топ-8.": "How many relationships a character has – top 8.",
 
   "По умолчанию": "Default",
   "Новое поле": "New field",

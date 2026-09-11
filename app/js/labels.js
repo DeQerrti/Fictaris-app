@@ -32,7 +32,6 @@ export function defaultLabels() {
       canvas: i18n("Холст"),
       plotgraph: i18n("Карта сюжета"),
       knowledge: i18n("Знания"),
-      stats: i18n("Статистика"),
       continuity: i18n("Проверка"),
       trash: i18n("Корзина"),
       settings: i18n("⚙"),

@@ -120,7 +120,7 @@ function buildSection(title, hint) {
 export async function renderStats(root) {
   root.innerHTML = "";
   const wrap = document.createElement("div");
-  wrap.className = "data-panel";
+  wrap.className = "stats-dashboard";
 
   const [characters, locations, factions, timeline, board, manuscript, relationships, statuses, writingLog] = await Promise.all([
     apiGet("/api/characters"),
@@ -137,9 +137,12 @@ export async function renderStats(root) {
   const totalWords = manuscript.chapters.reduce((sum, c) => sum + wordCount(c.content), 0);
   const cardCount = Object.keys(board.cards || {}).length;
 
-  wrap.appendChild(buildWritingStreakSection(writingLog));
+  const streakSection = buildWritingStreakSection(writingLog);
+  streakSection.classList.add("stats-dashboard-full");
+  wrap.appendChild(streakSection);
 
   const overview = buildSection(i18n("Обзор"));
+  overview.classList.add("stats-dashboard-full");
   const tiles = document.createElement("div");
   tiles.className = "stat-tiles";
   tiles.append(
@@ -244,7 +247,7 @@ export async function renderStats(root) {
     .slice(0, 8);
   const degreeMax = Math.max(1, ...degreeRows.map((r) => r.value));
 
-  const degreeSection = buildSection(i18n("Больше всего связей"), i18n("Сколько связей у персонажа в модуле «Связи» – топ-8."));
+  const degreeSection = buildSection(i18n("Больше всего связей"), i18n("Сколько связей у персонажа – топ-8."));
   degreeSection.appendChild(buildBarList(degreeRows, degreeMax));
   wrap.appendChild(degreeSection);
 

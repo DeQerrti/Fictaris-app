@@ -92,7 +92,6 @@ const NAV_ICONS = {
   canvas: "frame",
   plotgraph: "route",
   knowledge: "lightbulb",
-  stats: "barChart",
   continuity: "checkShield",
   trash: "trash",
 };
@@ -106,6 +105,13 @@ export function applyNavIcons() {
   // нумерацию горячих клавиш), поэтому мимо цикла ниже; тот же приём.
   const settingsBtn = document.getElementById("settingsBtn");
   if (settingsBtn && !settingsBtn.innerHTML) settingsBtn.innerHTML = iconSvg("settings", 16);
+  // Статистика — не пункт списка разделов (см. main.js, openStatsModal):
+  // всплывает модалкой поверх текущего экрана, а не уводит на отдельную
+  // вкладку, чтобы не пустовать половиной экрана под десяток плашек с
+  // цифрами. Кнопка рядом с шестерёнкой настроек — тот же приём иконки-
+  // без-подписи, что и у неё.
+  const statsBtn = document.getElementById("statsBtn");
+  if (statsBtn && !statsBtn.innerHTML) statsBtn.innerHTML = iconSvg("barChart", 16);
 
   document.querySelectorAll(".nav-item[data-module]").forEach((btn) => {
     const key = NAV_ICONS[btn.dataset.module];

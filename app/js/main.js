@@ -60,6 +60,7 @@ const sidebarBackdrop = document.getElementById("sidebarBackdrop");
 // и сбила нумерацию цифровых горячих клавиш 1—9 (shortcuts.js), которые
 // считают именно по .nav-item.
 const settingsBtn = document.getElementById("settingsBtn");
+const statsBtn = document.getElementById("statsBtn");
 
 // Счётчик запросов на переключение модуля — если кликнуть вкладку мышкой
 // (её MODULES[name] может уйти в сеть за данными), а потом, не дожидаясь
@@ -100,6 +101,10 @@ navItems.forEach((btn) => {
   btn.addEventListener("click", () => openModule(btn.dataset.module));
 });
 settingsBtn.addEventListener("click", () => openModule("settings"));
+// Статистика больше не вкладка (одинокая узкая колонка с цифрами
+// посреди пустого экрана) — модалка поверх текущего места, тем же
+// entity-modal.js, что и карточка персонажа по клику на @упоминание.
+statsBtn.addEventListener("click", () => openEntityModal("stats"));
 
 sidebarToggle.addEventListener("click", () => appEl.classList.toggle("sidebar-open"));
 sidebarBackdrop.addEventListener("click", () => appEl.classList.remove("sidebar-open"));
@@ -160,8 +165,12 @@ async function boot() {
     return;
   }
   const hidden = await getHiddenTabs();
+  // "stats" в MODULES только для модалки (statsBtn выше, entity-modal.js) —
+  // своего пункта в сайдбаре у него нет, так что как запасной модуль по
+  // умолчанию он не годится: незачем открывать эту заглушку без
+  // возможности с неё куда-то переключиться кликом.
   const defaultModule = hidden.includes("manuscript")
-    ? Object.keys(MODULES).find((key) => key !== "settings" && !hidden.includes(key)) || "settings"
+    ? Object.keys(MODULES).find((key) => key !== "settings" && key !== "stats" && !hidden.includes(key)) || "settings"
     : "manuscript";
   openModule(defaultModule);
   refreshTrashBadge();

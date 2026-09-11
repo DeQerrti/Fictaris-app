@@ -2124,6 +2124,56 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
   color: var(--text-faint);
 }
 
+/* Визуальная шкала времени (timeline.js, buildScale) — точки кладутся по
+   event.order пропорционально (тот же order, что и у drag-and-drop
+   реордера списка ниже), с минимальным отступом между соседями, поэтому
+   ширина трека шире контейнера чаще, чем нет – сам wrap скроллится по
+   горизонтали, а не сжимает точки друг в друга. */
+.timeline-scale-wrap { overflow-x: auto; overflow-y: hidden; padding-bottom: 4px; margin-bottom: 20px; }
+
+.timeline-scale-track { position: relative; height: 56px; }
+
+.timeline-scale-line { position: absolute; top: 10px; left: 0; right: 0; height: 2px; background: var(--border); }
+
+.timeline-scale-point {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.timeline-scale-dot {
+  width: 10px;
+  height: 10px;
+  margin-top: 5px;
+  border-radius: 50%;
+  background: var(--text-faint);
+  border: 2px solid var(--bg);
+}
+
+.timeline-scale-point:hover .timeline-scale-dot,
+.timeline-scale-point.active .timeline-scale-dot { background: var(--accent); }
+
+.timeline-scale-label {
+  font-size: 0.68rem;
+  color: var(--text-faint);
+  max-width: 84px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.timeline-scale-point:hover .timeline-scale-label,
+.timeline-scale-point.active .timeline-scale-label { color: var(--text); }
+
 .timeline-list {
   display: flex;
   flex-direction: column;
@@ -2629,6 +2679,25 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
   gap: 16px;
   max-width: 560px;
 }
+
+/* ── Статистика (stats.js) ─────────────────────
+   Раньше та же узкая колонка .data-panel (max-width: 560px), что и у
+   «Данных» в Настройках — на широком окне справа пустовал весь остаток
+   экрана. Теперь модалка (statsBtn, main.js/entity-modal.js), а внутри —
+   сетка плиток на всю ширину панели, а не одна колонка: писательская
+   серия и обзорные плашки (.stats-dashboard-full) — во всю ширину сверху,
+   остальные разделы с полосками — по клеткам сетки. */
+.stats-dashboard {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+  align-content: start;
+  padding: 24px;
+  overflow-y: auto;
+}
+
+.stats-dashboard-full { grid-column: 1 / -1; }
 
 /* ── Настройки: вкладки-категории (по образцу Obsidian) ────── */
 

@@ -79,6 +79,8 @@ function draw() {
   toolbar.appendChild(buildExportPngButton(() => container.querySelector(".timeline-list"), i18n("таймлайн")));
   listPane.appendChild(toolbar);
   listPane.appendChild(buildFilterBar());
+  const scale = buildScale();
+  if (scale) listPane.appendChild(scale);
   listPane.appendChild(buildList());
   view.appendChild(listPane);
 
@@ -141,6 +143,65 @@ function buildFilterBar() {
     wrap.appendChild(count);
   }
 
+  return wrap;
+}
+
+// ── Визуальная шкала времени ─────────────────────
+// Список карточек ниже уже показывает порядок событий, но не расстояние
+// между ними – переворот и бегство в одном году и Крепость Раскола через
+// десять лет визуально неотличимы. Шкала кладёт точки по event.order
+// пропорционально (тот же order, что и у drag-and-drop реордера выше),
+// с минимальным отступом между соседями, чтобы кучка событий в одну дату
+// не схлопнулась в одну точку с нечитаемой подписью.
+const SCALE_MIN_GAP = 84;
+
+function computeScalePositions(items) {
+  const orders = items.map((e) => e.order);
+  const min = Math.min(...orders);
+  const max = Math.max(...orders);
+  const span = max - min || 1;
+  const usableWidth = Math.max(400, (items.length - 1) * SCALE_MIN_GAP);
+  const positions = items.map((e) => ((e.order - min) / span) * usableWidth);
+  for (let i = 1; i < positions.length; i++) {
+    if (positions[i] < positions[i - 1] + SCALE_MIN_GAP) positions[i] = positions[i - 1] + SCALE_MIN_GAP;
+  }
+  return positions;
+}
+
+// Меньше двух точек шкале нечего показывать – одна точка на пустой линии
+// не несёт смысла, который несёт расстояние между двумя и более.
+function buildScale() {
+  const items = visibleEvents();
+  if (items.length < 2) return null;
+
+  const positions = computeScalePositions(items);
+  const trackWidth = positions[positions.length - 1] + 48;
+
+  const wrap = document.createElement("div");
+  wrap.className = "timeline-scale-wrap";
+
+  const track = document.createElement("div");
+  track.className = "timeline-scale-track";
+  track.style.width = `${trackWidth}px`;
+  const line = document.createElement("div");
+  line.className = "timeline-scale-line";
+  track.appendChild(line);
+
+  items.forEach((ev, i) => {
+    const point = document.createElement("button");
+    point.type = "button";
+    point.className = "timeline-scale-point" + (ev.id === activeId ? " active" : "");
+    point.style.left = `${positions[i] + 24}px`;
+    point.title = ev.date ? `${ev.date} – ${ev.title || i18n("Без названия")}` : ev.title || i18n("Без названия");
+    point.innerHTML = `
+      <span class="timeline-scale-dot"></span>
+      <span class="timeline-scale-label">${escapeHtml(ev.title || i18n("Без названия"))}</span>
+    `;
+    point.addEventListener("click", () => { activeId = ev.id; draw(); });
+    track.appendChild(point);
+  });
+
+  wrap.appendChild(track);
   return wrap;
 }
 
