@@ -142,16 +142,37 @@ function mutualUnions(list, byId) {
   return unions;
 }
 
+function sharedChildrenCount(aId, bId, list) {
+  let n = 0;
+  for (const c of list) {
+    const p = c.parentIds || [];
+    if (p.includes(aId) && p.includes(bId)) n++;
+  }
+  return n;
+}
+
 // Каждому персонажу — не больше одного "соседа по ряду" для раскладки:
-// при нескольких браках подряд в ряду окажется только первый по порядку
-// данных партнёр, остальные браки всё равно нарисуются линией (см.
-// unionsForChild ниже), просто без места рядом в сетке — рисовать двух
-// и более "соседей" в одномерном ряду одновременно физически некуда.
-function primaryPartnerOf(unions) {
-  const primary = new Map();
+// при нескольких браках в ряду рядом окажется только один партнёр,
+// остальные всё равно нарисуются чертой брака (см. unions в
+// buildTreeCard), просто без места рядом в сетке — рисовать трёх и
+// более "соседей" в одномерном ряду одновременно физически некуда.
+// Выбирается партнёр с наибольшим числом общих детей — именно от этой
+// пары зависит, где в ряду окажутся дети, так что для раскладки эта
+// связь важнее, чем более ранний по очереди в данных, но бездетный
+// брак. Без детей ни у одной пары — первый по порядку, как и раньше.
+function primaryPartnerOf(unions, list) {
+  const byPerson = new Map();
   for (const u of unions) {
-    if (!primary.has(u.a)) primary.set(u.a, u.b);
-    if (!primary.has(u.b)) primary.set(u.b, u.a);
+    if (!byPerson.has(u.a)) byPerson.set(u.a, []);
+    if (!byPerson.has(u.b)) byPerson.set(u.b, []);
+    const kids = sharedChildrenCount(u.a, u.b, list);
+    byPerson.get(u.a).push({ other: u.b, kids });
+    byPerson.get(u.b).push({ other: u.a, kids });
+  }
+  const primary = new Map();
+  for (const [id, partners] of byPerson) {
+    partners.sort((a, b) => b.kids - a.kids);
+    primary.set(id, partners[0].other);
   }
   return primary;
 }
@@ -190,27 +211,36 @@ function barycenter(unit, byId, pos) {
   return xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : Infinity;
 }
 
-// pos: id -> {x,y}px.
+// pos: id -> {x,y}px. Желаемый x ряда d>0 — барицентр уже размещённых
+// родителей (честное центрирование под серединой родителей, а не
+// просто "тот же порядок с фиксированным шагом"); единицы без известных
+// родителей в этом дереве идут в конец. Минимальный отступ по ходу
+// слева направо соблюдается принудительным сдвигом вправо — порядок,
+// заданный барицентром, при этом не портится, просто где тесно, там
+// раскладка чуть менее строго центрирована, а не наезжает друг на друга.
 function layout(rows, byId) {
   const maxDepth = Math.max(...rows.keys());
   const pos = new Map();
 
   for (let d = 0; d <= maxDepth; d++) {
     const units = rows.get(d) || [];
-    if (d > 0) units.sort((u1, u2) => barycenter(u1, byId, pos) - barycenter(u2, byId, pos));
+    const withDesired = units.map((u) => ({ u, x: d > 0 ? barycenter(u, byId, pos) : Infinity }));
+    withDesired.sort((a, b) => a.x - b.x);
 
-    let cursor = 0;
+    let prevRight = -Infinity;
     const y = TOP + d * ROW_H;
-    for (const unit of units) {
-      const width = unit.members.length === 2 ? SLOT_W * 2 : SLOT_W;
-      const unitX = cursor + width / 2;
-      if (unit.members.length === 2) {
-        pos.set(unit.members[0], { x: unitX - SLOT_W / 2, y });
-        pos.set(unit.members[1], { x: unitX + SLOT_W / 2, y });
+    for (const { u, x } of withDesired) {
+      const width = u.members.length === 2 ? SLOT_W * 2 : SLOT_W;
+      const half = width / 2;
+      const minX = prevRight === -Infinity ? half : prevRight + UNIT_GAP + half;
+      const unitX = Number.isFinite(x) ? Math.max(x, minX) : minX;
+      if (u.members.length === 2) {
+        pos.set(u.members[0], { x: unitX - SLOT_W / 2, y });
+        pos.set(u.members[1], { x: unitX + SLOT_W / 2, y });
       } else {
-        pos.set(unit.members[0], { x: unitX, y });
+        pos.set(u.members[0], { x: unitX, y });
       }
-      cursor += width + UNIT_GAP;
+      prevRight = unitX + half;
     }
   }
   return { pos, maxDepth };
@@ -275,7 +305,7 @@ function buildTreeCard(list, index) {
   const byId = new Map(list.map((c) => [c.id, c]));
   const depth = computeDepths(list, byId);
   const unions = mutualUnions(list, byId);
-  const primary = primaryPartnerOf(unions);
+  const primary = primaryPartnerOf(unions, list);
   const rows = buildUnits(list, depth, primary);
   const { pos, maxDepth } = layout(rows, byId);
 
@@ -291,11 +321,23 @@ function buildTreeCard(list, index) {
   const width = maxX - minX + MARGIN * 2;
   const height = TOP + (maxDepth + 1) * ROW_H;
 
+  // Сама SVG — окно фиксированного размера (как у графа проекта,
+  // graph.js), а не растянутое под весь контент: контент какой угодно
+  // ширины/высоты панорамируется и масштабируется внутри него через
+  // transform на viewport-группу (attachTreeInteraction ниже), а не
+  // через нативный скролл контейнера.
+  const viewportW = Math.max(520, (root?.clientWidth || 900) - 80);
+  const viewportH = Math.min(480, Math.max(280, height));
+
   const svgNS = "http://www.w3.org/2000/svg";
   const svg = document.createElementNS(svgNS, "svg");
-  svg.setAttribute("width", width);
-  svg.setAttribute("height", height);
-  svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  svg.setAttribute("viewBox", `0 0 ${viewportW} ${viewportH}`);
+  svg.setAttribute("preserveAspectRatio", "none");
+  svg.classList.add("ftree-svg");
+
+  const viewport = document.createElementNS(svgNS, "g");
+  viewport.classList.add("ftree-viewport");
+  svg.appendChild(viewport);
 
   // Подписи поколений — слева от самого левого узла своего ряда, внутри
   // того же SVG (едет вместе с рядом при горизонтальном скролле, а не
@@ -311,7 +353,7 @@ function buildTreeCard(list, index) {
     label.setAttribute("font-size", "11");
     label.setAttribute("font-family", "Inter,sans-serif");
     label.textContent = i18n("Поколение {n}", { n: d + 1 });
-    svg.appendChild(label);
+    viewport.appendChild(label);
   }
 
   // Черта брака — между обоими партнёрами одного признанного союза, где
@@ -328,7 +370,7 @@ function buildTreeCard(list, index) {
     line.setAttribute("y2", b.y);
     line.setAttribute("stroke", "var(--accent)");
     line.setAttribute("stroke-width", "2");
-    svg.appendChild(line);
+    viewport.appendChild(line);
   }
 
   // Связи к детям — пучками (см. edgesForChild): один плавный путь от
@@ -351,7 +393,7 @@ function buildTreeCard(list, index) {
       path.setAttribute("stroke", "var(--border)");
       path.setAttribute("stroke-width", "1.5");
       if (isAdoptiveEdge(c, bundle)) path.setAttribute("stroke-dasharray", "5 4");
-      svg.appendChild(path);
+      viewport.appendChild(path);
     }
   }
 
@@ -393,12 +435,14 @@ function buildTreeCard(list, index) {
     g.appendChild(text);
 
     g.addEventListener("click", () => openCharacter(c.id));
-    svg.appendChild(g);
+    viewport.appendChild(g);
   }
 
   const holder = document.createElement("div");
   holder.className = "graph-holder";
+  holder.style.height = `${viewportH}px`;
   holder.appendChild(svg);
+  attachTreeInteraction(svg, viewport, viewportW, viewportH);
 
   const card = document.createElement("div");
   card.className = "ftree-card";
@@ -411,6 +455,67 @@ function buildTreeCard(list, index) {
 
   card.appendChild(holder);
   return card;
+}
+
+// Панорамирование перетаскиванием фона + зум колесом — тот же приём,
+// что и в графе проекта (graph.js): view = {x,y,scale}, transform на
+// viewport-группу, пересчёт клика через getBoundingClientRect. Узлы
+// (.ftree-node) сами по себе не перетаскиваются — только клик, поэтому
+// им достаточно не запускать панораму под собой, отдельного
+// pointerdown-обработчика на каждом узле, в отличие от graph.js, не
+// нужно.
+function attachTreeInteraction(svg, viewport, width, height) {
+  const view = { x: 0, y: 0, scale: 1 };
+  const MIN_SCALE = 0.4;
+  const MAX_SCALE = 2.5;
+
+  function applyView() {
+    viewport.setAttribute("transform", `translate(${view.x},${view.y}) scale(${view.scale})`);
+  }
+
+  function toPoint(clientX, clientY) {
+    const rect = svg.getBoundingClientRect();
+    const sx = ((clientX - rect.left) / rect.width) * width;
+    const sy = ((clientY - rect.top) / rect.height) * height;
+    return { x: (sx - view.x) / view.scale, y: (sy - view.y) / view.scale };
+  }
+
+  svg.addEventListener(
+    "wheel",
+    (e) => {
+      e.preventDefault();
+      const before = toPoint(e.clientX, e.clientY);
+      const delta = e.deltaY > 0 ? 0.9 : 1.1;
+      view.scale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, view.scale * delta));
+      const after = toPoint(e.clientX, e.clientY);
+      view.x += (after.x - before.x) * view.scale;
+      view.y += (after.y - before.y) * view.scale;
+      applyView();
+    },
+    { passive: false }
+  );
+
+  let panStart = null;
+  svg.addEventListener("pointerdown", (e) => {
+    if (e.target.closest(".ftree-node")) return;
+    panStart = { x: e.clientX, y: e.clientY, vx: view.x, vy: view.y };
+    svg.setPointerCapture(e.pointerId);
+    svg.classList.add("panning");
+  });
+  svg.addEventListener("pointermove", (e) => {
+    if (!panStart) return;
+    view.x = panStart.vx + (e.clientX - panStart.x);
+    view.y = panStart.vy + (e.clientY - panStart.y);
+    applyView();
+  });
+  const endPan = () => {
+    panStart = null;
+    svg.classList.remove("panning");
+  };
+  svg.addEventListener("pointerup", endPan);
+  svg.addEventListener("pointerleave", endPan);
+
+  applyView();
 }
 
 function draw() {
@@ -428,7 +533,7 @@ function draw() {
   const hint = document.createElement("span");
   hint.className = "ftree-hint";
   hint.textContent = i18n(
-    "Клик по узлу открывает карточку – родителей и партнёров назначают там же. Пунктир – усыновление."
+    "Тащи фон – панорама, колесо – зум, клик по узлу открывает карточку – родителей и партнёров назначают там же. Пунктир – усыновление."
   );
   toolbar.append(addBtn, hint);
   wrap.appendChild(toolbar);

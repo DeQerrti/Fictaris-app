@@ -33,6 +33,7 @@ import { i18n } from "./i18n.js";
 let data = { order: [], canvases: {} };
 let chapters = [];
 let activeId = null;
+let focusCardId = null;
 let container = null;
 const save = debounceSave((d) => apiPost("/api/canvas", d));
 
@@ -64,6 +65,15 @@ const MIN_H = 80;
 // становятся отдельной, новой доской «Карта сюжета» здесь; повторно не
 // импортируется (data.plotImported), чтобы не плодить копии при каждом
 // открытии вкладки.
+// Только точное совпадение (без регистра) и только если оно однозначно
+// среди текущих глав — иначе null, пусть остаётся свободным текстом.
+function resolveChapterByTitle(label) {
+  const norm = (label || "").trim().toLowerCase();
+  if (!norm) return null;
+  const matches = chapters.filter((c) => (c.title || "").trim().toLowerCase() === norm);
+  return matches.length === 1 ? matches[0].id : null;
+}
+
 async function importLegacyPlotOnce() {
   if (data.plotImported) return;
   data.plotImported = true;
@@ -73,23 +83,28 @@ async function importLegacyPlotOnce() {
 
   const cv = blankCanvas();
   cv.name = i18n("Карта сюжета");
-  cv.cards = nodes.map((n) => ({
-    id: n.id,
-    x: n.x ?? 0,
-    y: n.y ?? 0,
-    w: 220,
-    h: 130,
-    text: n.note || "",
-    title: n.title || "",
+  cv.cards = nodes.map((n) => {
     // chapterLabel у старой карты — свободный текст ("Глава 7"), не id
-    // главы — автоматически сверить с настоящими главами ненадёжно
-    // (могли переименовать/переставить), поэтому переносится как есть,
-    // просто подписью, без перехода по клику, пока не перепривязано
-    // вручную через ПКМ → «Привязать к главе…».
-    chapterId: null,
-    chapterLabel: n.chapterLabel || "",
-    color: null,
-  }));
+    // главы. Нечёткое сопоставление ("Глава 7" ~ "7. Порт") рискует
+    // привязать не ту главу, поэтому сверяем только точным совпадением
+    // названия (без регистра) и только если оно однозначно — тогда сразу
+    // настоящая привязка (кликабельный chapterId). Без такого совпадения
+    // подпись просто переносится как раньше, до ручной перепривязки
+    // через ПКМ → «Привязать к главе…».
+    const chapterId = resolveChapterByTitle(n.chapterLabel);
+    return {
+      id: n.id,
+      x: n.x ?? 0,
+      y: n.y ?? 0,
+      w: 220,
+      h: 130,
+      text: n.note || "",
+      title: n.title || "",
+      chapterId,
+      chapterLabel: chapterId ? "" : n.chapterLabel || "",
+      color: null,
+    };
+  });
   cv.edges = (Array.isArray(plot?.edges) ? plot.edges : [])
     .filter((e) => nodes.some((n) => n.id === e.from) && nodes.some((n) => n.id === e.to))
     .map((e) => ({ id: e.id, fromId: e.from, toId: e.to, label: e.label || "" }));
@@ -99,8 +114,14 @@ async function importLegacyPlotOnce() {
   persist();
 }
 
-export async function renderCanvas(root) {
+// focusCardId — переход из поиска (search.js индексирует карточки холста
+// по id) или откуда-то ещё: находим, в какой именно доске лежит эта
+// карточка, открываем сразу её и центрируем вид на карточке (см.
+// buildCanvasView) — а не просто открываем домашний экран со списком
+// досок, откуда всё равно пришлось бы искать её глазами.
+export async function renderCanvas(root, focus) {
   container = root;
+  focusCardId = focus || null;
   [data, chapters] = await Promise.all([
     apiGet("/api/canvas"),
     apiGet("/api/manuscript").then((m) => m.chapters || []),
@@ -109,6 +130,10 @@ export async function renderCanvas(root) {
   if (!data.canvases || typeof data.canvases !== "object") data.canvases = {};
   if (activeId && !data.canvases[activeId]) activeId = null;
   await importLegacyPlotOnce();
+  if (focusCardId) {
+    const owner = data.order.find((id) => data.canvases[id]?.cards?.some((c) => c.id === focusCardId));
+    if (owner) activeId = owner;
+  }
   draw();
 }
 
@@ -667,6 +692,29 @@ function buildCanvasView() {
 
   renderCards();
   applyView();
+
+  // Переход из поиска (renderCanvas focusCardId) — центрируем вид на
+  // нужной карточке и на секунду подсвечиваем её, а не просто открываем
+  // доску и оставляем искать глазами. rect холдера доступен только
+  // после того, как wrap реально вставлен в DOM (см. draw()) — поэтому
+  // кадром позже, а не прямо здесь. Once — сбрасываем сразу, чтобы
+  // внутренние draw() этого же холста (правка карточки и т.п.) не
+  // подпрыгивали видом заново.
+  if (focusCardId) {
+    const target = cv.cards.find((c) => c.id === focusCardId);
+    focusCardId = null;
+    if (target) {
+      requestAnimationFrame(() => {
+        const rect = holder.getBoundingClientRect();
+        view.x = rect.width / 2 - (target.x + target.w / 2) * view.scale;
+        view.y = rect.height / 2 - (target.y + target.h / 2) * view.scale;
+        applyView();
+        const el = cardLayer.querySelector(`[data-card-id="${target.id}"]`);
+        el?.classList.add("canvas-card-highlight");
+        setTimeout(() => el?.classList.remove("canvas-card-highlight"), 1600);
+      });
+    }
+  }
 
   return wrap;
 }

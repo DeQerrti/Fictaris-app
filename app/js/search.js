@@ -81,6 +81,7 @@ function moduleLabels() {
     board: i18n("Карточка"),
     relationships: i18n("Связь"),
     knowledge: i18n("Факт"),
+    canvas: i18n("Карточка холста"),
   };
 }
 
@@ -107,7 +108,7 @@ function snippet(text, max = 90) {
 }
 
 async function buildIndex() {
-  const [characters, locations, factions, timeline, manuscript, board, relationships, knowledge] = await Promise.all([
+  const [characters, locations, factions, timeline, manuscript, board, relationships, knowledge, canvas] = await Promise.all([
     apiGet("/api/characters"),
     apiGet("/api/locations"),
     apiGet("/api/factions"),
@@ -116,6 +117,7 @@ async function buildIndex() {
     apiGet("/api/board"),
     apiGet("/api/relationships"),
     apiGet("/api/knowledge"),
+    apiGet("/api/canvas"),
   ]);
 
   const entries = [];
@@ -175,6 +177,22 @@ async function buildIndex() {
     entries.push({ module: "knowledge", id: null, title: f.label || i18n("Без названия"), subtitle: snippet(f.note), color: "#b5636b" });
   }
 
+  // Карточки холста — у renderCanvas есть фокус по id (focusCardId,
+  // canvas.js): переход открывает нужную доску и центрирует вид прямо
+  // на этой карточке, а не только сам холст целиком.
+  for (const cv of Object.values(canvas.canvases || {})) {
+    for (const card of cv.cards || []) {
+      const title = card.title || snippet(card.text, 40) || i18n("Без названия");
+      entries.push({
+        module: "canvas",
+        id: card.id,
+        title,
+        subtitle: snippet(card.title ? card.text : cv.name),
+        color: card.color || "#7d6a9e",
+      });
+    }
+  }
+
   return entries;
 }
 
@@ -187,7 +205,7 @@ function ensureOverlay() {
   if (overlay) return;
   overlay = document.createElement("div");
   overlay.className = "search-overlay hidden";
-  overlay.innerHTML = `<div class="search-modal"><input type="text" class="search-input" placeholder="${i18n("Персонажи, локации, фракции, таймлайн, рукопись, связи, знания…")}" /><div class="search-results"></div></div>`;
+  overlay.innerHTML = `<div class="search-modal"><input type="text" class="search-input" placeholder="${i18n("Персонажи, локации, фракции, таймлайн, рукопись, связи, знания, холст…")}" /><div class="search-results"></div></div>`;
   document.body.appendChild(overlay);
   input = overlay.querySelector(".search-input");
   list = overlay.querySelector(".search-results");

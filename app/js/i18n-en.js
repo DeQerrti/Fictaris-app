@@ -341,9 +341,10 @@ export const EN_DICT = {
 
   // ── Поиск (search.js) ──
   "Поиск": "Search",
-  "Персонажи, локации, фракции, таймлайн, рукопись, связи, знания…": "Characters, locations, factions, timeline, manuscript, relationships, knowledge…",
+  "Персонажи, локации, фракции, таймлайн, рукопись, связи, знания, холст…": "Characters, locations, factions, timeline, manuscript, relationships, knowledge, canvas…",
   "Точка сюжета": "Plot point",
   "Факт": "Fact",
+  "Карточка холста": "Canvas card",
   "Найдено": "Found",
   "Действия": "Actions",
   "Экспортировать мир в PDF": "Export world as PDF",

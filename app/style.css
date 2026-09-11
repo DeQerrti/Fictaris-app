@@ -2880,19 +2880,22 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
 
 /* .graph-holder — используется родословной (app/js/family-tree.js,
    .ftree-card ниже) для каждой отдельной карточки рода. Граф проекта
-   (app/js/graph.js) — свои классы, не общие с родословной: у него
-   холдер растянут на почти всю вкладку (раньше был зажат в 920×680 и
-   центрирован, вокруг пустовала половина экрана), а свой SVG растянут
-   на 100% холдера через CSS — см. расчёт width/height viewBox и
-   preserveAspectRatio="none" там же. */
+   (app/js/graph.js) — свои классы, не общие с родословной, но тот же
+   приём: фиксированный по размеру SVG-«иллюминатор» (viewportW/H,
+   family-tree.js), внутри которого содержимое панорамируется и
+   масштабируется через transform на viewport-группу — overflow:hidden
+   обрезает то, что временно уехало за пределы иллюминатора, а не
+   раздувает сам холдер под размер всего дерева. */
 .graph-holder {
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 16px;
-  overflow-x: auto;
-  overflow-y: visible;
+  overflow: hidden;
 }
+
+.ftree-svg { display: block; width: 100%; height: 100%; cursor: grab; touch-action: none; }
+.ftree-svg.panning { cursor: grabbing; }
 .pgraph-view {
   flex: 1;
   min-height: 0;
@@ -3124,6 +3127,15 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   overflow: hidden;
+  transition: box-shadow 0.3s, border-color 0.3s;
+}
+
+/* Переход из поиска на конкретную карточку (canvas.js, renderCanvas
+   focusCardId) — секундная подсветка вместо того, чтобы просто открыть
+   доску и оставить искать нужную карточку глазами. */
+.canvas-card-highlight {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(201, 148, 74, 0.35);
 }
 
 .canvas-card-head {

@@ -260,19 +260,35 @@ async function openMarkFactPopover(x, y, chapter, selectedText) {
   factSelect.addEventListener("change", syncNewInputVisibility);
   syncNewInputVisibility();
 
+  // Мультивыбор персонажей — той же фишкой-переключателем, что и
+  // фильтры таймлайна: факт часто узнают разом несколько персонажей
+  // одной сценой, отмечать это одно за другим было бы лишним трением.
   const charField = document.createElement("div");
   charField.className = "field";
   const charLabel = document.createElement("label");
-  charLabel.textContent = i18n("Персонаж");
+  charLabel.textContent = i18n("Персонажи");
   charField.appendChild(charLabel);
-  const charSelect = document.createElement("select");
+  const charRow = document.createElement("div");
+  charRow.className = "timeline-filter-bar";
+  const selectedChars = new Set();
   for (const c of characters) {
-    const opt = document.createElement("option");
-    opt.value = c.id;
-    opt.textContent = c.name || i18n("Без имени");
-    charSelect.appendChild(opt);
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "filter-chip";
+    chip.style.setProperty("--chip-color", c.color || "#7c7157");
+    chip.textContent = c.name || i18n("Без имени");
+    chip.addEventListener("click", () => {
+      if (selectedChars.has(c.id)) {
+        selectedChars.delete(c.id);
+        chip.classList.remove("active");
+      } else {
+        selectedChars.add(c.id);
+        chip.classList.add("active");
+      }
+    });
+    charRow.appendChild(chip);
   }
-  charField.appendChild(charSelect);
+  charField.appendChild(charRow);
   wrap.appendChild(charField);
 
   const confirmBtn = document.createElement("button");
@@ -280,6 +296,7 @@ async function openMarkFactPopover(x, y, chapter, selectedText) {
   confirmBtn.textContent = i18n("Отметить с этой главы");
   confirmBtn.disabled = !characters.length;
   confirmBtn.addEventListener("click", async () => {
+    if (!selectedChars.size) return;
     let fact;
     if (factSelect.value === "__new__") {
       const label = newLabelInput.value.trim();
@@ -290,9 +307,9 @@ async function openMarkFactPopover(x, y, chapter, selectedText) {
       fact = facts.find((f) => f.id === factSelect.value);
       if (!fact) return;
     }
-    const charId = charSelect.value;
-    if (!charId) return;
-    fact.entries = { ...fact.entries, [charId]: chapter.id };
+    const entries = { ...fact.entries };
+    for (const charId of selectedChars) entries[charId] = chapter.id;
+    fact.entries = entries;
     await apiPost("/api/knowledge", { facts });
     closeMenu();
   });
