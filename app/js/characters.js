@@ -1,6 +1,6 @@
 import { apiGet, apiPost, uid } from "./api.js";
 import { debounceSave } from "./save-badge.js";
-import { escapeHtml, characterSelect, centerGridIfSparse, buildEmptyState, buildCardFieldsHtml } from "./chips.js";
+import { escapeHtml, characterSelect, buildEmptyState, buildCardFieldsHtml, reorderById, attachCardDrag } from "./chips.js";
 import { pushTrash } from "./trash.js";
 import { buildReverseLinks } from "./reverse-links.js";
 import { loadTagsMap, buildTagsField } from "./tags.js";
@@ -149,6 +149,7 @@ function draw() {
     grid.appendChild(empty);
   }
 
+  const dragState = { current: null };
   for (const c of characters) {
     const template = templateFor(templates, c.templateId);
     const fields = (template?.fields || []).map((f) => ({ label: f.label, value: c[f.key] }));
@@ -165,6 +166,11 @@ function draw() {
       <div class="entity-card-fields">${buildCardFieldsHtml(fields)}</div>
     `;
     card.addEventListener("click", () => { activeId = c.id; draw(); });
+    attachCardDrag(card, c.id, dragState, (draggedId, targetId) => {
+      characters = reorderById(characters, draggedId, targetId);
+      persist();
+      draw();
+    });
     grid.appendChild(card);
   }
 
@@ -197,7 +203,6 @@ function draw() {
   });
 
   container.appendChild(view);
-  centerGridIfSparse(grid);
 }
 
 // Мини-редактор связей прямо в карточке персонажа — та же коллекция

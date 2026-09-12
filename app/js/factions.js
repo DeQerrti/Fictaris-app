@@ -1,6 +1,6 @@
 import { apiGet, apiPost, uid } from "./api.js";
 import { debounceSave } from "./save-badge.js";
-import { escapeHtml, characterSelect, buildToggleGroup, centerGridIfSparse, buildEmptyState, buildCardFieldsHtml } from "./chips.js";
+import { escapeHtml, characterSelect, buildToggleGroup, buildEmptyState, buildCardFieldsHtml, reorderById, attachCardDrag } from "./chips.js";
 import { FACTION_TYPES, factionTypeInfo, iconSvg } from "./icons.js";
 import { pushTrash } from "./trash.js";
 import { loadTagsMap, buildTagsField } from "./tags.js";
@@ -84,6 +84,7 @@ function draw() {
     grid.appendChild(empty);
   }
 
+  const dragState = { current: null };
   for (const f of factions) {
     const [, typeLabel, iconName, color] = factionTypeInfo(f.type);
     const leader = characters.find((c) => c.id === f.leaderId);
@@ -107,6 +108,11 @@ function draw() {
       <div class="entity-card-fields">${buildCardFieldsHtml(fields)}</div>
     `;
     card.addEventListener("click", () => { activeId = f.id; draw(); });
+    attachCardDrag(card, f.id, dragState, (draggedId, targetId) => {
+      factions = reorderById(factions, draggedId, targetId);
+      persist();
+      draw();
+    });
     grid.appendChild(card);
   }
 
@@ -136,7 +142,6 @@ function draw() {
   });
 
   container.appendChild(view);
-  centerGridIfSparse(grid);
 }
 
 function buildDrawer(f) {

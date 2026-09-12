@@ -12,23 +12,6 @@ export function escapeHtml(s) {
   }[c]));
 }
 
-// Сетки карточек (персонажи/локации/фракции — все три через один и тот
-// же класс .characters-grid) по умолчанию прижаты к верхнему краю
-// (align-content: start) — так и должно быть, когда карточек больше,
-// чем помещается на экран, и появляется скролл. Но когда карточек
-// всего три-пять, тот же прижим к верху на большом мониторе оставляет
-// голую пустоту на весь оставшийся экран — ощущается как недоделанный
-// экран, а не спокойный минимализм. Переключаем на центрирование
-// только когда сетка и без того целиком помещается без скролла —
-// scrollHeight/clientHeight можно мерить лишь после того, как сетка
-// уже в живом DOM (сразу после appendChild), отсюда requestAnimationFrame:
-// ждём кадр, чтобы браузер успел посчитать раскладку.
-export function centerGridIfSparse(grid) {
-  requestAnimationFrame(() => {
-    grid.classList.toggle("grid-sparse", grid.scrollHeight <= grid.clientHeight);
-  });
-}
-
 // Пустое состояние с иконкой над текстом — та же иконка, что и у
 // соответствующего пункта сайдбара (iconSvg/icons.js), чтобы совсем
 // пустой раздел читался как "здесь пока нечего показывать", а не как
@@ -67,6 +50,41 @@ export function buildCardFieldsHtml(fields) {
       `
     )
     .join("");
+}
+
+// Перетаскивание карточек в сетке (персонажи/локации/фракции) — общий
+// приём на все три: карточка вставляется на место той, на которую её
+// бросили, сдвигая соседей (а не куда-то по абсолютным координатам, как
+// на холсте, — тут обычный порядок в массиве данных). dragState —
+// {current: string|null}, общий на одну отрисовку сетки, чтобы
+// dragover/drop разных карточек видели, кого именно сейчас тащат.
+export function reorderById(list, draggedId, targetId) {
+  const fromIdx = list.findIndex((x) => x.id === draggedId);
+  const toIdx = list.findIndex((x) => x.id === targetId);
+  if (fromIdx === -1 || toIdx === -1 || fromIdx === toIdx) return list;
+  const copy = [...list];
+  const [item] = copy.splice(fromIdx, 1);
+  copy.splice(toIdx, 0, item);
+  return copy;
+}
+
+export function attachCardDrag(card, id, dragState, onDrop) {
+  card.draggable = true;
+  card.addEventListener("dragstart", (e) => {
+    dragState.current = id;
+    if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
+  });
+  card.addEventListener("dragover", (e) => {
+    if (dragState.current === null) return;
+    e.preventDefault();
+  });
+  card.addEventListener("drop", (e) => {
+    e.preventDefault();
+    const draggedId = dragState.current;
+    dragState.current = null;
+    if (draggedId === null || draggedId === id) return;
+    onDrop(draggedId, id);
+  });
 }
 
 export function characterSelect(list, selectedId, placeholder) {

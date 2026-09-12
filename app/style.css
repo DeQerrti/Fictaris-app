@@ -750,12 +750,6 @@ body.focus-mode .sidebar { display: none; }
   align-content: start;
 }
 
-/* centerGridIfSparse (chips.js) — переключается сама, когда карточек
-   мало и они и без того целиком помещаются без скролла: та же сетка,
-   просто по центру экрана, а не прижата к потолку с пустотой во весь
-   оставшийся экран под ней. */
-.characters-grid.grid-sparse { align-content: center; }
-
 .char-card {
   display: flex;
   align-items: stretch;
@@ -806,7 +800,7 @@ body.focus-mode .sidebar { display: none; }
   overflow: hidden;
   cursor: pointer;
   text-align: left;
-  height: 230px;
+  height: 340px;
 }
 
 .entity-card:hover { border-color: var(--accent); }

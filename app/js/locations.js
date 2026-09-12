@@ -1,6 +1,6 @@
 import { apiGet, apiPost, uid } from "./api.js";
 import { debounceSave } from "./save-badge.js";
-import { escapeHtml, centerGridIfSparse, buildEmptyState, buildCardFieldsHtml } from "./chips.js";
+import { escapeHtml, buildEmptyState, buildCardFieldsHtml, reorderById, attachCardDrag } from "./chips.js";
 import { pushTrash } from "./trash.js";
 import { LOCATION_TYPES, locationTypeInfo, iconSvg } from "./icons.js";
 import { buildReverseLinks } from "./reverse-links.js";
@@ -157,6 +157,7 @@ function draw() {
     grid.appendChild(empty);
   }
 
+  const dragState = { current: null };
   for (const { loc, depth } of orderedTree()) {
     const [, , iconName, color] = locationTypeInfo(loc.type);
     const parent = loc.parentId && locations.find((l) => l.id === loc.parentId);
@@ -182,6 +183,15 @@ function draw() {
     card.addEventListener("click", (e) => {
       if (parent && e.target.closest(".loc-parent-badge")) { activeId = parent.id; draw(); return; }
       activeId = loc.id;
+      draw();
+    });
+    // Порядок в сетке — порядок в самом массиве locations: перетаскивание
+    // двигает элемент в этом массиве (orderedTree строит дерево обходом
+    // именно в этом порядке), поэтому перестановка всегда только внутри
+    // своего уровня вложенности — родителя у карточки это не меняет.
+    attachCardDrag(card, loc.id, dragState, (draggedId, targetId) => {
+      locations = reorderById(locations, draggedId, targetId);
+      persist();
       draw();
     });
     grid.appendChild(card);
@@ -213,7 +223,6 @@ function draw() {
   });
 
   container.appendChild(view);
-  centerGridIfSparse(grid);
 }
 
 function buildDrawer(loc) {
