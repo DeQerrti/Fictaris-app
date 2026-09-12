@@ -11,11 +11,17 @@ const SCHEMA_VERSION = 1;
 const EMPTY_MANUSCRIPT = { chapters: [], activeChapterId: null };
 const EMPTY_BOARD = { columns: [], cards: {}, cardOrder: {} };
 const EMPTY_MAP = { rootIds: [], maps: {} };
+// EMPTY_PLOT — только для обратной совместимости: /api/plot больше не
+// заводится заново (Холст, canvas.js, поглотил бывшую «Карту сюжета»),
+// но старый экспорт JSON или уже накопленный на диске файл всё ещё
+// нужно уметь прочитать и один раз мигрировать (canvas.js,
+// importLegacyPlotOnce) — отсюда его тут и оставляем.
 const EMPTY_PLOT = { nodes: [], edges: [] };
+const EMPTY_CANVAS = { order: [], canvases: {} };
 const EMPTY_KNOWLEDGE = { facts: [] };
 
 async function fetchAll() {
-  const [characters, locations, relationships, factions, timeline, board, map, manuscript, plot, knowledge] = await Promise.all([
+  const [characters, locations, relationships, factions, timeline, board, map, manuscript, plot, knowledge, canvas] = await Promise.all([
     apiGet("/api/characters"),
     apiGet("/api/locations"),
     apiGet("/api/relationships"),
@@ -26,8 +32,9 @@ async function fetchAll() {
     apiGet("/api/manuscript"),
     apiGet("/api/plot"),
     apiGet("/api/knowledge"),
+    apiGet("/api/canvas"),
   ]);
-  return { characters, locations, relationships, factions, timeline, board, map, manuscript, plot, knowledge };
+  return { characters, locations, relationships, factions, timeline, board, map, manuscript, plot, knowledge, canvas };
 }
 
 // Полная замена — импорт и «Заполнить примером» идут одним и тем же
@@ -46,6 +53,7 @@ async function applyAll(bundle) {
     apiPost("/api/manuscript", bundle.manuscript && Array.isArray(bundle.manuscript.chapters) ? bundle.manuscript : EMPTY_MANUSCRIPT),
     apiPost("/api/plot", bundle.plot && Array.isArray(bundle.plot.nodes) ? bundle.plot : EMPTY_PLOT),
     apiPost("/api/knowledge", bundle.knowledge && Array.isArray(bundle.knowledge.facts) ? bundle.knowledge : EMPTY_KNOWLEDGE),
+    apiPost("/api/canvas", bundle.canvas && Array.isArray(bundle.canvas.order) ? bundle.canvas : EMPTY_CANVAS),
   ]);
 }
 

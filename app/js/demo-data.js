@@ -1,10 +1,10 @@
 // Связный тестовый сюжет для кнопки «Заполнить примером» — по духу
 // демо из брифа ("Хроники Раскола Троп"): персонажи, локации, связи,
 // фракции, таймлайн, доска, карта (карты — во множественном числе, см.
-// ниже), карта сюжета, знания и пара глав рукописи, всё ссылается друг
-// на друга. Карта — асинхронно: рисует холст-заглушку и заливает его
-// через /api/map/image, как обычная загрузка картинки пользователем, а
-// map.json ссылается на полученный путь.
+// ниже), холст (доска «Карта сюжета»), знания и пара глав рукописи, всё
+// ссылается друг на друга. Карта мира — асинхронно: рисует HTML-canvas-
+// заглушку и заливает её через /api/map/image, как обычная загрузка
+// картинки пользователем, а map.json ссылается на полученный путь.
 //
 // Язык контента — по текущему языку интерфейса (i18n.js, currentLang):
 // L(ru, en) ниже просто выбирает нужную половину для каждого текстового
@@ -97,13 +97,16 @@ export async function buildDemoBundle() {
     backstory: L("Знает все контрабандные тропы побережья", "Knows every smuggling route along the coast"),
     tags: L("союзница, ненадёжная", "ally, unreliable") };
 
-  // Родители Астры (и ниже — отец Варна) — только для родословной
-  // (family-tree.js читает character.parentIds/partnerIds), сами не
-  // появляются больше нигде в сюжете: без них вкладка «Родословная» у
-  // демо-проекта оставалась бы пустой, а без второго, отдельного рода не
-  // было бы видно, что дерево умеет показывать несколько родов разом.
-  // Родители Астры вдобавок в браке (partnerIds) — демонстрирует черту
-  // союза между супругами, а не только линии к детям.
+  // Родители Астры (и ниже — Тесса/Ирис/Ренар/Лия/отец Варна) — только
+  // для родословной (family-tree.js читает character.parentIds/
+  // partnerIds/adoptiveParentIds), сами не появляются больше нигде в
+  // сюжете: без них вкладка «Родословная» у демо-проекта показывала бы
+  // самое простое дерево, какое только бывает. Вместе они закрывают все
+  // случаи разом — брак (partnerIds), второй/бездетный брак (проверяет,
+  // что раскладка выбирает соседом по ряду родителя с общим ребёнком),
+  // усыновление (adoptiveParentIds, пунктир), третье поколение (внучка
+  // через отдельную ветку, не только у Астры) и второй, не связанный
+  // род (отец Варна) — чтобы дерево показывало несколько родов разом.
   const father = { id: "demo-c-father", name: L("Лорд Эдвин Вирен", "Lord Edwin Viren"), color: "#9a9250",
     role: L("Прежний глава Дома Вирен", "Former head of House Viren"), age: "†",
     appearance: L("Известен только по портретам", "Known only from portraits"),
@@ -118,6 +121,38 @@ export async function buildDemoBundle() {
   father.partnerIds = [mother.id];
   mother.partnerIds = [father.id];
 
+  // Первая, бездетная жена Эдвина — до Миры. Раскладка родословной
+  // (family-tree.js, primaryPartnerOf) выбирает соседом по ряду именно
+  // родителя с общим ребёнком (Миру, не Тессу), но черта второго брака
+  // всё равно рисуется — без такого примера было бы не видно, что
+  // несколько браков вообще что-то в раскладке значат.
+  const edwinFirstWife = { id: "demo-c-edwin-first-wife", name: L("Леди Тесса", "Lady Tessa"), color: "#7d6a9e",
+    role: L("Первая жена Эдвина Вирена", "Edwin Viren's first wife"), age: "†", appearance: "",
+    personality: "", motivation: "", goal: "", flaws: "",
+    backstory: L("Умерла бездетной за много лет до переворота", "Died childless long before the coup"), tags: L("погиб", "deceased"),
+    partnerIds: [father.id] };
+  father.partnerIds.push(edwinFirstWife.id);
+
+  // Младшая сестра Астры — уцелела и родила дочь уже в изгнании: вторая
+  // генерация внутри того же рода Вирен (не только у Астры), а её муж —
+  // человек со стороны, без кровной связи с Вирен, чтобы третье
+  // поколение показывало ещё и приёмного ребёнка (adoptiveParentIds).
+  const iris = { id: "demo-c-iris", name: L("Леди Ирис Вирен", "Lady Iris Viren"), color: "#b5636b",
+    role: L("Младшая сестра Астры", "Astra's younger sister"), age: "31", appearance: "",
+    personality: "", motivation: "", goal: "", flaws: "",
+    backstory: L("Бежала в изгнание с мужем сразу после переворота", "Fled into exile with her husband right after the coup"), tags: L("изгнанница", "exile"),
+    parentIds: [father.id, mother.id], partnerIds: ["demo-c-renar"] };
+  const renar = { id: "demo-c-renar", name: L("Ренар", "Renar"), color: "#6a8fae",
+    role: L("Муж Ирис", "Iris's husband"), age: "35", appearance: "",
+    personality: "", motivation: "", goal: "", flaws: "",
+    backstory: L("Не из Дома Вирен – познакомился с Ирис уже в изгнании", "Not of House Viren – met Iris in exile"), tags: "",
+    partnerIds: [iris.id] };
+  const lia = { id: "demo-c-lia", name: L("Лия", "Lia"), color: "#9a9250",
+    role: L("Племянница Астры", "Astra's niece"), age: "9", appearance: "",
+    personality: "", motivation: "", goal: "", flaws: "",
+    backstory: L("Дочь Ирис от первого брака – Ренар удочерил её после свадьбы", "Iris's daughter from an earlier relationship – Renar adopted her after their wedding"), tags: "",
+    parentIds: [iris.id, renar.id], adoptiveParentIds: [renar.id] };
+
   // Отец Варна — второй, отдельный род: не связан родителями ни с кем
   // из Дома Вирен выше, поэтому родословная показывает два разных рода
   // отдельными карточками, а не один смешанный список.
@@ -127,7 +162,7 @@ export async function buildDemoBundle() {
     backstory: L("Заложил притязания Дома Варн на трон", "Laid House Varn's claim to the throne"), tags: L("погиб", "deceased") };
   varn.parentIds = [varnFather.id];
 
-  const characters = [aster, kael, varn, nessa, father, mother, varnFather];
+  const characters = [aster, kael, varn, nessa, father, mother, edwinFirstWife, iris, renar, lia, varnFather];
 
   const fortress = { id: "demo-l-fortress", name: L("Крепость Раскола", "Fortress of the Sundering"), type: "dungeon",
     description: L("Полуразрушенный орденский замок в горах", "A half-ruined order castle in the mountains"),
@@ -258,25 +293,49 @@ export async function buildDemoBundle() {
     },
   };
 
-  // Карта сюжета — те же пять сюжетных точек, что и в таймлайне выше,
-  // просто как узлы с направленными связями между ними; не одна точка,
-  // а цепочка, иначе не видно, что связи вообще для чего-то нужны.
-  const chapter1Label = L("Глава 1", "Chapter 1");
-  const chapter2Label = L("Глава 2", "Chapter 2");
-  const plot = {
-    nodes: [
-      { id: "demo-p-1", title: L("Переворот", "The Coup"), note: L("Варн захватывает Сольвейн, семья Астры гибнет", "Varn seizes Solveign, Astra's family dies"), chapterLabel: chapter1Label, x: 140, y: 160 },
-      { id: "demo-p-2", title: L("Бегство", "The Escape"), note: L("Каэль вывозит юную Астру из столицы", "Kael smuggles young Astra out of the capital"), chapterLabel: chapter1Label, x: 380, y: 160 },
-      { id: "demo-p-3", title: L("Возвращение", "The Return"), note: L("Астра и Каэль прибывают в портовый квартал десять лет спустя", "Astra and Kael arrive at the docks, ten years later"), chapterLabel: chapter2Label, x: 620, y: 160 },
-      { id: "demo-p-4", title: L("Сделка с Нессой", "The Deal with Nessa"), note: L("Несса соглашается провести их к крепости – за долю от находки", "Nessa agrees to guide them to the fortress — for a cut of what they find"), chapterLabel: "", x: 620, y: 340 },
-      { id: "demo-p-5", title: L("Крепость Раскола", "Fortress of the Sundering"), note: L("Отряд достигает крепости в поисках клинка", "The party reaches the fortress in search of the blade"), chapterLabel: "", x: 860, y: 340 },
-    ],
-    edges: [
-      { id: "demo-pe-1", from: "demo-p-1", to: "demo-p-2", label: L("вынуждает бежать", "forces them to flee") },
-      { id: "demo-pe-2", from: "demo-p-2", to: "demo-p-3", label: L("десять лет спустя", "ten years later") },
-      { id: "demo-pe-3", from: "demo-p-3", to: "demo-p-4", label: L("нужен проводник", "needs a guide") },
-      { id: "demo-pe-4", from: "demo-p-4", to: "demo-p-5", label: L("ведёт к цели", "leads to the goal") },
-    ],
+  // Холст — доска «Карта сюжета» той же схемой, что и обычный холст
+  // (canvas.js): заголовок и привязка к главе — необязательные поля
+  // карточки, а не отдельный тип узла. Первые три точки привязаны к
+  // настоящим главам рукописи (chapterId — сразу кликабельная ссылка,
+  // не просто подпись), у двух дальше по сюжету глав ещё не написано,
+  // так что chapterId не задан. Последняя карточка — голая заметка без
+  // заголовка вообще, показывает, что структура именно необязательна:
+  // тот же холст годится и просто под черновую мысль.
+  const canvasBoardId = "demo-canvas-plot";
+  const canvas = {
+    order: [canvasBoardId],
+    canvases: {
+      [canvasBoardId]: {
+        id: canvasBoardId,
+        name: L("Карта сюжета", "Plot map"),
+        cards: [
+          { id: "demo-cc-1", x: 140, y: 160, w: 220, h: 130, title: L("Переворот", "The Coup"),
+            text: L("Варн захватывает Сольвейн, семья Астры гибнет", "Varn seizes Solveign, Astra's family dies"),
+            chapterId: "demo-ch-1", chapterLabel: "", color: null },
+          { id: "demo-cc-2", x: 380, y: 160, w: 220, h: 130, title: L("Бегство", "The Escape"),
+            text: L("Каэль вывозит юную Астру из столицы", "Kael smuggles young Astra out of the capital"),
+            chapterId: "demo-ch-1", chapterLabel: "", color: null },
+          { id: "demo-cc-3", x: 620, y: 160, w: 220, h: 130, title: L("Возвращение", "The Return"),
+            text: L("Астра и Каэль прибывают в портовый квартал десять лет спустя", "Astra and Kael arrive at the docks, ten years later"),
+            chapterId: "demo-ch-2", chapterLabel: "", color: null },
+          { id: "demo-cc-4", x: 620, y: 340, w: 220, h: 130, title: L("Сделка с Нессой", "The Deal with Nessa"),
+            text: L("Несса соглашается провести их к крепости – за долю от находки", "Nessa agrees to guide them to the fortress — for a cut of what they find"),
+            chapterId: null, chapterLabel: "", color: "#7d6a9e" },
+          { id: "demo-cc-5", x: 860, y: 340, w: 220, h: 130, title: L("Крепость Раскола", "Fortress of the Sundering"),
+            text: L("Отряд достигает крепости в поисках клинка", "The party reaches the fortress in search of the blade"),
+            chapterId: null, chapterLabel: "", color: "#a4483c" },
+          { id: "demo-cc-note", x: 140, y: 420, w: 220, h: 130, title: "",
+            text: L("Идея: показать сон Астры о родителях – может, где-то между главой 2 и 3?", "Idea: Astra's dream about her parents – maybe somewhere between chapter 2 and 3?"),
+            chapterId: null, chapterLabel: "", color: null },
+        ],
+        edges: [
+          { id: "demo-ce-1", fromId: "demo-cc-1", toId: "demo-cc-2", label: L("вынуждает бежать", "forces them to flee") },
+          { id: "demo-ce-2", fromId: "demo-cc-2", toId: "demo-cc-3", label: L("десять лет спустя", "ten years later") },
+          { id: "demo-ce-3", fromId: "demo-cc-3", toId: "demo-cc-4", label: L("нужен проводник", "needs a guide") },
+          { id: "demo-ce-4", fromId: "demo-cc-4", toId: "demo-cc-5", label: L("ведёт к цели", "leads to the goal") },
+        ],
+      },
+    },
   };
 
   // Знания — два факта, у каждого несколько персонажей на разных
@@ -299,5 +358,5 @@ export async function buildDemoBundle() {
     ],
   };
 
-  return { characters, locations, relationships, factions, timeline, board, map, manuscript, plot, knowledge };
+  return { characters, locations, relationships, factions, timeline, board, map, manuscript, canvas, knowledge };
 }
