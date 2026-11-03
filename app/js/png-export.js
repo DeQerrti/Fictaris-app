@@ -29,7 +29,7 @@ function loadHtml2Canvas() {
   return html2canvasPromise;
 }
 
-async function exportElementAsPng(element, filename, backgroundColor) {
+export async function exportElementAsPng(element, filename, backgroundColor) {
   await loadHtml2Canvas();
   const canvas = await html2canvas(element, {
     backgroundColor: backgroundColor || getComputedStyle(document.documentElement).getPropertyValue("--bg").trim() || "#14110d",

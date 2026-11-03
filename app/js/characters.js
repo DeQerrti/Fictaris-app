@@ -12,6 +12,7 @@ import { loadTemplates, saveTemplates, templateFor, buildFieldHint } from "./tem
 import { chooseTemplate } from "./template-choice.js";
 import { openTemplateEditorModal } from "./template-editor-modal.js";
 import { i18n } from "./i18n.js";
+import { PARENT_KINDS, PARTNER_KINDS, GENDERS, parentKind, setParentKind, forgetParent, partnerKind, setPartnerKind, forgetPartner } from "./kinship.js";
 
 const PALETTE = [
   "#c9944a", "#4f7d74", "#a4483c", "#7d6a9e",
@@ -301,12 +302,33 @@ function buildRelationshipsField(c) {
   return wrap;
 }
 
-// Родители — тот же набор фишек-переключателей, что и buildToggleGroup
-// (chips.js), но не он сам: под выбранными нужна ещё строка чекбоксов
-// "приёмный от…", а её состав меняется вместе с самим выбором родителей,
-// поэтому обе строки перерисовываются своими локальными функциями, а не
-// одним onChange наружу. adoptiveParentIds — подмножество parentIds
-// (family-tree.js рисует эту связь пунктиром, а не сплошной линией).
+// Под выбранными фишками — строка «кто это»: у родителя родной /
+// приёмный / предполагаемый, у пары — её вид (kinship.js). Состав строки
+// меняется вместе с выбором, поэтому обе части перерисовываются своими
+// локальными функциями, а не одним onChange наружу.
+function buildKindSelect(options, value, onChange) {
+  const select = document.createElement("select");
+  select.className = "kin-kind-select";
+  for (const [key, label] of options) {
+    const opt = document.createElement("option");
+    opt.value = key;
+    opt.textContent = i18n(label);
+    opt.selected = key === value;
+    select.appendChild(opt);
+  }
+  select.addEventListener("change", () => onChange(select.value));
+  return select;
+}
+
+function buildKindRow(row, name, select) {
+  const item = document.createElement("label");
+  item.className = "parent-adopt-chip";
+  const text = document.createElement("span");
+  text.textContent = name || i18n("Без имени");
+  item.append(text, select);
+  row.appendChild(item);
+}
+
 function buildParentsField(c) {
   const field = document.createElement("div");
   field.className = "field";
@@ -318,31 +340,19 @@ function buildParentsField(c) {
   chipsRow.className = "timeline-filter-bar";
   field.appendChild(chipsRow);
 
-  const adoptRow = document.createElement("div");
-  adoptRow.className = "parent-adopt-row";
-  field.appendChild(adoptRow);
+  const kindsRow = document.createElement("div");
+  kindsRow.className = "parent-adopt-row";
+  field.appendChild(kindsRow);
 
-  function renderAdopt() {
-    adoptRow.innerHTML = "";
+  function renderKinds() {
+    kindsRow.innerHTML = "";
     for (const pid of c.parentIds || []) {
       const p = characters.find((x) => x.id === pid);
       if (!p) continue;
-      const chip = document.createElement("label");
-      chip.className = "parent-adopt-chip";
-      const checkbox = document.createElement("input");
-      checkbox.type = "checkbox";
-      checkbox.checked = (c.adoptiveParentIds || []).includes(pid);
-      checkbox.addEventListener("change", () => {
-        const ids = new Set(c.adoptiveParentIds || []);
-        if (checkbox.checked) ids.add(pid);
-        else ids.delete(pid);
-        c.adoptiveParentIds = [...ids];
+      buildKindRow(kindsRow, p.name, buildKindSelect(PARENT_KINDS, parentKind(c, pid), (kind) => {
+        setParentKind(c, pid, kind);
         persist();
-      });
-      const text = document.createElement("span");
-      text.textContent = i18n("приёмный от {name}", { name: p.name || i18n("Без имени") });
-      chip.append(checkbox, text);
-      adoptRow.appendChild(chip);
+      }));
     }
   }
 
@@ -355,33 +365,25 @@ function buildParentsField(c) {
       chip.style.setProperty("--chip-color", other.color || "#7c7157");
       chip.textContent = other.name || i18n("Без имени");
       chip.addEventListener("click", () => {
-        const ids = new Set(c.parentIds || []);
-        if (ids.has(other.id)) {
-          ids.delete(other.id);
-          c.adoptiveParentIds = (c.adoptiveParentIds || []).filter((id) => id !== other.id);
-        } else {
-          ids.add(other.id);
-        }
-        c.parentIds = [...ids];
+        if (active) forgetParent(c, other.id);
+        else c.parentIds = [...(c.parentIds || []), other.id];
         persist();
         renderChips();
-        renderAdopt();
+        renderKinds();
       });
       chipsRow.appendChild(chip);
     }
   }
   renderChips();
-  renderAdopt();
+  renderKinds();
 
   return field;
 }
 
-// Партнёры/супруги — симметричная связь: добавили B партнёром A, у B
-// тоже должен появиться A, иначе family-tree.js не сможет нарисовать
-// пару как одну ячейку (там читается partnerIds обеих сторон). Раз оба
-// объекта — это ссылки на элементы одного и того же characters (не
-// копии), правка other.partnerIds и один persist() пишут обе стороны
-// разом, без отдельного запроса за "другим" персонажем.
+// Пары — симметричная связь: добавили B партнёром A, у B тоже должен
+// появиться A (и тот же вид пары), иначе family-tree.js не нарисует их
+// как пару. Оба объекта — ссылки на элементы одного и того же characters,
+// поэтому один persist() пишет обе стороны разом.
 function buildPartnersField(c) {
   const field = document.createElement("div");
   field.className = "field";
@@ -393,6 +395,22 @@ function buildPartnersField(c) {
   row.className = "timeline-filter-bar";
   field.appendChild(row);
 
+  const kindsRow = document.createElement("div");
+  kindsRow.className = "parent-adopt-row";
+  field.appendChild(kindsRow);
+
+  function renderKinds() {
+    kindsRow.innerHTML = "";
+    for (const pid of c.partnerIds || []) {
+      const other = characters.find((x) => x.id === pid);
+      if (!other) continue;
+      buildKindRow(kindsRow, other.name, buildKindSelect(PARTNER_KINDS, partnerKind(c, pid), (kind) => {
+        setPartnerKind(c, other, kind);
+        persist();
+      }));
+    }
+  }
+
   function render() {
     row.innerHTML = "";
     for (const other of characters.filter((x) => x.id !== c.id)) {
@@ -402,19 +420,15 @@ function buildPartnersField(c) {
       chip.style.setProperty("--chip-color", other.color || "#7c7157");
       chip.textContent = other.name || i18n("Без имени");
       chip.addEventListener("click", () => {
-        const cIds = new Set(c.partnerIds || []);
-        const oIds = new Set(other.partnerIds || []);
-        if (cIds.has(other.id)) {
-          cIds.delete(other.id);
-          oIds.delete(c.id);
+        if (active) {
+          forgetPartner(c, other);
         } else {
-          cIds.add(other.id);
-          oIds.add(c.id);
+          c.partnerIds = [...new Set([...(c.partnerIds || []), other.id])];
+          other.partnerIds = [...new Set([...(other.partnerIds || []), c.id])];
         }
-        c.partnerIds = [...cIds];
-        other.partnerIds = [...oIds];
         persist();
         render();
+        renderKinds();
       });
       row.appendChild(chip);
     }
@@ -426,7 +440,24 @@ function buildPartnersField(c) {
     }
   }
   render();
+  renderKinds();
 
+  return field;
+}
+
+// Пол — необязателен; нужен Родословной, чтобы писать «отец», «сестра»,
+// «мачеха», а не «родитель», «брат или сестра».
+function buildGenderField(c) {
+  const field = document.createElement("div");
+  field.className = "field";
+  const label = document.createElement("label");
+  label.textContent = i18n("Пол");
+  field.appendChild(label);
+  field.appendChild(buildKindSelect(GENDERS, c.gender || "", (value) => {
+    if (value) c.gender = value;
+    else delete c.gender;
+    persist();
+  }));
   return field;
 }
 
@@ -473,6 +504,7 @@ function buildDrawer(c) {
 
   drawer.appendChild(buildAvatarsField(c, () => { persist(); draw(); }));
 
+  drawer.appendChild(buildGenderField(c));
   drawer.appendChild(buildParentsField(c));
   drawer.appendChild(buildPartnersField(c));
 

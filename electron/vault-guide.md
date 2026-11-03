@@ -1,4 +1,4 @@
-<!-- fictaris-guide v1 – файл создан приложением Fictaris и обновляется им. Чтобы оставить свою версию, удалите эту строку. -->
+<!-- fictaris-guide v2 – файл создан приложением Fictaris и обновляется им. Чтобы оставить свою версию, удалите эту строку. -->
 # Проект Fictaris – как править файлы
 
 Эта папка – проект писательского приложения Fictaris: персонажи, локации, главы рукописи и т.д., по одному JSON-файлу на раздел. Файлы можно править напрямую – открытое приложение заметит изменение и перечитает данные. Если в приложении в этот момент есть несохранённые правки, оно спросит, чью версию оставить.
@@ -22,8 +22,11 @@
 - `color` – `#rrggbb`, цвет карточки.
 - `templateId` – id шаблона анкеты (`"default"`, если не уверены). Шаблоны лежат в `site-settings.json` → `templates.characters[]` (`fields[]: {key, label, type: "input"|"textarea"}`); значение поля анкеты хранится прямо в персонаже под ключом `key`. Стандартные ключи: `role`, `age`, `appearance`, `personality`, `motivation`, `goal`, `flaws`, `backstory` – строки.
 - `tags` – **строка** через запятую: `"протагонист, изгнанница"`.
-- `parentIds: string[]` – родители (id персонажей). `adoptiveParentIds` – подмножество `parentIds`, приёмные.
-- `partnerIds: string[]` – супруги/партнёры. **Симметрично**: если у A есть B, у B должен быть A.
+- `gender` – `"male"` | `"female"` или нет поля. Нужен Родословной, чтобы писать «отец», «сестра», а не «родитель», «брат или сестра».
+- `parentIds: string[]` – родители (id персонажей). Подмножества `parentIds`, не пересекаются: `adoptiveParentIds` – приёмные, `uncertainParentIds` – предполагаемые (отцовство под вопросом, тайна).
+- `partnerIds: string[]` – пары. **Симметрично**: если у A есть B, у B должен быть A.
+- `partnerKinds: { [id партнёра]: вид }` – вид пары: `"betrothed"` (помолвлены), `"lover"` (любовники), `"divorced"` (в разводе). Нет записи – в браке. **Тоже симметрично**, у обоих одинаково.
+- Внебрачность нигде не хранится: ребёнок внебрачный, если его кровные родители не в браке друг с другом.
 - `images: string[]` – пути к картинкам в `maps/`; первая – аватарка.
 
 ### locations.json – локации
@@ -80,7 +83,7 @@
 ## Что ссылается на что
 
 Удаляя или объединяя запись, почистите ссылки:
-- **персонаж** – `characters[].parentIds/adoptiveParentIds/partnerIds`, `relationships[].charA/charB` (связь удалить целиком), `factions[].leaderId/memberIds`, `timeline[].characterIds`, `board` → `cards[].characterId`, `map` → `pins[].characterId`, ключи `knowledge.facts[].entries`, упоминания `@Имя` в тексте глав. **Переименование персонажа ломает упоминания** – замените `@Старое имя` в `content` глав.
+- **персонаж** – `characters[].parentIds/adoptiveParentIds/uncertainParentIds/partnerIds`, ключи `partnerKinds`, `relationships[].charA/charB` (связь удалить целиком), `factions[].leaderId/memberIds`, `timeline[].characterIds`, `board` → `cards[].characterId`, `map` → `pins[].characterId`, ключи `knowledge.facts[].entries`, упоминания `@Имя` в тексте глав. **Переименование персонажа ломает упоминания** – замените `@Старое имя` в `content` глав.
 - **локация** – `locations[].parentId`, `factions[].headquartersId`, `timeline[].locationIds`, карточки досок, метки карт.
 - **фракция** – карточки досок (`factionId`).
 - **глава** – `canvas` → `cards[].chapterId`, карточки досок (`chapterId`), значения `knowledge.facts[].entries`, `manuscript.activeChapterId`.

@@ -162,7 +162,26 @@ export async function buildDemoBundle() {
     backstory: L("Заложил притязания Дома Варн на трон", "Laid House Varn's claim to the throne"), tags: L("погиб", "deceased") };
   varn.parentIds = [varnFather.id];
 
-  const characters = [aster, kael, varn, nessa, father, mother, edwinFirstWife, iris, renar, lia, varnFather];
+  // Тайна происхождения Нессы — для видов родства в родословной
+  // (kinship.js): любовница Эдвина (partnerKinds: lover), сама Несса —
+  // внебрачная (это следует само, из того что Эдвин и Ада не в браке), а
+  // отцовство Эдвина под вопросом (uncertainParentIds). В фокусе на Астре
+  // Несса выходит «сестрой по отцу», на Эдвине — «предполагаемой дочерью».
+  const ada = { id: "demo-c-ada", name: L("Ада Солтри", "Ada Saltry"), color: "#b5636b",
+    role: L("Певица из портового квартала", "A singer from the docks"), age: "†", appearance: "",
+    personality: "", motivation: "", goal: "", flaws: "",
+    backstory: L("Говорят, её навещал сам Лорд Эдвин", "Rumour has it Lord Edwin himself used to visit her"), tags: L("погиб", "deceased"),
+    partnerIds: [father.id], partnerKinds: { [father.id]: "lover" }, gender: "female" };
+  father.partnerIds.push(ada.id);
+  father.partnerKinds = { [ada.id]: "lover" };
+  nessa.parentIds = [father.id, ada.id];
+  nessa.uncertainParentIds = [father.id];
+
+  // Пол — ради подписей «отец», «сестра», «мачеха» в фокусе родословной.
+  for (const [c, gender] of [[aster, "female"], [kael, "male"], [varn, "male"], [nessa, "female"], [father, "male"], [mother, "female"],
+    [edwinFirstWife, "female"], [iris, "female"], [renar, "male"], [lia, "female"], [varnFather, "male"]]) c.gender = gender;
+
+  const characters = [aster, kael, varn, nessa, father, mother, edwinFirstWife, iris, renar, lia, varnFather, ada];
 
   const fortress = { id: "demo-l-fortress", name: L("Крепость Раскола", "Fortress of the Sundering"), type: "dungeon",
     description: L("Полуразрушенный орденский замок в горах", "A half-ruined order castle in the mountains"),
