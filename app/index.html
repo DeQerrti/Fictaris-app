@@ -43,15 +43,15 @@
 </head>
 <body>
   <div id="app">
-    <button class="sidebar-toggle" id="sidebarToggle" aria-label="Меню">☰</button>
+    <button class="sidebar-toggle" id="sidebarToggle" data-i18n aria-label="Меню">☰</button>
     <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
     <nav class="sidebar">
       <div class="sidebar-resize-handle" id="sidebarResizeHandle"></div>
       <div class="brand-row">
         <div class="brand">Fictaris</div>
         <div class="brand-row-actions">
-          <button class="sidebar-collapse-btn" id="sidebarCollapse" aria-label="Свернуть список разделов до иконок"></button>
-          <button class="sidebar-pin" id="sidebarPin" aria-label="Закрепить меню"></button>
+          <button class="sidebar-collapse-btn" id="sidebarCollapse" data-i18n aria-label="Свернуть список разделов до иконок"></button>
+          <button class="sidebar-pin" id="sidebarPin" data-i18n aria-label="Закрепить меню"></button>
         </div>
       </div>
       <div class="sidebar-nav">
@@ -72,12 +72,12 @@
       <div class="project-switcher">
         <div class="project-switcher-row">
           <button class="project-current" id="projectBtn">…</button>
-          <button class="settings-btn" id="statsBtn" title="Статистика" aria-label="Статистика"></button>
-          <button class="settings-btn" id="settingsBtn" data-module="settings" title="Настройки" aria-label="Настройки"></button>
+          <button class="settings-btn" id="statsBtn" data-i18n title="Статистика" aria-label="Статистика"></button>
+          <button class="settings-btn" id="settingsBtn" data-i18n data-module="settings" title="Настройки" aria-label="Настройки"></button>
         </div>
         <div class="project-menu" id="projectMenu"></div>
       </div>
-      <div class="save-badge" id="saveBadge" title="Статус последнего сохранения на диск в папке проекта – «Сохранено» значит, что все изменения уже записаны в файлы">Сохранено</div>
+      <div class="save-badge" id="saveBadge" data-i18n title="Статус последнего сохранения на диск в папке проекта – «Сохранено» значит, что все изменения уже записаны в файлы">Сохранено</div>
     </nav>
     <main id="content"></main>
   </div>

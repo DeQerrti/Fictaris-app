@@ -124,11 +124,6 @@ export function parseRichSections(value) {
     .filter((s) => s.title || s.text);
 }
 
-// Есть ли смысл показывать оглавление — хотя бы один заголовок в тексте.
-export function hasRichHeadings(value) {
-  return parseRichSections(value).some((s) => s.level > 0);
-}
-
 // Подсказка под полем "richtext" в редакторе (drawer) — один и тот же
 // текст в трёх модулях (characters/locations/factions), поэтому общей
 // функцией, а не копией разметки в каждом.

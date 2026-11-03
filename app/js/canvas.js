@@ -162,14 +162,16 @@ function buildHome() {
     const cv = data.canvases[id];
     if (!cv) continue;
     const card = document.createElement("div");
-    card.className = "char-card map-home-card";
+    card.className = "entity-card map-home-card";
 
     const open = document.createElement("button");
     open.className = "map-home-open";
     open.innerHTML = `
-      <div class="char-avatar" style="background:#7d6a9e">${iconSvg("frame", 30)}</div>
-      <div class="char-name">${escapeHtml(cv.name || i18n("Без названия"))}</div>
-      <div class="char-role">${i18n("{n} карточек", { n: (cv.cards || []).length })}</div>
+      <div class="map-card-thumb canvas-card-thumb">${canvasThumbSvg(cv) || iconSvg("frame", 30)}</div>
+      <div class="map-card-footer">
+        <div class="char-name">${escapeHtml(cv.name || i18n("Без названия"))}</div>
+        <div class="char-role">${i18n("{n} карточек", { n: (cv.cards || []).length })}</div>
+      </div>
     `;
     open.addEventListener("click", () => {
       activeId = id;
@@ -205,7 +207,7 @@ function buildHome() {
   }
 
   const addCard = document.createElement("button");
-  addCard.className = "char-card add-card";
+  addCard.className = "entity-card add-card";
   addCard.textContent = i18n("+ Новый холст");
   addCard.addEventListener("click", () => {
     const cv = blankCanvas();
@@ -219,6 +221,37 @@ function buildHome() {
 
   view.appendChild(grid);
   return view;
+}
+
+// Миниатюра холста на домашнем экране — вместо картинки, как у карт
+// (map.js): те же прямоугольники карточек и стрелки, вписанные в рамку.
+// Пустой холст — null, и вместо схемы рисуется значок.
+function canvasThumbSvg(cv) {
+  const cards = cv.cards || [];
+  if (!cards.length) return null;
+  const minX = Math.min(...cards.map((c) => c.x));
+  const minY = Math.min(...cards.map((c) => c.y));
+  const maxX = Math.max(...cards.map((c) => c.x + (c.w || 220)));
+  const maxY = Math.max(...cards.map((c) => c.y + (c.h || 130)));
+  const pad = 40;
+  const byId = new Map(cards.map((c) => [c.id, c]));
+  const center = (c) => [c.x + (c.w || 220) / 2, c.y + (c.h || 130) / 2];
+  const edges = (cv.edges || [])
+    .map((e) => [byId.get(e.fromId), byId.get(e.toId)])
+    .filter(([a, b]) => a && b)
+    .map(([a, b]) => {
+      const [x1, y1] = center(a);
+      const [x2, y2] = center(b);
+      return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`;
+    })
+    .join("");
+  const rects = cards
+    .map((c) => {
+      const color = /^#[0-9a-f]{6}$/i.test(c.color || "") ? c.color : "var(--card)";
+      return `<rect x="${c.x}" y="${c.y}" width="${c.w || 220}" height="${c.h || 130}" rx="10" fill="${color}"/>`;
+    })
+    .join("");
+  return `<svg viewBox="${minX - pad} ${minY - pad} ${maxX - minX + pad * 2} ${maxY - minY + pad * 2}" preserveAspectRatio="xMidYMid meet"><g class="canvas-thumb-edges">${edges}</g><g class="canvas-thumb-cards">${rects}</g></svg>`;
 }
 
 // ── Сам холст ───────────────────────────────────

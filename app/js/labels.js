@@ -85,6 +85,18 @@ export async function applyLabels() {
     if (!btn.title) btn.title = text.trim();
   });
 
+  // Подсказки кнопок самой разметки index.html (статистика, настройки,
+  // сайдбар) — там они по-русски, ключом словаря; data-i18n помечает,
+  // что их нужно перевести. Один раз: снимаем метку, чтобы повторный
+  // вызов (сохранение подписей в настройках) не искал уже английский текст.
+  document.querySelectorAll("[data-i18n]").forEach((el) => {
+    for (const attr of ["title", "aria-label"]) {
+      const value = el.getAttribute(attr);
+      if (value) el.setAttribute(attr, i18n(value));
+    }
+    el.removeAttribute("data-i18n");
+  });
+
   return labels;
 }
 
