@@ -5,7 +5,9 @@ import { locationTypeInfo, iconSvg } from "./icons.js";
 import { attachMentionAutocomplete, attachMentionContextMenu } from "./mentions.js";
 import { pushTrash } from "./trash.js";
 import { buildExportPngButton } from "./png-export.js";
-import { loadCalendar, absoluteDay, formatDate } from "./calendar.js";
+import { loadCalendar, absoluteDay, formatDate, yearLength } from "./calendar.js";
+import { openPopover } from "./context-menu.js";
+import { avatarInnerHtml } from "./avatars.js";
 import { i18n, i18nPlural } from "./i18n.js";
 
 let events = [];
@@ -67,22 +69,100 @@ export async function renderTimeline(root, focusId) {
   draw();
 }
 
+// ── Два режима ───────────────────────────────────
+// «Летопись» — вертикальная ось: события по порядку, сгруппированные по
+// годам, между группами — сколько лет прошло. «Шкала» — время слева
+// направо, у каждого персонажа своя дорожка, годы без событий сжаты в
+// узкий разрыв. Выбор — предпочтение этого устройства, а не часть мира,
+// поэтому localStorage, а не site-settings.json.
+const MODE_KEY = "fictaris_timeline_mode";
+const MODES = [
+  ["chronicle", "Летопись", "Вертикальная ось с группами по годам"],
+  ["lanes", "Шкала", "Время слева направо, дорожка у каждого персонажа"],
+];
+
+function readMode() {
+  try {
+    const v = localStorage.getItem(MODE_KEY);
+    return MODES.some(([key]) => key === v) ? v : "chronicle";
+  } catch {
+    return "chronicle";
+  }
+}
+
+function writeMode(mode) {
+  try {
+    localStorage.setItem(MODE_KEY, mode);
+  } catch {
+    // приватное окно и т.п. — режим просто не запомнится
+  }
+}
+
+let mode = readMode();
+
+// ── Время события ────────────────────────────────
+// { year, frac } — frac ∈ [0, 1) доля года, или null, если в дате есть год,
+// но нет ничего точнее. Свой календарь (Настройки → Календарь) даёт
+// точный день; без него — год из текста даты плюс сезон, если он назван.
+// Нет числа в дате вовсе — null: такие события идут в «Без даты».
+const SEASONS = [
+  [/зим|winter/i, 0.04],
+  [/весн|spring/i, 0.29],
+  [/лет(?:о|а|у|ом)(?![а-яё])|summer/i, 0.54],
+  [/осен|autumn|fall/i, 0.79],
+];
+
+function eventTime(ev) {
+  if (calendar && Number.isFinite(ev.dateYear)) {
+    const start = absoluteDay(calendar, ev.dateYear, 0, 1);
+    const day = absoluteDay(calendar, ev.dateYear, ev.dateMonth ?? 0, ev.dateDay ?? 1);
+    return { year: ev.dateYear, frac: (day - start) / yearLength(calendar) };
+  }
+  const m = /-?\d+/.exec(ev.date || "");
+  if (!m) return null;
+  const season = SEASONS.find(([re]) => re.test(ev.date));
+  return { year: Number(m[0]), frac: season ? season[1] : null };
+}
+
+function yearLabel(year) {
+  const era = calendar?.eraLabel || i18n("год");
+  return `${era.charAt(0).toUpperCase()}${era.slice(1)} ${year}`;
+}
+
+// Оба фильтра — персонажи и локации — сужают список одновременно
+// (событие должно подходить под каждый выбранный фильтр по отдельности,
+// а не под любой из них), иначе выбор локации без выбора персонажа не
+// работал бы вовсе.
+function visibleEvents() {
+  return sorted().filter((e) => {
+    if (filterCharIds.size && !e.characterIds?.some((id) => filterCharIds.has(id))) return false;
+    if (filterLocIds.size && !e.locationIds?.some((id) => filterLocIds.has(id))) return false;
+    return true;
+  });
+}
+
 function draw() {
   container.innerHTML = "";
   const view = document.createElement("div");
   view.className = "timeline-view";
 
-  const listPane = document.createElement("div");
-  listPane.className = "timeline-list-pane";
-  const toolbar = document.createElement("div");
-  toolbar.className = "timeline-toolbar";
-  toolbar.appendChild(buildExportPngButton(() => container.querySelector(".timeline-list"), i18n("таймлайн")));
-  listPane.appendChild(toolbar);
-  listPane.appendChild(buildFilterBar());
-  const scale = buildScale();
-  if (scale) listPane.appendChild(scale);
-  listPane.appendChild(buildList());
-  view.appendChild(listPane);
+  const pane = document.createElement("div");
+  pane.className = "timeline-pane";
+  pane.appendChild(buildToolbar());
+  const items = visibleEvents();
+  if (!items.length) {
+    // Иконка — только для честно пустого таймлайна, не для "отфильтровали
+    // всё подчистую": та временная (снял фильтр — событий полно), а
+    // иконка нужна ровно для "здесь пока правда нечего показывать".
+    const empty = events.length
+      ? buildEmptyState(i18n("Нет событий с таким фильтром."))
+      : buildEmptyState(i18n("Событий пока нет – добавь первое."), "clock");
+    empty.classList.add("timeline-empty");
+    pane.appendChild(empty);
+  } else {
+    pane.appendChild(mode === "lanes" ? buildLanes(items) : buildChronicle(items));
+  }
+  view.appendChild(pane);
 
   const active = events.find((e) => e.id === activeId);
   if (active) view.appendChild(buildDrawer(active));
@@ -97,210 +177,381 @@ function draw() {
   container.appendChild(view);
 }
 
-function buildFilterBar() {
-  const wrap = document.createElement("div");
-
-  // Подпись слева от ряда — без неё два ряда цветных фишек над списком
-  // не читались как фильтры.
-  const filterLabel = (text) => {
-    const label = document.createElement("span");
-    label.className = "timeline-filter-label";
-    label.textContent = text;
-    return label;
-  };
-
-  if (characters.length) {
-    const bar = document.createElement("div");
-    bar.className = "timeline-filter-bar";
-    bar.appendChild(filterLabel(i18n("Персонажи")));
-    for (const c of characters) {
-      const chip = document.createElement("button");
-      chip.className = "filter-chip" + (filterCharIds.has(c.id) ? " active" : "");
-      chip.style.setProperty("--chip-color", c.color || "#7c7157");
-      chip.textContent = c.name;
-      chip.addEventListener("click", () => {
-        if (filterCharIds.has(c.id)) filterCharIds.delete(c.id);
-        else filterCharIds.add(c.id);
-        draw();
-      });
-      bar.appendChild(chip);
-    }
-    wrap.appendChild(bar);
-  }
-
-  if (locations.length) {
-    const bar = document.createElement("div");
-    bar.className = "timeline-filter-bar";
-    bar.appendChild(filterLabel(i18n("Места")));
-    for (const l of locations) {
-      const [, , icon, color] = locationTypeInfo(l.type);
-      const chip = document.createElement("button");
-      chip.className = "filter-chip" + (filterLocIds.has(l.id) ? " active" : "");
-      chip.style.setProperty("--chip-color", color);
-      chip.innerHTML = `${iconSvg(icon, 11)}<span>${escapeHtml(l.name)}</span>`;
-      chip.addEventListener("click", () => {
-        if (filterLocIds.has(l.id)) filterLocIds.delete(l.id);
-        else filterLocIds.add(l.id);
-        draw();
-      });
-      bar.appendChild(chip);
-    }
-    wrap.appendChild(bar);
-  }
-
-  if (filterCharIds.size || filterLocIds.size) {
-    const count = document.createElement("div");
-    count.className = "filter-count";
-    count.textContent = i18nPlural(events.length, ["{shown} из {total} события", "{shown} из {total} событий", "{shown} из {total} событий"], { shown: visibleEvents().length }, "total");
-    wrap.appendChild(count);
-  }
-
-  return wrap;
+function addEvent() {
+  const ev = blank();
+  events.push(ev);
+  activeId = ev.id;
+  persist();
+  draw();
 }
 
-// ── Визуальная шкала времени ─────────────────────
-// Список карточек ниже уже показывает порядок событий, но не расстояние
-// между ними – переворот и бегство в одном году и Крепость Раскола через
-// десять лет визуально неотличимы. Шкала кладёт точки по event.order
-// пропорционально (тот же order, что и у drag-and-drop реордера выше),
-// с минимальным отступом между соседями, чтобы кучка событий в одну дату
-// не схлопнулась в одну точку с нечитаемой подписью.
-const SCALE_MIN_GAP = 84;
-// Подпись шириной SCALE_MIN_GAP центрируется на точке — крайним точкам
-// нужен отступ хотя бы в половину подписи, иначе её начало у первого
-// события уезжало за левый край шкалы.
-const SCALE_EDGE = SCALE_MIN_GAP / 2 + 6;
+function buildToolbar() {
+  const bar = document.createElement("div");
+  bar.className = "timeline-toolbar";
 
-function computeScalePositions(items) {
-  const orders = items.map((e) => e.order);
-  const min = Math.min(...orders);
-  const max = Math.max(...orders);
-  const span = max - min || 1;
-  const usableWidth = Math.max(400, (items.length - 1) * SCALE_MIN_GAP);
-  const positions = items.map((e) => ((e.order - min) / span) * usableWidth);
-  for (let i = 1; i < positions.length; i++) {
-    if (positions[i] < positions[i - 1] + SCALE_MIN_GAP) positions[i] = positions[i - 1] + SCALE_MIN_GAP;
-  }
-  return positions;
-}
+  const title = document.createElement("div");
+  title.className = "timeline-heading";
+  title.textContent = i18n("Таймлайн");
+  const meta = document.createElement("div");
+  meta.className = "timeline-meta";
+  const years = events.map(eventTime).filter(Boolean).map((t) => t.year);
+  const count = i18nPlural(events.length, ["{n} событие", "{n} события", "{n} событий"]);
+  meta.textContent = years.length
+    ? `${count} · ${Math.min(...years)}–${Math.max(...years)}`
+    : count;
+  const spacer = document.createElement("div");
+  spacer.style.flex = "1";
 
-// Меньше двух точек шкале нечего показывать – одна точка на пустой линии
-// не несёт смысла, который несёт расстояние между двумя и более.
-function buildScale() {
-  const items = visibleEvents();
-  if (items.length < 2) return null;
-
-  const positions = computeScalePositions(items);
-  const trackWidth = positions[positions.length - 1] + SCALE_EDGE * 2;
-
-  const wrap = document.createElement("div");
-  wrap.className = "timeline-scale-wrap";
-
-  const track = document.createElement("div");
-  track.className = "timeline-scale-track";
-  track.style.width = `${trackWidth}px`;
-  const line = document.createElement("div");
-  line.className = "timeline-scale-line";
-  track.appendChild(line);
-
-  items.forEach((ev, i) => {
-    const point = document.createElement("button");
-    point.type = "button";
-    point.className = "timeline-scale-point" + (ev.id === activeId ? " active" : "");
-    point.style.left = `${positions[i] + SCALE_EDGE}px`;
-    point.title = ev.date ? `${ev.date} – ${ev.title || i18n("Без названия")}` : ev.title || i18n("Без названия");
-    point.innerHTML = `
-      <span class="timeline-scale-dot"></span>
-      <span class="timeline-scale-label">${escapeHtml(ev.title || i18n("Без названия"))}</span>
-    `;
-    point.addEventListener("click", () => { activeId = ev.id; draw(); });
-    track.appendChild(point);
-  });
-
-  wrap.appendChild(track);
-  return wrap;
-}
-
-// Оба фильтра — персонажи и локации — сужают список одновременно
-// (событие должно подходить под каждый выбранный фильтр по отдельности,
-// а не под любой из них), иначе выбор локации без выбора персонажа не
-// работал бы вовсе.
-function visibleEvents() {
-  const all = sorted();
-  return all.filter((e) => {
-    if (filterCharIds.size && !e.characterIds?.some((id) => filterCharIds.has(id))) return false;
-    if (filterLocIds.size && !e.locationIds?.some((id) => filterLocIds.has(id))) return false;
-    return true;
-  });
-}
-
-function buildList() {
-  const list = document.createElement("div");
-  list.className = "timeline-list";
-
-  const items = visibleEvents();
-  if (!items.length) {
-    // Иконка — только для честно пустого таймлайна, не для "отфильтровали
-    // всё подчистую": та временная (снял фильтр — событий полно), а
-    // иконка нужна ровно для "здесь пока правда нечего показывать".
-    const empty = events.length
-      ? buildEmptyState(i18n("Нет событий с таким фильтром."))
-      : buildEmptyState(i18n("Событий пока нет – добавь первое."), "clock");
-    list.appendChild(empty);
-  }
-
-  let dragId = null;
-
-  for (const ev of items) {
-    const item = document.createElement("div");
-    item.className = "timeline-item" + (ev.id === activeId ? " active" : "");
-    item.draggable = true;
-
-    const chips = [
-      ...(ev.characterIds || []).map((id) => charById(id)).filter(Boolean).map((c) =>
-        `<span class="chip" style="background:${c.color || "#7c7157"}">${escapeHtml(c.name)}</span>`
-      ),
-      // Места — контурные, со значком типа: сплошной цветной фишкой они не
-      // отличались от персонажей.
-      ...(ev.locationIds || []).map((id) => locById(id)).filter(Boolean).map((l) => {
-        const [, , icon, color] = locationTypeInfo(l.type);
-        return `<span class="chip chip-place" style="--chip-color:${color}">${iconSvg(icon, 11)}${escapeHtml(l.name)}</span>`;
-      }),
-    ].join("");
-
-    item.innerHTML = `
-      <div class="timeline-date">${escapeHtml(ev.date || "–")}</div>
-      <div class="timeline-title">${escapeHtml(ev.title || i18n("Без названия"))}</div>
-      ${ev.description ? `<div class="timeline-desc">${escapeHtml(ev.description)}</div>` : ""}
-      <div class="timeline-chips">${chips}</div>
-    `;
-
-    item.addEventListener("click", () => { activeId = ev.id; draw(); });
-
-    item.addEventListener("dragstart", () => { dragId = ev.id; });
-    item.addEventListener("dragover", (e) => e.preventDefault());
-    item.addEventListener("drop", (e) => {
-      e.preventDefault();
-      if (dragId === null || dragId === ev.id) return;
-      reorder(dragId, ev.id, items);
+  const switcher = document.createElement("div");
+  switcher.className = "segmented";
+  for (const [key, label, hint] of MODES) {
+    const btn = document.createElement("button");
+    btn.className = "segmented-btn" + (mode === key ? " active" : "");
+    btn.textContent = i18n(label);
+    btn.title = i18n(hint);
+    btn.addEventListener("click", () => {
+      if (mode === key) return;
+      mode = key;
+      writeMode(key);
+      draw();
     });
-
-    list.appendChild(item);
+    switcher.appendChild(btn);
   }
+
+  const filterBtn = document.createElement("button");
+  const active = filterCharIds.size + filterLocIds.size;
+  filterBtn.className = "btn" + (active ? " accent" : "");
+  filterBtn.innerHTML = `${iconSvg("filter", 14)}<span>${escapeHtml(i18n("Фильтр"))}</span>${active ? `<span class="timeline-filter-badge">${active}</span>` : ""}`;
+  filterBtn.addEventListener("click", () => {
+    const r = filterBtn.getBoundingClientRect();
+    openFilterPopover(r.left, r.bottom + 6);
+  });
+
+  const exportBtn = buildExportPngButton(() => container.querySelector(".timeline-export-target"), i18n("таймлайн"));
 
   const addBtn = document.createElement("button");
-  addBtn.className = "add-chapter";
+  addBtn.className = "btn accent";
   addBtn.textContent = i18n("+ Событие");
-  addBtn.addEventListener("click", () => {
-    const ev = blank();
-    events.push(ev);
-    activeId = ev.id;
-    persist();
-    draw();
-  });
-  list.appendChild(addBtn);
+  addBtn.addEventListener("click", addEvent);
 
-  return list;
+  bar.append(title, meta, spacer, switcher, filterBtn, exportBtn, addBtn);
+  return bar;
+}
+
+// Фильтр — во всплывающем окне по кнопке, а не стеной фишек над
+// событиями: с ростом проекта стена росла бы и выталкивала сам таймлайн
+// вниз. Окно перерисовывается на месте после каждого щелчка — выбор
+// виден сразу, а таймлайн под ним уже отфильтрован.
+function openFilterPopover(x, y) {
+  const wrap = document.createElement("div");
+  wrap.className = "timeline-filter-popover";
+
+  function fill() {
+    wrap.innerHTML = "";
+    const section = (label, list, selected, colorOf, iconOf) => {
+      if (!list.length) return;
+      const title = document.createElement("div");
+      title.className = "timeline-filter-label";
+      title.textContent = label;
+      const row = document.createElement("div");
+      row.className = "timeline-filter-bar";
+      for (const item of list) {
+        const chip = document.createElement("button");
+        chip.className = "filter-chip" + (selected.has(item.id) ? " active" : "");
+        chip.style.setProperty("--chip-color", colorOf(item));
+        const icon = iconOf?.(item);
+        chip.innerHTML = `${icon ? iconSvg(icon, 11) : ""}<span>${escapeHtml(item.name || i18n("Без имени"))}</span>`;
+        chip.addEventListener("click", () => {
+          if (selected.has(item.id)) selected.delete(item.id);
+          else selected.add(item.id);
+          fill();
+          draw();
+        });
+        row.appendChild(chip);
+      }
+      wrap.append(title, row);
+    };
+    section(i18n("Персонажи"), characters, filterCharIds, (c) => c.color || "#7c7157");
+    section(i18n("Места"), locations, filterLocIds, (l) => locationTypeInfo(l.type)[3], (l) => locationTypeInfo(l.type)[2]);
+
+    const footer = document.createElement("div");
+    footer.className = "timeline-filter-footer";
+    const shown = document.createElement("span");
+    shown.className = "filter-count";
+    shown.textContent = i18nPlural(events.length, ["{shown} из {total} события", "{shown} из {total} событий", "{shown} из {total} событий"], { shown: visibleEvents().length }, "total");
+    const reset = document.createElement("button");
+    reset.className = "btn";
+    reset.textContent = i18n("Сбросить");
+    reset.disabled = !filterCharIds.size && !filterLocIds.size;
+    reset.addEventListener("click", () => {
+      filterCharIds.clear();
+      filterLocIds.clear();
+      fill();
+      draw();
+    });
+    footer.append(shown, reset);
+    wrap.appendChild(footer);
+  }
+
+  fill();
+  openPopover(x, y, wrap, "timeline-filter-menu");
+}
+
+function buildChips(ev) {
+  return [
+    ...(ev.characterIds || []).map((id) => charById(id)).filter(Boolean).map((c) =>
+      `<span class="chip" style="background:${c.color || "#7c7157"}">${escapeHtml(c.name)}</span>`
+    ),
+    // Места — контурные, со значком типа: сплошной цветной фишкой они не
+    // отличались от персонажей.
+    ...(ev.locationIds || []).map((id) => locById(id)).filter(Boolean).map((l) => {
+      const [, , icon, color] = locationTypeInfo(l.type);
+      return `<span class="chip chip-place" style="--chip-color:${color}">${iconSvg(icon, 11)}${escapeHtml(l.name)}</span>`;
+    }),
+  ].join("");
+}
+
+// ── Летопись ─────────────────────────────────────
+// Группы — подряд идущие события одного года в текущем порядке (order:
+// ручная перестановка побеждает дату, см. reorder), а не сортировка по
+// году поверх него — иначе перетаскивание не меняло бы ничего видимого.
+function buildChronicle(items) {
+  const groups = [];
+  for (const ev of items) {
+    const year = eventTime(ev)?.year ?? null;
+    const last = groups[groups.length - 1];
+    if (last && last.year === year) last.items.push(ev);
+    else groups.push({ year, items: [ev] });
+  }
+
+  const outer = document.createElement("div");
+  outer.className = "chronicle-outer";
+  const spine = document.createElement("div");
+  spine.className = "chronicle timeline-export-target";
+  const toc = document.createElement("nav");
+  toc.className = "chronicle-toc";
+  const tocTitle = document.createElement("div");
+  tocTitle.className = "timeline-filter-label";
+  tocTitle.textContent = i18n("Периоды");
+  toc.appendChild(tocTitle);
+
+  let dragId = null;
+  let side = 0;
+  groups.forEach((g, gi) => {
+    const prev = groups[gi - 1];
+    if (prev && prev.year !== null && g.year !== null && g.year - prev.year > 1) {
+      const gap = document.createElement("div");
+      gap.className = "chronicle-gap";
+      gap.innerHTML = `<span>${escapeHtml(i18nPlural(g.year - prev.year, ["прошёл {n} год", "прошло {n} года", "прошло {n} лет"]))}</span>`;
+      spine.appendChild(gap);
+    }
+
+    const head = document.createElement("div");
+    head.className = "chronicle-period";
+    head.innerHTML = `<span>${escapeHtml(g.year === null ? i18n("Без даты") : yearLabel(g.year))}</span>`;
+    spine.appendChild(head);
+
+    const tocItem = document.createElement("button");
+    tocItem.className = "chronicle-toc-item";
+    tocItem.innerHTML = `<b>${escapeHtml(g.year === null ? i18n("Без даты") : yearLabel(g.year))}</b><small>${escapeHtml(i18nPlural(g.items.length, ["{n} событие", "{n} события", "{n} событий"]))}</small>`;
+    tocItem.addEventListener("click", () => head.scrollIntoView({ behavior: "smooth", block: "start" }));
+    toc.appendChild(tocItem);
+
+    for (const ev of g.items) {
+      const row = document.createElement("div");
+      row.className = "chronicle-row " + (side++ % 2 === 0 ? "left" : "right");
+
+      const card = document.createElement("div");
+      card.className = "chronicle-card" + (ev.id === activeId ? " active" : "");
+      card.draggable = true;
+      card.innerHTML = `
+        <div class="timeline-date">${escapeHtml(ev.date || "–")}</div>
+        <div class="timeline-title">${escapeHtml(ev.title || i18n("Без названия"))}</div>
+        ${ev.description ? `<div class="timeline-desc">${escapeHtml(ev.description)}</div>` : ""}
+        <div class="timeline-chips">${buildChips(ev)}</div>
+      `;
+      card.addEventListener("click", () => { activeId = ev.id; draw(); });
+      card.addEventListener("dragstart", () => { dragId = ev.id; });
+      card.addEventListener("dragover", (e) => e.preventDefault());
+      card.addEventListener("drop", (e) => {
+        e.preventDefault();
+        if (dragId === null || dragId === ev.id) return;
+        reorder(dragId, ev.id, items);
+      });
+
+      const dot = document.createElement("span");
+      dot.className = "chronicle-dot";
+      row.append(card, dot);
+      spine.appendChild(row);
+    }
+  });
+
+  outer.append(spine, toc);
+  return outer;
+}
+
+// ── Шкала ────────────────────────────────────────
+// Ширина года — не меньше LANE_YEAR_MIN и растягивается на всю доступную
+// ширину, если лет немного; годы без событий между соседними — один
+// разрыв LANE_BREAK шириной, сколько бы их ни было. Карточки, которые
+// не помещаются рядом по времени, уходят на следующий ряд той же дорожки.
+const LANE_LABEL_W = 190;
+const LANE_YEAR_MIN = 560;
+const LANE_BREAK = 96;
+const LANE_CARD_W = 170;
+const LANE_CARD_H = 52;
+const LANE_PAD = 10;
+
+function buildLanes(items) {
+  const timed = [];
+  const undated = [];
+  for (const ev of items) {
+    const t = eventTime(ev);
+    if (t) timed.push({ ev, t });
+    else undated.push(ev);
+  }
+
+  // Событиям с годом, но без сезона/дня — места внутри года по порядку
+  // (order), равномерно, а не все в одну точку на начале года.
+  const byYear = new Map();
+  for (const it of timed) {
+    if (!byYear.has(it.t.year)) byYear.set(it.t.year, []);
+    byYear.get(it.t.year).push(it);
+  }
+  for (const list of byYear.values()) {
+    const loose = list.filter((it) => it.t.frac === null);
+    loose.forEach((it, i) => { it.frac = (i + 0.5) / loose.length; });
+    for (const it of list) if (it.t.frac !== null) it.frac = it.t.frac;
+  }
+  const years = [...byYear.keys()].sort((a, b) => a - b);
+
+  const avail = Math.max(0, container.clientWidth - LANE_LABEL_W - 2);
+  const segCount = years.length + (undated.length ? 1 : 0);
+  const breaks = years.filter((y, i) => i && y - years[i - 1] > 1).length;
+  const yearW = Math.max(LANE_YEAR_MIN, segCount ? (avail - breaks * LANE_BREAK) / segCount : LANE_YEAR_MIN);
+
+  const segments = [];
+  let x = 0;
+  years.forEach((y, i) => {
+    if (i && y - years[i - 1] > 1) {
+      segments.push({ gap: y - years[i - 1] - 1, x, w: LANE_BREAK });
+      x += LANE_BREAK;
+    }
+    segments.push({ year: y, x, w: yearW });
+    x += yearW;
+  });
+  if (undated.length) {
+    segments.push({ undated: true, x, w: Math.max(yearW, undated.length * (LANE_CARD_W + 8) + LANE_PAD * 2) });
+    x = segments[segments.length - 1].x + segments[segments.length - 1].w;
+  }
+  const trackW = x;
+
+  const xOf = (it) => {
+    const seg = segments.find((s) => s.year === it.t.year);
+    return seg.x + LANE_PAD + it.frac * (seg.w - LANE_CARD_W - LANE_PAD * 2);
+  };
+  const placed = [
+    ...timed.map((it) => ({ ev: it.ev, x: xOf(it) })),
+    ...undated.map((ev, i) => ({ ev, x: segments[segments.length - 1].x + LANE_PAD + i * (LANE_CARD_W + 8) })),
+  ];
+
+  const lanes = [];
+  for (const c of characters) {
+    const mine = placed.filter((p) => (p.ev.characterIds || []).includes(c.id));
+    if (mine.length) lanes.push({ label: "character", c, items: mine, color: () => c.color || "#7c7157" });
+  }
+  const nobody = placed.filter((p) => !(p.ev.characterIds || []).some((id) => charById(id)));
+  if (nobody.length) lanes.push({ label: "nobody", items: nobody, color: () => "var(--text-faint)" });
+  const withPlace = placed.filter((p) => (p.ev.locationIds || []).some((id) => locById(id)));
+  if (withPlace.length) {
+    lanes.push({
+      label: "places",
+      items: withPlace,
+      color: (ev) => locationTypeInfo(locById((ev.locationIds || []).find((id) => locById(id)))?.type)[3],
+      text: (ev) => (ev.locationIds || []).map((id) => locById(id)?.name).filter(Boolean).join(", "),
+    });
+  }
+
+  const outer = document.createElement("div");
+  outer.className = "lanes-outer";
+  const grid = document.createElement("div");
+  grid.className = "lanes timeline-export-target";
+  grid.style.width = `${LANE_LABEL_W + trackW}px`;
+
+  const head = document.createElement("div");
+  head.className = "lanes-row lanes-head";
+  head.innerHTML = `<div class="lanes-label">${escapeHtml(i18n("Дорожки"))}</div>`;
+  const headTrack = document.createElement("div");
+  headTrack.className = "lanes-track";
+  headTrack.style.width = `${trackW}px`;
+  for (const s of segments) {
+    const cell = document.createElement("div");
+    cell.className = "lanes-seg" + (s.gap !== undefined ? " lanes-break" : "");
+    cell.style.left = `${s.x}px`;
+    cell.style.width = `${s.w}px`;
+    cell.textContent = s.gap !== undefined
+      ? i18nPlural(s.gap, ["… {n} год …", "… {n} года …", "… {n} лет …"])
+      : s.undated ? i18n("Без даты") : yearLabel(s.year);
+    headTrack.appendChild(cell);
+  }
+  head.appendChild(headTrack);
+  grid.appendChild(head);
+
+  for (const lane of lanes) {
+    // Жадная раскладка по рядам: карточка встаёт в первый ряд, где она не
+    // налезает на предыдущую, — иначе события одного сезона закрывали бы
+    // друг друга.
+    const rowEnds = [];
+    const sortedItems = [...lane.items].sort((a, b) => a.x - b.x);
+    const pos = sortedItems.map((p) => {
+      let r = rowEnds.findIndex((end) => p.x >= end + 6);
+      if (r === -1) { r = rowEnds.length; rowEnds.push(0); }
+      rowEnds[r] = p.x + LANE_CARD_W;
+      return { ...p, row: r };
+    });
+    const rows = Math.max(1, rowEnds.length);
+
+    const rowEl = document.createElement("div");
+    rowEl.className = "lanes-row";
+    const label = document.createElement("div");
+    label.className = "lanes-label";
+    if (lane.label === "character") {
+      label.innerHTML = `<span class="lanes-avatar" style="background:${lane.c.color || "#7c7157"}">${avatarInnerHtml(lane.c, escapeHtml((lane.c.name || "?").trim().slice(0, 1).toUpperCase()))}</span><span>${escapeHtml(lane.c.name)}</span>`;
+    } else {
+      label.innerHTML = `<span class="lanes-label-icon">${iconSvg(lane.label === "places" ? "pin" : "user", 15)}</span><span class="lanes-label-muted">${escapeHtml(lane.label === "places" ? i18n("Места") : i18n("Без участников"))}</span>`;
+    }
+
+    const track = document.createElement("div");
+    track.className = "lanes-track";
+    track.style.width = `${trackW}px`;
+    track.style.height = `${rows * (LANE_CARD_H + 8) + LANE_PAD * 2 - 8}px`;
+    for (const s of segments) {
+      const cell = document.createElement("div");
+      cell.className = "lanes-seg" + (s.gap !== undefined ? " lanes-break" : "");
+      cell.style.left = `${s.x}px`;
+      cell.style.width = `${s.w}px`;
+      track.appendChild(cell);
+    }
+    for (const p of pos) {
+      const card = document.createElement("button");
+      card.type = "button";
+      card.className = "lanes-card" + (p.ev.id === activeId ? " active" : "");
+      card.style.left = `${p.x}px`;
+      card.style.top = `${LANE_PAD + p.row * (LANE_CARD_H + 8)}px`;
+      card.style.width = `${LANE_CARD_W}px`;
+      card.style.borderLeftColor = lane.color(p.ev);
+      const text = lane.text ? lane.text(p.ev) : p.ev.title || i18n("Без названия");
+      card.title = `${p.ev.date ? `${p.ev.date} – ` : ""}${p.ev.title || i18n("Без названия")}`;
+      card.innerHTML = `<span class="lanes-card-date">${escapeHtml(p.ev.date || "–")}</span><span class="lanes-card-title">${escapeHtml(text)}</span>`;
+      card.addEventListener("click", () => { activeId = p.ev.id; draw(); });
+      track.appendChild(card);
+    }
+    rowEl.append(label, track);
+    grid.appendChild(rowEl);
+  }
+
+  outer.appendChild(grid);
+  return outer;
 }
 
 // Новый order — среднее между соседями в текущем видимом (отсортированном

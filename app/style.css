@@ -1675,7 +1675,6 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
 
 .export-png-btn { margin-left: auto; }
 
-.timeline-toolbar { display: flex; margin-bottom: 12px; }
 
 /* ── Горячие клавиши ───────────────────────── */
 
@@ -2181,21 +2180,230 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
 
 .timeline-view { display: flex; width: 100%; }
 
-.timeline-list-pane {
+/* Таймлайн — шапка и два режима (app/js/timeline.js): «Летопись» —
+   вертикальная ось с периодами, «Шкала» — дорожки по времени. */
+.timeline-pane { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; container-type: inline-size; }
+
+.timeline-toolbar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 16px 28px;
+  border-bottom: 1px solid var(--border);
+}
+.timeline-toolbar .btn { display: inline-flex; align-items: center; gap: 6px; }
+.timeline-heading { font-family: var(--font-book); font-size: 1.35rem; font-weight: 600; color: var(--text); }
+.timeline-meta { font-size: 0.82rem; color: var(--text-faint); font-variant-numeric: tabular-nums; }
+.timeline-toolbar .export-png-btn { margin-left: 0; }
+.timeline-filter-badge {
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 0.72rem;
+  line-height: 18px;
+  text-align: center;
+}
+.timeline-empty { margin: 48px auto; }
+
+.segmented { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; padding: 2px; gap: 2px; background: var(--panel-alt); }
+.segmented-btn {
+  min-height: 28px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--text-dim);
+  font-family: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.segmented-btn:hover { color: var(--text); }
+.segmented-btn.active { background: var(--card); color: var(--text); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25); }
+
+.timeline-filter-menu { padding: 12px 14px; max-width: 520px; }
+.timeline-filter-popover .timeline-filter-label { margin: 0 0 6px; }
+.timeline-filter-popover .timeline-filter-bar { margin-bottom: 14px; }
+.timeline-filter-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; border-top: 1px solid var(--border); padding-top: 10px; }
+
+/* Летопись: ось по центру, карточки — по очереди слева и справа; на узком
+   экране ось уходит влево и карточки идут одной колонкой. */
+.chronicle-outer { flex: 1; overflow: auto; display: flex; gap: 32px; padding: 28px; }
+.chronicle {
   flex: 1;
-  overflow-y: auto;
-  padding: 20px 24px;
+  min-width: 0;
+  max-width: 1200px;
+  margin: 0 auto;
+  position: relative;
+  padding-bottom: 24px;
+}
+.chronicle::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--border);
+}
+.chronicle-period, .chronicle-gap { position: relative; display: flex; justify-content: center; margin: 0 0 16px; scroll-margin-top: 16px; }
+.chronicle-period span {
+  font-family: var(--font-book);
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  padding: 6px 18px;
+  border-radius: 18px;
+}
+.chronicle-gap span {
+  font-size: 0.78rem;
+  color: var(--text-faint);
+  background: var(--bg);
+  border: 1px dashed var(--border);
+  padding: 4px 12px;
+  border-radius: 12px;
+}
+.chronicle-row { position: relative; display: flex; margin-bottom: 14px; }
+.chronicle-row.left { padding-right: calc(50% + 22px); }
+.chronicle-row.right { padding-left: calc(50% + 22px); }
+.chronicle-dot {
+  position: absolute;
+  left: 50%;
+  top: 22px;
+  width: 12px;
+  height: 12px;
+  margin-left: -6px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px var(--bg);
+}
+.chronicle-card {
+  width: 100%;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  cursor: pointer;
+}
+.chronicle-row.left .chronicle-card { border-right: 3px solid var(--accent); }
+.chronicle-row.right .chronicle-card { border-left: 3px solid var(--accent); }
+.chronicle-row.left .timeline-chips { justify-content: flex-end; }
+.chronicle-card:hover { border-color: var(--accent); }
+.chronicle-card.active { background: var(--panel); border-color: var(--accent); }
+
+.chronicle-toc { width: 200px; flex-shrink: 0; position: sticky; top: 0; align-self: flex-start; display: flex; flex-direction: column; gap: 2px; }
+.chronicle-toc .timeline-filter-label { margin: 0 12px 6px; }
+.chronicle-toc-item {
   display: flex;
   flex-direction: column;
+  gap: 1px;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  text-align: left;
+  font-family: inherit;
+  cursor: pointer;
+}
+.chronicle-toc-item b { font-size: 0.88rem; font-weight: 600; color: var(--text); }
+.chronicle-toc-item small { font-size: 0.75rem; color: var(--text-faint); }
+.chronicle-toc-item:hover { background: var(--card); }
+
+/* Порог — по ширине самой вкладки (container query), а не окна: сайдбар
+   отнимает своё, и окно в 1000px — это вкладка в 760px. */
+@container (max-width: 900px) {
+  .chronicle-toc { display: none; }
+}
+@container (max-width: 640px) {
+  .chronicle-outer { padding: 20px 16px; }
+  .chronicle::before { left: 7px; }
+  .chronicle-period, .chronicle-gap { justify-content: flex-start; }
+  .chronicle-row.left, .chronicle-row.right { padding: 0 0 0 28px; }
+  .chronicle-dot { left: 8px; }
+  .chronicle-row.left .chronicle-card { border-right: 1px solid var(--border); border-left: 3px solid var(--accent); }
+  .chronicle-row.left .timeline-chips { justify-content: flex-start; }
 }
 
-.timeline-filter-bar {
+/* Шкала: дорожка у каждого персонажа, время слева направо. Подписи
+   дорожек и строка годов прилипают при прокрутке в обе стороны. */
+.lanes-outer { flex: 1; overflow: auto; }
+.lanes { position: relative; }
+.lanes-row { display: flex; border-bottom: 1px solid var(--border); }
+.lanes-head { position: sticky; top: 0; z-index: 3; background: var(--panel); }
+.lanes-label {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  width: 190px;
+  flex-shrink: 0;
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
   align-items: center;
-  margin-bottom: 16px;
+  gap: 9px;
+  padding: 0 16px;
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+  font-size: 0.88rem;
+  color: var(--text);
+  box-sizing: border-box;
 }
+.lanes-head .lanes-label { font-size: 0.72rem; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.04em; }
+.lanes-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  color: #14110d;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+.lanes-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.lanes-label-icon { color: var(--text-faint); display: inline-flex; }
+.lanes-label-muted { color: var(--text-dim); }
+.lanes-track { position: relative; flex-shrink: 0; }
+.lanes-head .lanes-track { height: 36px; }
+.lanes-seg { position: absolute; top: 0; bottom: 0; border-left: 1px solid var(--border); box-sizing: border-box; }
+.lanes-head .lanes-seg { display: flex; align-items: center; padding: 0 12px; font-size: 0.85rem; font-weight: 600; color: var(--text); }
+.lanes-row:not(.lanes-head) .lanes-seg:not(.lanes-break) {
+  background: repeating-linear-gradient(90deg, transparent 0 calc(25% - 1px), color-mix(in srgb, var(--border) 45%, transparent) calc(25% - 1px) 25%);
+}
+.lanes-break { border-right: 1px dashed var(--border); border-left-style: dashed; }
+.lanes-head .lanes-break { justify-content: center; font-size: 0.75rem; font-weight: 400; color: var(--text-faint); }
+.lanes-row:not(.lanes-head) .lanes-break {
+  background: repeating-linear-gradient(135deg, transparent 0 6px, color-mix(in srgb, var(--border) 35%, transparent) 6px 7px);
+}
+.lanes-card {
+  position: absolute;
+  height: 52px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  padding: 0 10px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 6px;
+  text-align: left;
+  font-family: inherit;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  box-sizing: border-box;
+}
+.lanes-card:hover { border-color: var(--accent); }
+.lanes-card.active { border-color: var(--accent); background: var(--panel); }
+.lanes-card-date { font-size: 0.7rem; color: var(--text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lanes-card-title { font-size: 0.85rem; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
 
 .filter-chip {
   background: none;
@@ -2247,75 +2455,7 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
 }
 .parent-adopt-chip input { margin: 0; }
 
-/* Визуальная шкала времени (timeline.js, buildScale) — точки кладутся по
-   event.order пропорционально (тот же order, что и у drag-and-drop
-   реордера списка ниже), с минимальным отступом между соседями, поэтому
-   ширина трека шире контейнера чаще, чем нет – сам wrap скроллится по
-   горизонтали, а не сжимает точки друг в друга. */
-.timeline-scale-wrap { flex-shrink: 0; overflow-x: auto; overflow-y: hidden; padding-bottom: 4px; margin-bottom: 20px; }
-
-.timeline-scale-track { position: relative; height: 56px; }
-
-.timeline-scale-line { position: absolute; top: 10px; left: 0; right: 0; height: 2px; background: var(--border); }
-
-.timeline-scale-point {
-  position: absolute;
-  top: 0;
-  transform: translateX(-50%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  background: none;
-  border: none;
-  padding: 0;
-  cursor: pointer;
-  font-family: inherit;
-}
-
-.timeline-scale-dot {
-  width: 10px;
-  height: 10px;
-  margin-top: 5px;
-  border-radius: 50%;
-  background: var(--text-faint);
-  border: 2px solid var(--bg);
-}
-
-.timeline-scale-point:hover .timeline-scale-dot,
-.timeline-scale-point.active .timeline-scale-dot { background: var(--accent); }
-
-.timeline-scale-label {
-  font-size: 0.68rem;
-  color: var(--text-faint);
-  max-width: 84px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.timeline-scale-point:hover .timeline-scale-label,
-.timeline-scale-point.active .timeline-scale-label { color: var(--text); }
-
-.timeline-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  max-width: 960px;
-}
-
-.timeline-item {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--accent);
-  border-radius: 8px;
-  padding: 12px 14px;
-  cursor: grab;
-}
-
-.timeline-item:hover { border-color: var(--accent); border-left-color: var(--accent); }
-.timeline-item.active { background: var(--panel); }
-
+/* Содержимое карточки события в «Летописи» (timeline.js, buildChronicle). */
 .timeline-date {
   font-family: var(--font-ui); font-variant-numeric: tabular-nums;
   font-size: 0.72rem;
@@ -3462,6 +3602,6 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
   }
 
   .chapter-list { width: 130px; }
-  .timeline-list-pane { min-width: 0; }
+  .timeline-pane { min-width: 0; }
   .board-column { width: 200px; }
 }

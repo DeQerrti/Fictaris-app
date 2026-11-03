@@ -28,6 +28,7 @@ const PATHS = {
   close: '<path d="M5 5l14 14M19 5L5 19"/>',
   check: '<path d="M4 12l5 5L20 6"/>',
   shuffle: '<polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/>',
+  filter: '<path d="M4 5h16l-6 8v5l-4 2v-7L4 5z"/>',
   pushpin: '<path d="M9 3h6l-1 6 3 3H7l3-3-1-6z"/><path d="M12 12v9"/>',
   chevronLeft: '<path d="M15 6l-6 6 6 6"/>',
   chevronRight: '<path d="M9 6l6 6-6 6"/>',
