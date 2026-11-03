@@ -779,5 +779,6 @@ export const EN_DICT = {
   "Несохранённые правки в приложении будут отброшены": "Unsaved edits in the app will be discarded",
   "Оставить мои": "Keep mine",
   "Версия с диска останется в истории файла": "The version on disk will stay in the file history",
+  "Не удалось сохранить: {error}": "Could not save: {error}",
   "Файлы проекта изменены вне Fictaris ({files}), а здесь есть несохранённые правки.": "Project files were changed outside Fictaris ({files}), and there are unsaved edits here.",
 };

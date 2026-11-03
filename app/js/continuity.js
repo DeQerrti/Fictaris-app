@@ -1,4 +1,5 @@
 import { apiGet } from "./api.js";
+import { flattenBoards } from "./board-data.js";
 import { escapeHtml, buildEmptyState } from "./chips.js";
 import { knowledgeIssues } from "./knowledge.js";
 import { i18n } from "./i18n.js";
@@ -125,7 +126,7 @@ export async function renderContinuity(root) {
     apiGet("/api/manuscript"),
     apiGet("/api/knowledge"),
   ]);
-  const data = { characters, locations, relationships, factions, timeline, board, map, manuscript, knowledge };
+  const data = { characters, locations, relationships, factions, timeline, board: flattenBoards(board), map, manuscript, knowledge };
 
   const sections = [
     [i18n("Битые ссылки"), brokenRefs(data)],

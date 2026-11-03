@@ -6,6 +6,7 @@ import { openContextMenu, openPopover, closeMenu } from "./context-menu.js";
 import { escapeHtml } from "./chips.js";
 import { iconSvg, locationTypeInfo } from "./icons.js";
 import { i18n } from "./i18n.js";
+import { migrateBoards } from "./board-data.js";
 
 const LABEL_COLORS = [
   "#c9944a", "#4f7d74", "#a4483c", "#7d6a9e",
@@ -29,18 +30,6 @@ const save = debounceSave((d) => apiPost("/api/board", d));
 
 function persist() {
   save(data);
-}
-
-// Формат на диске раньше был одной доской ({columns, cards, cardOrder}
-// без обёртки) — заворачиваем в { boards: [...], activeBoardId } при
-// первой загрузке, ничего не теряя из уже сохранённого.
-function migrate(raw) {
-  if (raw && Array.isArray(raw.boards) && raw.boards.length) {
-    return { boards: raw.boards, activeBoardId: raw.activeBoardId || raw.boards[0].id };
-  }
-  const legacy = raw && raw.columns ? raw : { columns: [], cards: {}, cardOrder: {} };
-  const first = { id: uid(), name: i18n("Доска 1"), ...legacy };
-  return { boards: [first], activeBoardId: first.id };
 }
 
 function columnsFromTitles(titles) {
@@ -220,7 +209,7 @@ export async function renderBoard(root) {
   factions = facs;
   locations = locs;
   chapters = manuscriptData.chapters || [];
-  data = migrate(rawBoard);
+  data = migrateBoards(rawBoard);
   board = data.boards.find((b) => b.id === data.activeBoardId) || data.boards[0];
   if (!board.columns.length) {
     Object.assign(board, defaultColumns());

@@ -1,4 +1,5 @@
 import { apiGet, apiPost, uid } from "./api.js";
+import { migrateBoards } from "./board-data.js";
 import { escapeHtml, buildEmptyState } from "./chips.js";
 import { i18n } from "./i18n.js";
 
@@ -38,11 +39,12 @@ async function restoreArrayItem(listPath, item) {
 
 // Доска — не плоский массив, а columns/cards/cardOrder, поэтому карточка
 // возвращается не туда же, откуда её удалили (колонки самой уже может не
-// быть), а в отдельную «Восстановлено», которая создаётся при первой
-// необходимости.
+// быть), а в отдельную «Восстановлено» активной доски, которая создаётся
+// при первой необходимости.
 async function restoreBoardCard(card) {
-  const board = await apiGet("/api/board");
-  if (board.cards[card.id]) return;
+  const data = migrateBoards(await apiGet("/api/board"));
+  if (data.boards.some((b) => b.cards[card.id])) return;
+  const board = data.boards.find((b) => b.id === data.activeBoardId) || data.boards[0];
   let col = board.columns.find((c) => c.title === i18n("Восстановлено"));
   if (!col) {
     col = { id: uid(), title: i18n("Восстановлено") };
@@ -51,7 +53,7 @@ async function restoreBoardCard(card) {
   }
   board.cards[card.id] = card;
   board.cardOrder[col.id].push(card.id);
-  await apiPost("/api/board", board);
+  await apiPost("/api/board", data);
 }
 
 // Глава — тоже не плоский массив на верхнем уровне, а manuscript.chapters

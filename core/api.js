@@ -152,10 +152,13 @@ export const ROUTES = {
   },
 
   "GET /api/board": async ({ vault }) => vault.readJson("board.json", EMPTY_BOARD),
+  // Несколько досок ({boards, activeBoardId}, app/js/board-data.js) —
+  // и старая одиночная доска без обёртки: её всё ещё пишут импорт
+  // старого экспорта и «Заполнить примером».
   "POST /api/board": async ({ vault, body }) => {
-    if (!body || !Array.isArray(body.columns) || !body.cards || !body.cardOrder) {
-      throw new ApiError("Некорректная доска");
-    }
+    const isBoard = (b) => b && Array.isArray(b.columns) && b.cards && b.cardOrder;
+    const ok = Array.isArray(body?.boards) ? body.boards.length > 0 && body.boards.every(isBoard) : isBoard(body);
+    if (!ok) throw new ApiError("Некорректная доска");
     return vault.writeJson("board.json", body);
   },
 

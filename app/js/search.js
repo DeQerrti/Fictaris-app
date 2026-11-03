@@ -1,4 +1,5 @@
 import { apiGet } from "./api.js";
+import { flattenBoards } from "./board-data.js";
 import { escapeHtml } from "./chips.js";
 import { locationTypeInfo, factionTypeInfo, iconSvg } from "./icons.js";
 import { exportWorldPdf } from "./export-pdf.js";
@@ -147,9 +148,10 @@ async function buildIndex() {
   // У карточек доски нет отдельного экрана-редактора с фокусом по id
   // (board.js правит их прямо внутри колонок) — переход просто
   // открывает доску, без подсветки конкретной карточки.
-  for (const col of board.columns || []) {
-    for (const cardId of board.cardOrder?.[col.id] || []) {
-      const card = board.cards?.[cardId];
+  const allBoards = flattenBoards(board);
+  for (const col of allBoards.columns) {
+    for (const cardId of allBoards.cardOrder[col.id] || []) {
+      const card = allBoards.cards[cardId];
       if (card) entries.push({ module: "board", id: null, title: card.title, subtitle: col.title, color: "#9a9250" });
     }
   }

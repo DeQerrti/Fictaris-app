@@ -1,4 +1,5 @@
 import { apiGet, apiPost, uid } from "./api.js";
+import { flattenBoards } from "./board-data.js";
 import { debounceSave } from "./save-badge.js";
 import { escapeHtml, characterSelect, buildEmptyState, buildCardFieldsHtml, reorderById, attachCardDrag } from "./chips.js";
 import { pushTrash } from "./trash.js";
@@ -90,6 +91,7 @@ export async function renderCharacters(root, focusId) {
     loadTagsMap(),
     loadTemplates("characters"),
   ]);
+  board = flattenBoards(board);
   if (focusId && characters.some((c) => c.id === focusId)) activeId = focusId;
   draw();
 }

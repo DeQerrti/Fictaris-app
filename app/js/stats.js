@@ -1,4 +1,5 @@
 import { apiGet } from "./api.js";
+import { flattenBoards } from "./board-data.js";
 import { escapeHtml } from "./chips.js";
 import { factionTypeInfo, locationTypeInfo } from "./icons.js";
 import { loadStatuses } from "./chapter-status.js";
@@ -135,7 +136,7 @@ export async function renderStats(root) {
   ]);
 
   const totalWords = manuscript.chapters.reduce((sum, c) => sum + wordCount(c.content), 0);
-  const cardCount = Object.keys(board.cards || {}).length;
+  const cardCount = Object.keys(flattenBoards(board).cards).length;
 
   const streakSection = buildWritingStreakSection(writingLog);
   streakSection.classList.add("stats-dashboard-full");

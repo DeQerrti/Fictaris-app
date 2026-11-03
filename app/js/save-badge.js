@@ -50,11 +50,15 @@ export function debounceSave(fn, delay = 600) {
     markSaving();
     const run = async () => {
       inFlight++;
+      let res;
       try {
-        await fn(...args);
+        res = await fn(...args);
       } finally {
         inFlight--;
       }
+      // apiPost не бросает на ответ с ошибкой — отказ сервера иначе
+      // проходил бы молча (так с 0.3.5 по 0.3.19 терялись все правки Доски).
+      if (res?.error) showSaveError(res.error);
       markSaved();
     };
     timer = setTimeout(() => {
@@ -65,6 +69,25 @@ export function debounceSave(fn, delay = 600) {
     pendingTimers.add(timer);
   };
   return debounced;
+}
+
+const ERROR_MS = 8000;
+let errorEl = null;
+let errorTimer = null;
+
+function showSaveError(message) {
+  errorEl?.remove();
+  clearTimeout(errorTimer);
+  errorEl = document.createElement("div");
+  errorEl.className = "update-banner external-change-banner";
+  const text = document.createElement("span");
+  text.textContent = i18n("Не удалось сохранить: {error}", { error: message });
+  errorEl.appendChild(text);
+  document.body.appendChild(errorEl);
+  errorTimer = setTimeout(() => {
+    errorEl?.remove();
+    errorEl = null;
+  }, ERROR_MS);
 }
 
 function markSaving() {

@@ -48,7 +48,7 @@ async function applyAll(bundle) {
     apiPost("/api/relationships", Array.isArray(bundle.relationships) ? bundle.relationships : []),
     apiPost("/api/factions", Array.isArray(bundle.factions) ? bundle.factions : []),
     apiPost("/api/timeline", Array.isArray(bundle.timeline) ? bundle.timeline : []),
-    apiPost("/api/board", bundle.board && Array.isArray(bundle.board.columns) ? bundle.board : EMPTY_BOARD),
+    apiPost("/api/board", bundle.board && (Array.isArray(bundle.board.boards) || Array.isArray(bundle.board.columns)) ? bundle.board : EMPTY_BOARD),
     apiPost("/api/map", bundle.map && typeof bundle.map.maps === "object" ? bundle.map : EMPTY_MAP),
     apiPost("/api/manuscript", bundle.manuscript && Array.isArray(bundle.manuscript.chapters) ? bundle.manuscript : EMPTY_MANUSCRIPT),
     apiPost("/api/plot", bundle.plot && Array.isArray(bundle.plot.nodes) ? bundle.plot : EMPTY_PLOT),
