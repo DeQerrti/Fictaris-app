@@ -20,6 +20,7 @@ export function initEntityModal(modules) {
 
 let modalEl = null;
 let onCloseCb = null;
+let current = null; // { render, body, focusId } — для refreshEntityModal
 
 function onEscape(e) {
   if (e.key === "Escape") closeEntityModal();
@@ -28,6 +29,7 @@ function onEscape(e) {
 export function closeEntityModal() {
   modalEl?.remove();
   modalEl = null;
+  current = null;
   document.removeEventListener("keydown", onEscape);
   const cb = onCloseCb;
   onCloseCb = null;
@@ -68,5 +70,17 @@ export async function openEntityModal(moduleName, focusId, options = {}) {
   modalEl = backdrop;
   document.addEventListener("keydown", onEscape);
 
+  current = { render, body, focusId };
   await render(body, focusId);
+}
+
+// Файлы проекта изменились снаружи (external-changes.js) — модалка
+// перерисовывается на месте, не закрываясь.
+export async function refreshEntityModal() {
+  if (!current) return;
+  const { render, body, focusId } = current;
+  const scroll = body.scrollTop;
+  body.innerHTML = "";
+  await render(body, focusId);
+  body.scrollTop = scroll;
 }

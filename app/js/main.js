@@ -27,7 +27,8 @@ import { initShortcuts, loadShortcuts } from "./shortcuts.js";
 import { initSidebar } from "./sidebar.js";
 import { maybeShowOnboarding } from "./onboarding.js";
 import { loadLang, i18n } from "./i18n.js";
-import { initEntityModal, openEntityModal } from "./entity-modal.js";
+import { initEntityModal, openEntityModal, refreshEntityModal } from "./entity-modal.js";
+import { initExternalChanges } from "./external-changes.js";
 import { recordRecent } from "./recent-nav.js";
 
 const MODULES = {
@@ -162,6 +163,22 @@ async function refreshTrashBadge() {
   trashBadge.textContent = n > 0 ? String(n) : "";
 }
 document.addEventListener("fictaris:trash-changed", refreshTrashBadge);
+
+// Файлы проекта поправили снаружи (external-changes.js) — открытый
+// раздел перечитывает данные тем же рендером. Без arg: тот ведёт к
+// карточке, с которой раздел когда-то открыли, а не к той, что открыта
+// сейчас; глава рукописи и так помнится в manuscript.json. Прокрутку
+// возвращаем руками — иначе каждая внешняя правка кидала бы наверх.
+async function reloadAfterExternalChange() {
+  if (currentModuleName) {
+    const scroll = content.scrollTop;
+    await openModule(currentModuleName);
+    content.scrollTop = scroll;
+  }
+  refreshEntityModal();
+  refreshTrashBadge();
+}
+initExternalChanges(reloadAfterExternalChange);
 
 async function boot() {
   await loadLang(); // до всего остального — applyLabels и любой другой i18n() ниже должны видеть уже загруженный язык

@@ -14,6 +14,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Vault } from "./vault.js";
+import { watchVault } from "./watcher.js";
 import { registerAppScheme, registerAppProtocol, appUrl } from "./protocol.js";
 import { ROUTES, ApiError } from "../core/api.js";
 import { findUpdate, openDownload } from "./update.js";
@@ -91,9 +92,17 @@ async function askForVault() {
   return canceled ? null : filePaths[0];
 }
 
+let stopWatching = () => {};
+
 async function useVault(root) {
+  stopWatching();
   vault = new Vault(root);
   await vault.ensure();
+  // Правки файлов проекта снаружи (редактор, Claude) — страница сама
+  // решает, перечитать открытый раздел или спросить (app/js/external-changes.js).
+  stopWatching = watchVault(vault, (files) => {
+    if (win && !win.webContents.isDestroyed()) win.webContents.send("vault-changed", { files });
+  });
 }
 
 // ── Экспорт мира в PDF (app/js/export-pdf.js) ────

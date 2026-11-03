@@ -774,4 +774,10 @@ export const EN_DICT = {
   "Мир": "World",
   "Инструменты": "Tools",
   "Новая группа": "New group",
+  "Обновлено с диска: {files}": "Reloaded from disk: {files}",
+  "Загрузить с диска": "Load from disk",
+  "Несохранённые правки в приложении будут отброшены": "Unsaved edits in the app will be discarded",
+  "Оставить мои": "Keep mine",
+  "Версия с диска останется в истории файла": "The version on disk will stay in the file history",
+  "Файлы проекта изменены вне Fictaris ({files}), а здесь есть несохранённые правки.": "Project files were changed outside Fictaris ({files}), and there are unsaved edits here.",
 };

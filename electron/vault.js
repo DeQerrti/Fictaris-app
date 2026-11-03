@@ -18,6 +18,10 @@ let writeCounter = 0;
 export class Vault {
   constructor(root) {
     this.root = root;
+    // Последнее содержимое каждого файла, которое приложение само видело
+    // на диске: своя запись или уже показанная внешняя правка. По нему
+    // electron/watcher.js отличает чужие правки от эха собственных.
+    this.known = new Map();
   }
 
   file(name) {
@@ -55,6 +59,7 @@ export class Vault {
     const tmp = `${target}.${process.pid}.${Date.now().toString(36)}${(writeCounter++).toString(36)}.tmp`;
     try {
       await fs.writeFile(tmp, body, "utf8");
+      this.known.set(name, body);
       await fs.rename(tmp, target);
     } catch (e) {
       await fs.rm(tmp, { force: true });

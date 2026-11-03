@@ -22,4 +22,7 @@ const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("fictaris", {
   invoke: (method, path, body) => ipcRenderer.invoke("api", { method, path, body }),
+  // Единственный путь в обратную сторону — main сообщает, что файлы
+  // проекта изменились снаружи (electron/watcher.js).
+  onVaultChanged: (cb) => ipcRenderer.on("vault-changed", (_event, data) => cb(data)),
 });
