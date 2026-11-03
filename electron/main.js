@@ -98,6 +98,10 @@ async function useVault(root) {
   stopWatching();
   vault = new Vault(root);
   await vault.ensure();
+  await fs
+    .readFile(path.join(HERE, "vault-guide.md"), "utf8")
+    .then((text) => vault.ensureGuide(text))
+    .catch(() => {}); // без описания формата проект всё равно работает
   // Правки файлов проекта снаружи (редактор, Claude) — страница сама
   // решает, перечитать открытый раздел или спросить (app/js/external-changes.js).
   stopWatching = watchVault(vault, (files) => {

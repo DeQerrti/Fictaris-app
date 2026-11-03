@@ -13,6 +13,8 @@ import path from "node:path";
 import { isAllowedFile, historyDate } from "../core/files.js";
 
 const HISTORY_LIMIT = 50;
+const GUIDE_FILE = "CLAUDE.md";
+const GUIDE_MARK = /^<!-- fictaris-guide v\d+/;
 let writeCounter = 0;
 
 export class Vault {
@@ -32,6 +34,22 @@ export class Vault {
   async ensure() {
     await fs.mkdir(this.root, { recursive: true });
     await fs.mkdir(path.join(this.root, ".history"), { recursive: true });
+  }
+
+  // Описание формата файлов для того, кто правит проект снаружи (Claude
+  // и другие агенты читают CLAUDE.md в папке сами) — electron/vault-guide.md.
+  // Файл принадлежит приложению, пока в первой строке стоит его метка:
+  // убрал метку — значит, правишь сам, и обновление его больше не трогает.
+  async ensureGuide(text) {
+    const target = path.join(this.root, GUIDE_FILE);
+    let current = null;
+    try {
+      current = await fs.readFile(target, "utf8");
+    } catch (e) {
+      if (e.code !== "ENOENT") return;
+    }
+    if (current !== null && (current === text || !GUIDE_MARK.test(current))) return;
+    await fs.writeFile(target, text, "utf8");
   }
 
   // Отсутствующий файл — не поломка, а первый запуск.
