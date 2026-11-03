@@ -492,12 +492,20 @@ function buildCard(card, colId) {
   notesArea.className = "board-card-notes";
   notesArea.value = card.notes || "";
   notesArea.placeholder = i18n("Пиши здесь свободно – правый клик даёт цвет и связи…");
-  notesArea.rows = 5;
+  notesArea.rows = 2;
+  // Тот же автоподгон, что у заголовка: пустая карточка — две строки, а
+  // не пять пустых, и без ручки изменения размера в углу.
+  function autosizeNotes() {
+    notesArea.style.height = "auto";
+    notesArea.style.height = `${notesArea.scrollHeight}px`;
+  }
   notesArea.addEventListener("input", () => {
     card.notes = notesArea.value;
     persist();
+    autosizeNotes();
   });
   el.appendChild(notesArea);
+  setTimeout(autosizeNotes, 0);
 
   const chipsRow = document.createElement("div");
   chipsRow.className = "board-card-chips";
@@ -521,11 +529,11 @@ function buildCard(card, colId) {
   }
   const linkedLocation = locationById(card.locationId);
   if (linkedLocation) {
-    const [, , , color] = locationTypeInfo(linkedLocation.type);
+    const [, , icon, color] = locationTypeInfo(linkedLocation.type);
     const chip = document.createElement("span");
-    chip.className = "chip";
-    chip.style.background = color;
-    chip.textContent = linkedLocation.name || i18n("Без имени");
+    chip.className = "chip chip-place";
+    chip.style.setProperty("--chip-color", color);
+    chip.innerHTML = `${iconSvg(icon, 11)}${escapeHtml(linkedLocation.name || i18n("Без имени"))}`;
     chipsRow.appendChild(chip);
   }
   const linkedChapter = chapterById(card.chapterId);

@@ -179,7 +179,7 @@ async function buildAppearanceSection() {
 function buildPaletteSection(settings) {
   const wrap = document.createElement("div");
   wrap.style.marginTop = "20px";
-  wrap.innerHTML = `<h4 style="margin:0 0 10px;">${i18n("Палитра")}</h4>`;
+  wrap.innerHTML = `<h4>${i18n("Палитра")}</h4>`;
 
   const custom = { ...(settings.customColors || {}) };
   const grid = document.createElement("div");

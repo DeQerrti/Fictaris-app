@@ -1,6 +1,14 @@
-@import url("https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Newsreader:ital,wght@0,400;0,500;1,400&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=Inter:wght@400;500;600&display=swap");
 
 :root {
+  /* Два семейства на всё приложение: Inter — интерфейс (цифры дат и
+     счётчиков ровняет tabular-nums, отдельный моноширинный не нужен),
+     Newsreader — текст книги и крупные заголовки (глава, имя в
+     редакторе карточки, название приложения). Моноширинный системный —
+     только там, где он по смыслу: клавиши и сравнение версий. */
+  --font-ui: Inter, system-ui, sans-serif;
+  --font-book: Newsreader, Georgia, serif;
+  --font-mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
   --bg: #14110d;
   --panel: #1e1912;
   --panel-alt: #191510;
@@ -8,8 +16,10 @@
   --border: #3a3020;
   --text: #ece0c3;
   --text-dim: #a99977;
-  --text-faint: #7c7157;
-  --placeholder: #5c5240;
+  /* faint — не ниже 4.5:1 на карточках (WCAG AA для текста): им пишутся
+     подзаголовки и счётчики; placeholder бледнее, но читаем. */
+  --text-faint: #9a8d6c;
+  --placeholder: #857959;
   --accent: #c9944a;
   --accent-hover: #dba760;
 
@@ -37,8 +47,8 @@
   --border: #cbb98f;
   --text: #2b2013;
   --text-dim: #5c4d34;
-  --text-faint: #8a7856;
-  --placeholder: #a89878;
+  --text-faint: #6f5f42;
+  --placeholder: #968666;
   --accent: #a4653a;
   --accent-hover: #8f5530;
 }
@@ -117,7 +127,7 @@ html, body {
   height: 100%;
   background: var(--bg);
   color: var(--text);
-  font-family: Inter, system-ui, sans-serif;
+  font-family: var(--font-ui);
   overflow: hidden;
 }
 
@@ -191,7 +201,7 @@ body.focus-mode .sidebar { display: none; }
 }
 
 .brand {
-  font-family: Fraunces, Georgia, serif;
+  font-family: var(--font-book);
   font-weight: 600;
   font-size: 1.25rem;
   color: var(--accent-hover);
@@ -235,8 +245,8 @@ body.focus-mode .sidebar { display: none; }
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   background: none;
   border: none;
   border-radius: 6px;
@@ -249,14 +259,8 @@ body.focus-mode .sidebar { display: none; }
    приложения (все они рисованные SVG/символьные, не системный набор
    эмодзи). Направление меняется по состоянию: вправо — авто-скрытие
    включено (сайдбар можно свернуть), развёрнут на 180° — закреплено. */
-.sidebar-pin::before {
-  content: "›";
-  display: inline-block;
-  font-size: 1.15rem;
-  line-height: 1;
-  transition: transform 0.15s ease;
-}
-.sidebar-pin.pinned::before { transform: rotate(180deg); }
+.sidebar-pin svg { transition: transform 0.15s ease; transform: rotate(45deg); }
+.sidebar-pin.pinned svg { transform: none; }
 .sidebar-pin:hover { background: var(--panel); color: var(--text); }
 .sidebar-pin.pinned { color: var(--accent); }
 
@@ -267,8 +271,8 @@ body.focus-mode .sidebar { display: none; }
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   background: none;
   border: none;
   border-radius: 6px;
@@ -769,7 +773,7 @@ body.focus-mode .sidebar { display: none; }
   width: 92px;
   flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
-  font-family: Inter, sans-serif;
+  font-family: var(--font-ui);
   font-weight: 600;
   font-size: 1.5rem;
   color: #14110d;
@@ -820,7 +824,7 @@ body.focus-mode .sidebar { display: none; }
   border-radius: 8px;
   flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
-  font-family: Inter, sans-serif;
+  font-family: var(--font-ui);
   font-weight: 600;
   font-size: 1.05rem;
   color: #14110d;
@@ -845,6 +849,15 @@ body.focus-mode .sidebar { display: none; }
 }
 
 .entity-card:hover .entity-card-fields { overflow-y: auto; }
+
+/* Не поместившееся — плавно гаснет к низу карточки, а не обрезается
+   посреди строки; при наведении поля прокручиваются целиком (выше), и
+   затухание снимается. */
+.entity-card-fields {
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 36px), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 36px), transparent);
+}
+.entity-card:hover .entity-card-fields { -webkit-mask-image: none; mask-image: none; }
 
 .entity-card-field-label {
   font-size: 0.68rem;
@@ -960,11 +973,8 @@ button.btn.icon-btn.gallery-nav:hover { background: rgba(0, 0, 0, 0.6); }
 }
 .avatar-thumb-add:hover { color: var(--text); border-color: var(--accent); }
 
-/* Интер, не Fraunces — на мелких карточках жирная декоративная засечка
-   резала глаз (Fraunces хорош в заголовках покрупнее — там и остаётся),
-   здесь нужен просто ровный, спокойный текст. */
 .char-name {
-  font-family: Inter, sans-serif;
+  font-family: var(--font-ui);
   font-weight: 600;
   font-size: 0.95rem;
   color: var(--text);
@@ -1111,7 +1121,7 @@ button.btn.icon-btn.gallery-nav:hover { background: rgba(0, 0, 0, 0.6); }
 }
 
 .drawer h2 {
-  font-family: Fraunces, serif;
+  font-family: var(--font-book);
   margin: 0 0 16px;
 }
 
@@ -1123,7 +1133,7 @@ button.btn.icon-btn.gallery-nav:hover { background: rgba(0, 0, 0, 0.6); }
   background: none;
   border: none;
   color: var(--text);
-  font-family: Fraunces, serif;
+  font-family: var(--font-book);
   font-size: 1.3rem;
   font-weight: 600;
   width: 100%;
@@ -1355,7 +1365,7 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
   background: var(--panel-alt);
 }
 
-.stat-tile-value { font-family: "JetBrains Mono", monospace; font-size: 1.5rem; font-weight: 600; color: var(--accent-hover); }
+.stat-tile-value { font-family: var(--font-ui); font-variant-numeric: tabular-nums; font-size: 1.5rem; font-weight: 600; color: var(--accent-hover); }
 .stat-tile-label { color: var(--text-dim); font-size: 0.78rem; margin-top: 2px; }
 
 .stat-bar-list { display: flex; flex-direction: column; gap: 8px; max-width: 640px; }
@@ -1390,7 +1400,7 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
   background: var(--text-faint);
 }
 .streak-bar.hit .streak-bar-fill { background: #5a8a5f; }
-.stat-bar-value { font-family: "JetBrains Mono", monospace; font-size: 0.8rem; color: var(--text-faint); text-align: right; }
+.stat-bar-value { font-family: var(--font-ui); font-variant-numeric: tabular-nums; font-size: 0.8rem; color: var(--text-faint); text-align: right; }
 
 /* ── Первый запуск ─────────────────────────── */
 
@@ -1405,13 +1415,13 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
 
 .onboarding-card h2 {
   margin: 0 0 16px;
-  font-family: Fraunces, Georgia, serif;
+  font-family: var(--font-book);
   font-size: 1.3rem;
   color: var(--accent-hover);
 }
 
 .onboarding-card ul { margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: 10px; color: var(--text-dim); font-size: 0.88rem; line-height: 1.4; }
-.onboarding-card kbd { background: var(--panel-alt); border: 1px solid var(--border); border-radius: 4px; padding: 1px 6px; font-family: "JetBrains Mono", monospace; font-size: 0.8rem; }
+.onboarding-card kbd { background: var(--panel-alt); border: 1px solid var(--border); border-radius: 4px; padding: 1px 6px; font-family: var(--font-mono); font-size: 0.8rem; }
 .onboarding-actions { display: flex; gap: 10px; margin-top: 22px; }
 
 /* ── Оформление ────────────────────────────── */
@@ -1665,7 +1675,7 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
 
 .export-png-btn { margin-left: auto; }
 
-.timeline-toolbar { display: flex; padding: 12px 16px 0; }
+.timeline-toolbar { display: flex; margin-bottom: 12px; }
 
 /* ── Горячие клавиши ───────────────────────── */
 
@@ -1675,7 +1685,7 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
 
 .shortcut-key {
   min-width: 70px;
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 0.78rem;
 }
 
@@ -1724,7 +1734,7 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
 
 .sync-hint { color: var(--text-faint); font-size: 0.78rem; margin: 4px 0 0; }
 .sync-status { margin-top: 10px; color: var(--text-dim); font-size: 0.85rem; min-height: 1.2em; }
-.sync-progress { color: var(--text-faint); font-size: 0.78rem; font-family: "JetBrains Mono", monospace; }
+.sync-progress { color: var(--text-faint); font-size: 0.78rem; font-family: var(--font-ui); font-variant-numeric: tabular-nums; }
 .sync-actions { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
 
 .sync-conflicts { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
@@ -2052,7 +2062,7 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
   background: none;
   border: none;
   color: var(--text);
-  font-family: Fraunces, serif;
+  font-family: var(--font-book);
   font-size: 1.3rem;
   font-weight: 600;
 }
@@ -2060,7 +2070,7 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
 .chapter-title-input:focus { outline: none; }
 
 .word-count {
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-ui); font-variant-numeric: tabular-nums;
   font-size: 0.75rem;
   color: var(--text-faint);
 }
@@ -2070,7 +2080,7 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
   background: none;
   border: none;
   color: var(--text);
-  font-family: Newsreader, Georgia, serif;
+  font-family: var(--font-book);
   font-size: var(--editor-font-size, 17px);
   line-height: 1.7;
   padding: 24px 48px;
@@ -2142,7 +2152,7 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
 
 .snapshot-item { margin-top: 8px; }
 .snapshot-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.snapshot-date { font-family: "JetBrains Mono", monospace; font-size: 0.75rem; color: var(--text-faint); }
+.snapshot-date { font-family: var(--font-ui); font-variant-numeric: tabular-nums; font-size: 0.75rem; color: var(--text-faint); }
 .snapshot-actions { display: flex; gap: 6px; }
 
 /* ── Общее: цветной чип ────────────────────── */
@@ -2155,6 +2165,17 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
   color: #14110d;
   font-weight: 500;
 }
+
+.chip-place {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: 1px solid var(--chip-color);
+  color: var(--text);
+  padding: 1px 7px;
+}
+.chip-place svg { color: var(--chip-color); flex-shrink: 0; }
 
 /* ── Таймлайн ──────────────────────────────── */
 
@@ -2189,6 +2210,17 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
 
 .filter-chip:hover { border-color: var(--chip-color, var(--accent)); }
 
+.filter-chip svg { flex-shrink: 0; }
+.filter-chip:has(svg) { display: inline-flex; align-items: center; gap: 4px; }
+
+.timeline-filter-label {
+  font-size: 0.68rem;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  min-width: 76px;
+}
+
 .filter-chip.active {
   background: var(--chip-color, var(--accent));
   border-color: var(--chip-color, var(--accent));
@@ -2196,7 +2228,7 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
 }
 
 .filter-count {
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-ui); font-variant-numeric: tabular-nums;
   font-size: 0.72rem;
   color: var(--text-faint);
 }
@@ -2269,7 +2301,7 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
   display: flex;
   flex-direction: column;
   gap: 10px;
-  max-width: 680px;
+  max-width: 960px;
 }
 
 .timeline-item {
@@ -2285,18 +2317,29 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
 .timeline-item.active { background: var(--panel); }
 
 .timeline-date {
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-ui); font-variant-numeric: tabular-nums;
   font-size: 0.72rem;
   color: var(--text-faint);
 }
 
 .timeline-title {
-  font-family: Fraunces, serif;
+  font-family: var(--font-ui);
   font-weight: 600;
   margin-top: 2px;
 }
 
 .timeline-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+
+.timeline-desc {
+  margin-top: 4px;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: var(--text-dim);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
 
 /* ── Доска ─────────────────────────────────── */
 
@@ -2413,10 +2456,11 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
 
 .board-column-title {
   flex: 1;
+  min-width: 0;
   background: none;
   border: none;
   color: var(--text);
-  font-family: Fraunces, serif;
+  font-family: var(--font-ui);
   font-weight: 600;
   font-size: 0.95rem;
 }
@@ -2427,15 +2471,18 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  min-width: 28px;
+  min-height: 28px;
   background: none;
   border: none;
+  border-radius: 6px;
   color: var(--text-faint);
   cursor: pointer;
   font-size: 0.72rem;
-  padding: 2px 6px;
+  padding: 0 6px;
 }
 
-.board-column-del:hover, .board-card-del:hover { color: var(--color-3); }
+.board-column-del:hover, .board-card-del:hover { color: var(--color-3); background: var(--panel-alt); }
 
 .board-card-list {
   display: flex;
@@ -2445,12 +2492,31 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
 }
 
 .board-card {
+  position: relative;
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 8px 10px;
   cursor: grab;
 }
+
+/* Удаление карточки — в углу и только по наведению: в потоке под
+   чипами крестик читался как «убрать чип», а не «удалить карточку». */
+.board-card .board-card-del {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 6px;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.board-card:hover .board-card-del,
+.board-card .board-card-del:focus-visible { opacity: 1; }
+.board-card .board-card-del:hover { background: var(--panel-alt); }
+.board-card-title { padding-right: 22px; }
 
 .board-card:hover { border-color: var(--accent); }
 
@@ -2478,11 +2544,15 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
   font-family: inherit;
   font-size: 0.8rem;
   line-height: 1.4;
-  resize: vertical;
+  resize: none;
+  overflow: hidden;
   min-height: 2.6em;
 }
 
 .board-card-notes::placeholder { color: var(--placeholder); }
+/* Подсказка про правый клик — одна и та же в каждой пустой карточке;
+   видна, только когда к карточке тянутся мышью или пишут в ней. */
+.board-card:not(:hover) .board-card-notes:not(:focus)::placeholder { color: transparent; }
 .board-card-notes:focus { outline: none; background: var(--panel-alt); border-radius: 4px; }
 
 .add-column {
@@ -2525,7 +2595,7 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
   background: none;
   border: none;
   color: var(--text-faint);
-  font-family: Fraunces, serif;
+  font-family: var(--font-ui);
   font-size: 0.95rem;
   cursor: pointer;
   padding: 2px 4px;
@@ -2540,7 +2610,7 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
   border: 1px solid var(--accent);
   border-radius: 4px;
   color: var(--text);
-  font-family: Fraunces, serif;
+  font-family: var(--font-ui);
   font-size: 0.95rem;
   padding: 2px 6px;
 }
@@ -2692,13 +2762,13 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: Fraunces, serif;
+  font-family: var(--font-ui);
   font-weight: 600;
   color: #14110d;
 }
 
 .mention-preview-name {
-  font-family: Fraunces, serif;
+  font-family: var(--font-ui);
   font-weight: 600;
   font-size: 0.9rem;
 }
@@ -2711,7 +2781,7 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
 /* ── Корзина ───────────────────────────────── */
 
 .trash-badge {
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-ui); font-variant-numeric: tabular-nums;
   font-size: 0.7rem;
   color: var(--accent-hover);
 }
@@ -2749,7 +2819,7 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
 
 .trash-date {
   color: var(--text-faint);
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-ui); font-variant-numeric: tabular-nums;
   font-size: 0.72rem;
 }
 
@@ -2822,9 +2892,19 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
 }
 
 .data-section h3 {
-  font-family: Fraunces, serif;
+  font-family: var(--font-ui);
+  font-weight: 600;
   margin: 0 0 6px;
   font-size: 1.05rem;
+}
+
+/* Подраздел внутри секции (например «Палитра» под «Оформлением») — тем
+   же шрифтом и весом, на ступень мельче. */
+.data-section h4 {
+  font-family: var(--font-ui);
+  font-weight: 600;
+  font-size: 0.92rem;
+  margin: 0 0 10px;
 }
 
 .data-section p {
@@ -2874,7 +2954,7 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
   background: var(--panel-alt);
   border-radius: 6px;
   padding: 6px 10px;
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-ui); font-variant-numeric: tabular-nums;
   font-size: 0.78rem;
   color: var(--text-dim);
 }
@@ -2895,7 +2975,7 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
   margin: 0;
   max-height: 360px;
   overflow: auto;
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 0.76rem;
   white-space: pre-wrap;
   word-break: break-all;
@@ -2969,7 +3049,7 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
 
 .rel-sliders { display: flex; align-items: center; gap: 10px; }
 .rel-score-label {
-  font-family: "JetBrains Mono", monospace;
+  font-family: var(--font-ui); font-variant-numeric: tabular-nums;
   font-size: 0.75rem;
   color: var(--text-faint);
   width: 36px;
@@ -3052,7 +3132,7 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
 
 .ftree-card { display: flex; flex-direction: column; gap: 8px; }
 .ftree-card-title {
-  font-family: Fraunces, serif;
+  font-family: var(--font-ui);
   font-size: 0.95rem;
   color: var(--text-dim);
 }
@@ -3071,7 +3151,7 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: Inter, sans-serif;
+  font-family: var(--font-ui);
   font-weight: 600;
   font-size: 1rem;
   color: #14110d;
@@ -3101,7 +3181,7 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
   border: none;
   border-bottom: 1px solid var(--border);
   color: var(--text);
-  font-family: Fraunces, serif;
+  font-family: var(--font-ui);
   font-size: 1rem;
   padding: 4px 2px;
   min-width: 160px;

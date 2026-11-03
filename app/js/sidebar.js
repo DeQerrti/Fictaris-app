@@ -60,6 +60,9 @@ export function initSidebar() {
 
   document.documentElement.style.setProperty("--sidebar-width", `${readWidth()}px`);
 
+  // Булавка, а не вторая стрелка: рядом уже стоит стрелка «свернуть до
+  // иконок», и две одинаковые ‹ ‹ было не различить.
+  if (pinBtn) pinBtn.innerHTML = iconSvg("pushpin", 14);
   let pinned = readPinned();
   function applyPinned() {
     appEl.classList.toggle("sidebar-autohide", !pinned);

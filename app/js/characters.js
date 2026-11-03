@@ -154,7 +154,10 @@ function draw() {
   const dragState = { current: null };
   for (const c of characters) {
     const template = templateFor(templates, c.templateId);
-    const fields = (template?.fields || []).map((f) => ({ label: f.label, value: c[f.key] }));
+    // Роль уже стоит подзаголовком под именем — второй раз в полях не нужна.
+    const fields = (template?.fields || [])
+      .filter((f) => f.key !== "role")
+      .map((f) => ({ label: f.label, value: c[f.key] }));
     const card = document.createElement("button");
     card.className = "entity-card";
     card.innerHTML = `

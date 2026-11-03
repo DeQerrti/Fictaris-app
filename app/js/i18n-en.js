@@ -813,4 +813,5 @@ export const EN_DICT = {
   "Закрепить меню": "Pin the menu",
   "Настройки": "Settings",
   "Статус последнего сохранения на диск в папке проекта – «Сохранено» значит, что все изменения уже записаны в файлы": "Status of the last save to the project folder – “Saved” means all changes are already written to files",
+  "Места": "Places",
 };

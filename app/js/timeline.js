@@ -1,7 +1,7 @@
 import { apiGet, apiPost, uid } from "./api.js";
 import { debounceSave } from "./save-badge.js";
 import { escapeHtml, buildToggleGroup, buildEmptyState } from "./chips.js";
-import { locationTypeInfo } from "./icons.js";
+import { locationTypeInfo, iconSvg } from "./icons.js";
 import { attachMentionAutocomplete, attachMentionContextMenu } from "./mentions.js";
 import { pushTrash } from "./trash.js";
 import { buildExportPngButton } from "./png-export.js";
@@ -100,9 +100,19 @@ function draw() {
 function buildFilterBar() {
   const wrap = document.createElement("div");
 
+  // Подпись слева от ряда — без неё два ряда цветных фишек над списком
+  // не читались как фильтры.
+  const filterLabel = (text) => {
+    const label = document.createElement("span");
+    label.className = "timeline-filter-label";
+    label.textContent = text;
+    return label;
+  };
+
   if (characters.length) {
     const bar = document.createElement("div");
     bar.className = "timeline-filter-bar";
+    bar.appendChild(filterLabel(i18n("Персонажи")));
     for (const c of characters) {
       const chip = document.createElement("button");
       chip.className = "filter-chip" + (filterCharIds.has(c.id) ? " active" : "");
@@ -121,11 +131,13 @@ function buildFilterBar() {
   if (locations.length) {
     const bar = document.createElement("div");
     bar.className = "timeline-filter-bar";
+    bar.appendChild(filterLabel(i18n("Места")));
     for (const l of locations) {
+      const [, , icon, color] = locationTypeInfo(l.type);
       const chip = document.createElement("button");
       chip.className = "filter-chip" + (filterLocIds.has(l.id) ? " active" : "");
-      chip.style.setProperty("--chip-color", locationTypeInfo(l.type)[3]);
-      chip.textContent = l.name;
+      chip.style.setProperty("--chip-color", color);
+      chip.innerHTML = `${iconSvg(icon, 11)}<span>${escapeHtml(l.name)}</span>`;
       chip.addEventListener("click", () => {
         if (filterLocIds.has(l.id)) filterLocIds.delete(l.id);
         else filterLocIds.add(l.id);
@@ -248,14 +260,18 @@ function buildList() {
       ...(ev.characterIds || []).map((id) => charById(id)).filter(Boolean).map((c) =>
         `<span class="chip" style="background:${c.color || "#7c7157"}">${escapeHtml(c.name)}</span>`
       ),
-      ...(ev.locationIds || []).map((id) => locById(id)).filter(Boolean).map((l) =>
-        `<span class="chip" style="background:${locationTypeInfo(l.type)[3]}">${escapeHtml(l.name)}</span>`
-      ),
+      // Места — контурные, со значком типа: сплошной цветной фишкой они не
+      // отличались от персонажей.
+      ...(ev.locationIds || []).map((id) => locById(id)).filter(Boolean).map((l) => {
+        const [, , icon, color] = locationTypeInfo(l.type);
+        return `<span class="chip chip-place" style="--chip-color:${color}">${iconSvg(icon, 11)}${escapeHtml(l.name)}</span>`;
+      }),
     ].join("");
 
     item.innerHTML = `
       <div class="timeline-date">${escapeHtml(ev.date || "–")}</div>
       <div class="timeline-title">${escapeHtml(ev.title || i18n("Без названия"))}</div>
+      ${ev.description ? `<div class="timeline-desc">${escapeHtml(ev.description)}</div>` : ""}
       <div class="timeline-chips">${chips}</div>
     `;
 
