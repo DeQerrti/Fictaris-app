@@ -3,7 +3,7 @@ import { debounceSave } from "./save-badge.js";
 import { escapeHtml, buildEmptyState } from "./chips.js";
 import { openContextMenu, openPopover, closeMenu } from "./context-menu.js";
 import { iconSvg } from "./icons.js";
-import { i18n } from "./i18n.js";
+import { i18n, i18nPlural } from "./i18n.js";
 
 // ══════════════════════════════════════════════
 //  ХОЛСТ
@@ -170,7 +170,7 @@ function buildHome() {
       <div class="map-card-thumb canvas-card-thumb">${canvasThumbSvg(cv) || iconSvg("frame", 30)}</div>
       <div class="map-card-footer">
         <div class="char-name">${escapeHtml(cv.name || i18n("Без названия"))}</div>
-        <div class="char-role">${i18n("{n} карточек", { n: (cv.cards || []).length })}</div>
+        <div class="char-role">${i18nPlural((cv.cards || []).length, ["{n} карточка", "{n} карточки", "{n} карточек"])}</div>
       </div>
     `;
     open.addEventListener("click", () => {

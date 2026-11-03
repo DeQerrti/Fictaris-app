@@ -5,7 +5,7 @@ import { exportWorldPdf } from "./export-pdf.js";
 import { diffLines, collapseContext } from "./diff.js";
 import { iconSvg } from "./icons.js";
 import { openPopover, closeMenu } from "./context-menu.js";
-import { i18n } from "./i18n.js";
+import { i18n, i18nPlural } from "./i18n.js";
 
 const SCHEMA_VERSION = 1;
 const EMPTY_MANUSCRIPT = { chapters: [], activeChapterId: null };
@@ -253,7 +253,7 @@ async function buildDiffPanel(file, version) {
     const line = document.createElement("div");
     if (r.type === "gap") {
       line.className = "diff-line diff-gap";
-      line.textContent = i18n("… ещё {count} неизменных строк …", { count: r.count });
+      line.textContent = i18nPlural(r.count, ["… ещё {count} неизменная строка …", "… ещё {count} неизменные строки …", "… ещё {count} неизменных строк …"], {}, "count");
     } else {
       line.className = "diff-line diff-" + r.type;
       line.textContent = (r.type === "add" ? "+ " : r.type === "del" ? "- " : "  ") + r.text;

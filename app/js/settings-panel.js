@@ -1,6 +1,6 @@
 import { apiGet, apiPost } from "./api.js";
 import { buildDataSections } from "./data-panel.js";
-import { i18n, currentLang, setLang } from "./i18n.js";
+import { i18n, currentLang, setLang, i18nPlural } from "./i18n.js";
 import { THEME_PRESETS, CUSTOM_COLOR_TOKENS, saveTheme } from "./theme.js";
 import { escapeHtml } from "./chips.js";
 import { iconSvg } from "./icons.js";
@@ -1434,9 +1434,11 @@ async function startSync(config, btn, status, progress, conflictsBox) {
     }
 
     if (result.conflicts.length) {
-      status.textContent = i18n("Готово, но {n} файл(ов) изменились и здесь, и в репозитории – выбери, что оставить.", {
-        n: result.conflicts.length,
-      });
+      status.textContent = i18nPlural(result.conflicts.length, [
+        "Готово, но {n} файл изменился и здесь, и в репозитории – выбери, что оставить.",
+        "Готово, но {n} файла изменились и здесь, и в репозитории – выбери, что оставить.",
+        "Готово, но {n} файлов изменились и здесь, и в репозитории – выбери, что оставить.",
+      ]);
       renderConflicts(conflictsBox, config, result.conflicts);
     } else {
       status.textContent = i18n("Готово: отправлено {pushed}, забрано {pulled}, без изменений {skipped}.", result);

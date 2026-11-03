@@ -1764,10 +1764,32 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
 
 .update-banner-actions { display: flex; gap: 8px; flex-shrink: 0; }
 
-/* Правка файлов проекта снаружи (app/js/external-changes.js) — та же
-   полоска снизу, но поверх модалки карточки: конфликт решается и
-   оттуда, не закрывая её. */
-.external-change-banner { z-index: 16000; }
+/* Правка файлов проекта снаружи (app/js/external-changes.js) и отказ
+   автосохранения (save-badge.js) — уведомление в углу, а не полоска во
+   всю ширину: та закрывала низ сайдбара. Поверх модалки карточки —
+   конфликт решается и оттуда, не закрывая её. */
+.external-change-banner {
+  z-index: 16000;
+  left: auto;
+  right: 20px;
+  bottom: 20px;
+  max-width: 420px;
+  flex-wrap: wrap;
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+  animation: external-change-in 0.18s ease-out;
+}
+.external-change-banner .update-banner-actions { margin-left: auto; }
+
+@keyframes external-change-in {
+  from { opacity: 0; transform: translateY(8px); }
+}
+
+@media (max-width: 600px) {
+  .external-change-banner { left: 12px; right: 12px; bottom: 12px; max-width: none; }
+}
 
 /* Обновление готово — модалка по центру поверх всего окна, а не просто
    полоска: перезапуск подменяет файлы приложения на диске, так что
@@ -2198,7 +2220,7 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
    реордера списка ниже), с минимальным отступом между соседями, поэтому
    ширина трека шире контейнера чаще, чем нет – сам wrap скроллится по
    горизонтали, а не сжимает точки друг в друга. */
-.timeline-scale-wrap { overflow-x: auto; overflow-y: hidden; padding-bottom: 4px; margin-bottom: 20px; }
+.timeline-scale-wrap { flex-shrink: 0; overflow-x: auto; overflow-y: hidden; padding-bottom: 4px; margin-bottom: 20px; }
 
 .timeline-scale-track { position: relative; height: 56px; }
 

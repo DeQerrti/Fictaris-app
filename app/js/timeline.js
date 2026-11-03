@@ -6,7 +6,7 @@ import { attachMentionAutocomplete, attachMentionContextMenu } from "./mentions.
 import { pushTrash } from "./trash.js";
 import { buildExportPngButton } from "./png-export.js";
 import { loadCalendar, absoluteDay, formatDate } from "./calendar.js";
-import { i18n } from "./i18n.js";
+import { i18n, i18nPlural } from "./i18n.js";
 
 let events = [];
 let characters = [];
@@ -139,7 +139,7 @@ function buildFilterBar() {
   if (filterCharIds.size || filterLocIds.size) {
     const count = document.createElement("div");
     count.className = "filter-count";
-    count.textContent = i18n("{shown} из {total} событий", { shown: visibleEvents().length, total: events.length });
+    count.textContent = i18nPlural(events.length, ["{shown} из {total} события", "{shown} из {total} событий", "{shown} из {total} событий"], { shown: visibleEvents().length }, "total");
     wrap.appendChild(count);
   }
 
@@ -154,6 +154,10 @@ function buildFilterBar() {
 // с минимальным отступом между соседями, чтобы кучка событий в одну дату
 // не схлопнулась в одну точку с нечитаемой подписью.
 const SCALE_MIN_GAP = 84;
+// Подпись шириной SCALE_MIN_GAP центрируется на точке — крайним точкам
+// нужен отступ хотя бы в половину подписи, иначе её начало у первого
+// события уезжало за левый край шкалы.
+const SCALE_EDGE = SCALE_MIN_GAP / 2 + 6;
 
 function computeScalePositions(items) {
   const orders = items.map((e) => e.order);
@@ -175,7 +179,7 @@ function buildScale() {
   if (items.length < 2) return null;
 
   const positions = computeScalePositions(items);
-  const trackWidth = positions[positions.length - 1] + 48;
+  const trackWidth = positions[positions.length - 1] + SCALE_EDGE * 2;
 
   const wrap = document.createElement("div");
   wrap.className = "timeline-scale-wrap";
@@ -191,7 +195,7 @@ function buildScale() {
     const point = document.createElement("button");
     point.type = "button";
     point.className = "timeline-scale-point" + (ev.id === activeId ? " active" : "");
-    point.style.left = `${positions[i] + 24}px`;
+    point.style.left = `${positions[i] + SCALE_EDGE}px`;
     point.title = ev.date ? `${ev.date} – ${ev.title || i18n("Без названия")}` : ev.title || i18n("Без названия");
     point.innerHTML = `
       <span class="timeline-scale-dot"></span>

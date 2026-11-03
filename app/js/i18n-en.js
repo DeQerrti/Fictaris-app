@@ -70,7 +70,7 @@ export const EN_DICT = {
   "таймлайн": "timeline",
   "доска": "board",
   "карта": "map",
-  "{shown} из {total} событий": "{shown} of {total} events",
+  "{shown} из {total} событий": "{shown} of {total} event|{shown} of {total} events",
   "Нет событий с таким фильтром.": "No events match this filter.",
   "Событий пока нет – добавь первое.": "No events yet – add the first one.",
   "+ Событие": "+ Event",
@@ -111,7 +111,7 @@ export const EN_DICT = {
 
   // ── Карта (map.js) ──
   "Карт пока нет – загрузи изображение, чтобы создать первую.": "No maps yet – upload an image to create the first one.",
-  "{n} меток": "{n} pins",
+  "{n} меток": "{n} pin|{n} pins",
   "Удалить карту со всеми вложенными под-картами": "Delete map along with all nested sub-maps",
   "Удалит карту со всем вложенным. Точно?": "This will delete the map with everything nested inside. Sure?",
   "+ Новая карта": "+ New map",
@@ -183,7 +183,7 @@ export const EN_DICT = {
   "Фокус-режим – скрыть сайдбар и список глав": "Focus mode – hide the sidebar and chapter list",
   "Снимок": "Snapshot",
   "Сохранить текущий текст как снимок версии (до 20 на главу)": "Save the current text as a version snapshot (up to 20 per chapter)",
-  "{count} слов": "{count} words",
+  "{count} слов": "{count} word|{count} words",
   "Глава пуста.": "The chapter is empty.",
   "Пиши здесь… @имя вставит упоминание персонажа, @[Имя|нужный падеж] – если по тексту не «Надя», а «Наде»":
     "Write here… @name inserts a character mention, @[Name|display text] – for a different grammatical form in the sentence",
@@ -482,8 +482,8 @@ export const EN_DICT = {
   "ещё не было": "never yet",
   "Подключено к": "Connected to",
   "Последняя синхронизация: {when}.": "Last sync: {when}.",
-  "Готово, но {n} файл(ов) изменились и здесь, и в репозитории – выбери, что оставить.":
-    "Done, but {n} file(s) changed both here and in the repository – pick what to keep.",
+  "Готово, но {n} файлов изменились и здесь, и в репозитории – выбери, что оставить.":
+    "Done, but {n} file changed both here and in the repository – pick what to keep.|Done, but {n} files changed both here and in the repository – pick what to keep.",
   "Готово: отправлено {pushed}, забрано {pulled}, без изменений {skipped}.":
     "Done: pushed {pushed}, pulled {pulled}, unchanged {skipped}.",
 
@@ -546,7 +546,7 @@ export const EN_DICT = {
   "Файл слишком большой для построчного сравнения – воспользуйся «Восстановить», если нужно вернуть именно эту версию.":
     "This file is too large to diff line by line – use \"Restore\" if you need to bring back exactly this version.",
   "Между этой версией и текущим состоянием нет отличий.": "There's no difference between this version and the current state.",
-  "… ещё {count} неизменных строк …": "… {count} more unchanged lines …",
+  "… ещё {count} неизменных строк …": "… {count} more unchanged line …|… {count} more unchanged lines …",
 
   "пунктир – найдено по «@упоминанию» в тексте, не задано вручную": "dashed – found via an \"@mention\" in text, not set by hand",
 
@@ -658,7 +658,7 @@ export const EN_DICT = {
   "Новый холст": "New canvas",
   "Холстов пока нет – создай первый для свободных заметок, схем или сюжетных точек, не привязанных к конкретным персонажам или локациям.":
     "No canvases yet – create the first one for free-form notes, diagrams, or plot points not tied to specific characters or locations.",
-  "{n} карточек": "{n} cards",
+  "{n} карточек": "{n} card|{n} cards",
   "Удалить холст": "Delete canvas",
   "Точно удалить холст со всеми карточками?": "Delete the canvas with all its cards for good?",
   "+ Новый холст": "+ New canvas",

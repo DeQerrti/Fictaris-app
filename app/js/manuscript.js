@@ -11,7 +11,7 @@ import { iconSvg } from "./icons.js";
 import { applyInlineMarkupHtml } from "./text-format.js";
 import { recordToday } from "./writing-goal.js";
 import { openEntityModal } from "./entity-modal.js";
-import { i18n } from "./i18n.js";
+import { i18n, i18nPlural } from "./i18n.js";
 
 // Список статусов — настраиваемый (chapter-status.js; править —
 // "Статус" → "Управлять статусами…" по ПКМ на главе/папке), общий для
@@ -901,7 +901,7 @@ function buildEditor() {
   // по папке, как можно было подумать глядя на неё здесь.
   const wc = document.createElement("div");
   wc.className = "word-count";
-  wc.textContent = i18n("{count} слов", { count: wordCount(chapter.content) });
+  wc.textContent = i18nPlural(wordCount(chapter.content), ["{count} слово", "{count} слова", "{count} слов"], {}, "count");
   header.appendChild(wc);
 
   // Статус — уже переехал в ПКМ по главе в списке слева (chapter-list),
@@ -986,7 +986,7 @@ function buildEditor() {
     textarea.placeholder = i18n("Пиши здесь… @имя вставит упоминание персонажа, @[Имя|нужный падеж] – если по тексту не «Надя», а «Наде»");
     textarea.addEventListener("input", () => {
       chapter.content = textarea.value;
-      wc.textContent = i18n("{count} слов", { count: wordCount(chapter.content) });
+      wc.textContent = i18nPlural(wordCount(chapter.content), ["{count} слово", "{count} слова", "{count} слов"], {}, "count");
       persist();
     });
     wrap.appendChild(textarea);

@@ -4,7 +4,7 @@ import { characterSelect, escapeHtml, buildEmptyState } from "./chips.js";
 import { locationTypeInfo, iconSvg } from "./icons.js";
 import { compressImage } from "./image-compress.js";
 import { buildExportPngButton } from "./png-export.js";
-import { i18n } from "./i18n.js";
+import { i18n, i18nPlural } from "./i18n.js";
 
 let map = { rootIds: [], maps: {} };
 let characters = [];
@@ -117,7 +117,7 @@ function buildMapsHome() {
       </div>
       <div class="map-card-footer">
         <div class="char-name">${escapeHtml(m.name || i18n("Без названия"))}</div>
-        <div class="char-role">${i18n("{n} меток", { n: (m.pins || []).length })}</div>
+        <div class="char-role">${i18nPlural((m.pins || []).length, ["{n} метка", "{n} метки", "{n} меток"])}</div>
       </div>
     `;
     open.addEventListener("click", () => {

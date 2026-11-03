@@ -33,6 +33,25 @@ export function i18n(ru, vars) {
   return text;
 }
 
+// Строка с числом, которое требует согласования: «1 метка, 3 метки,
+// 5 меток, 21 метка, 11 меток». forms — три русские формы [одна,
+// несколько, много]; ключ словаря — форма «много» (как и раньше у этих
+// строк), а английский перевод — «один|много»: "{n} pin|{n} pins".
+// Число подставляется в vars под ключом countKey.
+export function i18nPlural(n, forms, vars = {}, countKey = "n") {
+  const all = { ...vars, [countKey]: n };
+  if (lang === "en" && EN_DICT[forms[2]]) {
+    const [one, other = one] = EN_DICT[forms[2]].split("|");
+    return i18n(n === 1 ? one : other, all);
+  }
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  const form = mod10 === 1 && mod100 !== 11 ? 0 : mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14) ? 1 : 2;
+  let text = forms[form];
+  for (const [key, value] of Object.entries(all)) text = text.split(`{${key}}`).join(value);
+  return text;
+}
+
 export async function loadLang() {
   const settings = await apiGet("/api/site-settings").catch(() => ({}));
   lang = settings.lang === "en" ? "en" : "ru";
