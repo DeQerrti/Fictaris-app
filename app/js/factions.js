@@ -1,22 +1,53 @@
 import { apiGet, apiPost, uid } from "./api.js";
 import { debounceSave } from "./save-badge.js";
-import { escapeHtml, characterSelect, buildToggleGroup, buildEmptyState, buildCardFieldsHtml, reorderById, attachCardDrag } from "./chips.js";
-import { FACTION_TYPES, factionTypeInfo, iconSvg } from "./icons.js";
+import { escapeHtml, characterSelect, buildEmptyState } from "./chips.js";
+import { FACTION_TYPES, factionTypeInfo, locationTypeInfo, iconSvg } from "./icons.js";
 import { pushTrash } from "./trash.js";
-import { loadTagsMap, buildTagsField } from "./tags.js";
+import { loadTagsMap, buildTagsField, parseTags } from "./tags.js";
 import { avatarInnerHtml, buildAvatarsField } from "./avatars.js";
-import { loadTemplates, saveTemplates, templateFor, buildFieldHint } from "./templates.js";
+import { loadTemplates, saveTemplates, templateFor } from "./templates.js";
 import { chooseTemplate } from "./template-choice.js";
 import { openTemplateEditorModal } from "./template-editor-modal.js";
-import { i18n } from "./i18n.js";
+import { closeEntityModal } from "./entity-modal.js";
+import { i18n, i18nPlural } from "./i18n.js";
+import {
+  readPref, writePref, buildEntityToolbar, buildOverviewSection, buildDossierList, buildDossierSplit,
+  updateListRow, sectionHeading, buildNone, buildFact, buildFactText, buildSelect, buildNameInput, buildTemplateFields,
+  buildLinkRow, iconLead, buildEventRow, openEntity, shortName, personAvatarHtml,
+} from "./entity-view.js";
+
+// ══════════════════════════════════════════════
+//  ФРАКЦИИ
+//
+//  «Расклад сил» — фракции крупными карточками: идеология, глава,
+//  состав, отношения с другими фракциями; ниже — кто ни к кому не
+//  примкнул. «Досье» — список слева, страница фракции справа.
+//
+//  Отношения фракций нигде не хранятся — они выводятся из связей их
+//  людей (relationships.json): у Астры с Варном вражда −90, значит Дом
+//  Вирен и Легион Варна враждуют.
+// ══════════════════════════════════════════════
+
+const MODE_KEY = "fictaris_factions_mode";
+const MODES = [
+  ["overview", "Расклад сил", "Все фракции рядом"],
+  ["dossier", "Досье", "Список слева, страница фракции справа"],
+];
 
 let factions = [];
 let characters = [];
 let locations = [];
+let relationships = [];
+let timeline = [];
 let tagsMap = {};
 let templates = [];
 let activeId = null;
 let container = null;
+let inModal = false;
+let query = "";
+let mode = readPref(MODE_KEY, MODES.map(([k]) => k), "overview");
+let bodyEl = null;
+let metaEl = null;
 const save = debounceSave((list) => apiPost("/api/factions", list));
 
 function persist() {
@@ -27,8 +58,15 @@ function addWithTemplate(templateId) {
   const f = blank(templateId);
   factions.push(f);
   activeId = f.id;
+  if (!inModal) {
+    mode = "dossier";
+    writePref(MODE_KEY, mode);
+  }
   persist();
   draw();
+  const name = container.querySelector(".dossier-name");
+  name?.focus();
+  name?.select();
 }
 
 // "+ Новый шаблон…" в меню выбора — см. тот же приём в characters.js.
@@ -59,199 +97,446 @@ function blank(templateId) {
 
 export async function renderFactions(root, focusId) {
   container = root;
-  [factions, characters, locations, tagsMap, templates] = await Promise.all([
+  inModal = root.classList.contains("entity-modal-body");
+  [factions, characters, locations, relationships, timeline, tagsMap, templates] = await Promise.all([
     apiGet("/api/factions"),
     apiGet("/api/characters"),
     apiGet("/api/locations"),
+    apiGet("/api/relationships"),
+    apiGet("/api/timeline"),
     loadTagsMap(),
     loadTemplates("factions"),
   ]);
-  if (focusId && factions.some((f) => f.id === focusId)) activeId = focusId;
+  if (focusId && factions.some((f) => f.id === focusId)) {
+    activeId = focusId;
+    if (!inModal) {
+      mode = "dossier";
+      writePref(MODE_KEY, mode);
+    }
+  }
   draw();
 }
 
-function draw() {
-  container.innerHTML = "";
-  const view = document.createElement("div");
-  view.className = "characters-view";
+// ── Что известно о фракции ─────────────────────
 
-  const grid = document.createElement("div");
-  grid.className = "characters-grid";
-
-  if (!factions.length) {
-    const empty = buildEmptyState(i18n("Фракций пока нет – добавь первую."), "shield");
-    empty.style.gridColumn = "1 / -1";
-    grid.appendChild(empty);
-  }
-
-  const dragState = { current: null };
-  for (const f of factions) {
-    const [, typeLabel, iconName, color] = factionTypeInfo(f.type);
-    const leader = characters.find((c) => c.id === f.leaderId);
-    const hq = locations.find((l) => l.id === f.headquartersId);
-    const template = templateFor(templates, f.templateId);
-    const fields = [
-      { label: i18n("Глава фракции"), value: leader?.name },
-      { label: i18n("Штаб-квартира"), value: hq?.name },
-      ...(template?.fields || []).map((fl) => ({ label: fl.label, value: f[fl.key] })),
-    ];
-    const card = document.createElement("button");
-    card.className = "entity-card";
-    card.innerHTML = `
-      <div class="entity-card-header">
-        <div class="entity-card-avatar" style="background:${color}">${avatarInnerHtml(f, iconSvg(iconName, 30))}</div>
-        <div class="entity-card-heading">
-          <div class="char-name">${escapeHtml(f.name || i18n("Без имени"))}</div>
-          <div class="char-role">${escapeHtml(i18n(typeLabel))}</div>
-        </div>
-      </div>
-      <div class="entity-card-fields">${buildCardFieldsHtml(fields)}</div>
-    `;
-    card.addEventListener("click", () => { activeId = f.id; draw(); });
-    attachCardDrag(card, f.id, dragState, (draggedId, targetId) => {
-      factions = reorderById(factions, draggedId, targetId);
-      persist();
-      draw();
-    });
-    grid.appendChild(card);
-  }
-
-  const addCard = document.createElement("button");
-  addCard.className = "entity-card add-card";
-  addCard.textContent = i18n("+ Добавить фракцию");
-  addCard.title = i18n("Правая кнопка – выбрать шаблон анкеты или завести новый");
-  addCard.addEventListener("click", () => {
-    chooseTemplate(templates, addCard, addWithTemplate, { onCreateNew: addWithNewTemplate });
-  });
-  addCard.addEventListener("contextmenu", (e) => {
-    e.preventDefault();
-    chooseTemplate(templates, addCard, addWithTemplate, { forceMenu: true, onCreateNew: addWithNewTemplate });
-  });
-  grid.appendChild(addCard);
-
-  view.appendChild(grid);
-
-  const active = factions.find((f) => f.id === activeId);
-  if (active) view.appendChild(buildDrawer(active));
-
-  // Дровер теперь модальное окно по центру экрана (style.css, .drawer) —
-  // клик по затемнению вокруг него (не по самой панели) закрывает его,
-  // как и у обычных модалок в приложении.
-  view.addEventListener("click", (e) => {
-    if (e.target === view) { activeId = null; draw(); }
-  });
-
-  container.appendChild(view);
+// Глава — тоже в составе, даже если его нет в memberIds.
+function memberIdsOf(f) {
+  return [...new Set([f.leaderId, ...(f.memberIds || [])].filter(Boolean))];
 }
 
-function buildDrawer(f) {
-  const drawer = document.createElement("div");
-  drawer.className = "drawer";
+function charById(id) {
+  return characters.find((c) => c.id === id) || null;
+}
 
-  const nameField = document.createElement("input");
-  nameField.value = f.name;
-  nameField.className = "drawer-name-field";
-  nameField.addEventListener("input", () => { f.name = nameField.value; persist(); });
-  drawer.appendChild(nameField);
-
-  const typeField = document.createElement("div");
-  typeField.className = "field";
-  typeField.style.marginTop = "14px";
-  const typeLabel = document.createElement("label");
-  typeLabel.textContent = i18n("Тип");
-  typeField.appendChild(typeLabel);
-  const typeSelect = document.createElement("select");
-  for (const [value, label] of FACTION_TYPES) {
-    const opt = document.createElement("option");
-    opt.value = value;
-    opt.textContent = i18n(label);
-    if (f.type === value) opt.selected = true;
-    typeSelect.appendChild(opt);
+// Отношения с другими фракциями — среднее по связям между их людьми.
+function tiesOf(f) {
+  const mine = new Set(memberIdsOf(f));
+  const ties = [];
+  for (const g of factions) {
+    if (g.id === f.id) continue;
+    const theirs = new Set(memberIdsOf(g));
+    const rels = relationships.filter((r) =>
+      (mine.has(r.charA) && theirs.has(r.charB)) || (mine.has(r.charB) && theirs.has(r.charA)));
+    if (!rels.length) continue;
+    const score = Math.round(rels.reduce((sum, r) => sum + (r.score || 0), 0) / rels.length);
+    ties.push({ faction: g, score, rels });
   }
-  typeSelect.addEventListener("change", () => { f.type = typeSelect.value; persist(); draw(); });
-  typeField.appendChild(typeSelect);
-  drawer.appendChild(typeField);
+  return ties.sort((a, b) => a.score - b.score);
+}
 
-  drawer.appendChild(buildAvatarsField(f, () => { persist(); draw(); }));
+function tieWord(score) {
+  return i18n(score <= -30 ? "враждуют" : score >= 30 ? "союзники" : "нейтралитет");
+}
 
-  const leaderField = document.createElement("div");
-  leaderField.className = "field";
-  const leaderLabel = document.createElement("label");
-  leaderLabel.textContent = i18n("Глава фракции");
-  leaderField.appendChild(leaderLabel);
-  const leaderSelect = characterSelect(characters, f.leaderId, i18n("Не назначен"));
-  leaderSelect.addEventListener("change", () => { f.leaderId = leaderSelect.value || null; persist(); });
-  leaderField.appendChild(leaderSelect);
-  drawer.appendChild(leaderField);
+function tieColor(score) {
+  return score <= -30 ? "var(--color-3)" : score >= 30 ? "var(--color-8)" : "var(--text-faint)";
+}
 
-  const hqField = document.createElement("div");
-  hqField.className = "field";
-  const hqLabel = document.createElement("label");
-  hqLabel.textContent = i18n("Штаб-квартира");
-  hqField.appendChild(hqLabel);
-  const hqSelect = document.createElement("select");
-  const noneOpt = document.createElement("option");
-  noneOpt.value = "";
-  noneOpt.textContent = i18n("Не указана");
-  hqSelect.appendChild(noneOpt);
-  for (const l of locations) {
-    const opt = document.createElement("option");
-    opt.value = l.id;
-    opt.textContent = l.name || i18n("Без имени");
-    if (f.headquartersId === l.id) opt.selected = true;
-    hqSelect.appendChild(opt);
+function tieDetail(rels) {
+  return rels.map((r) => {
+    const label = `${shortName(charById(r.charA)?.name)} – ${shortName(charById(r.charB)?.name)}`;
+    return r.label ? `${label}: ${r.label}` : label;
+  }).join("; ");
+}
+
+// События фракции: с участием её людей или в её штаб-квартире.
+function eventsOf(f) {
+  const ids = new Set(memberIdsOf(f));
+  return timeline
+    .filter((e) => (e.characterIds || []).some((id) => ids.has(id)) || (f.headquartersId && (e.locationIds || []).includes(f.headquartersId)))
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+}
+
+function matches(f) {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  const typeLabel = i18n(factionTypeInfo(f.type)[1]);
+  return [f.name, typeLabel, f.tags, f.description].some((s) => (s || "").toLowerCase().includes(q));
+}
+
+function tileHtml(f, cls, size) {
+  const [, , iconName, color] = factionTypeInfo(f.type);
+  return `<div class="${cls}" style="background:${color}">${avatarInnerHtml(f, iconSvg(iconName, size))}</div>`;
+}
+
+function subtitle(f) {
+  const hq = locations.find((l) => l.id === f.headquartersId);
+  const type = i18n(factionTypeInfo(f.type)[1]);
+  return hq ? `${type} · ${hq.name || i18n("Без имени")}` : type;
+}
+
+function blurb(f) {
+  if ((f.description || "").trim()) return f.description;
+  const field = (templateFor(templates, f.templateId)?.fields || []).find((x) => x.type !== "input" && (f[x.key] || "").trim());
+  return field ? f[field.key] : "";
+}
+
+function tiesHtml(ties) {
+  return ties.map((t) => `
+    <div class="fac-tie" style="--tie-color:${tieColor(t.score)}">
+      <i></i><b>${escapeHtml(t.faction.name || i18n("Без названия"))}</b><span>${escapeHtml(tieWord(t.score))}</span>
+      <small>${escapeHtml(tieDetail(t.rels))}</small>
+    </div>
+  `).join("");
+}
+
+// ── Отрисовка ──────────────────────────────────
+
+function draw() {
+  container.innerHTML = "";
+  if (inModal) {
+    const f = factions.find((x) => x.id === activeId);
+    if (f) container.appendChild(buildPage(f));
+    return;
   }
-  hqSelect.addEventListener("change", () => { f.headquartersId = hqSelect.value || null; persist(); });
-  hqField.appendChild(hqSelect);
-  drawer.appendChild(hqField);
+  const pane = document.createElement("div");
+  pane.className = "characters-pane";
+  pane.appendChild(buildToolbar());
+  bodyEl = document.createElement("div");
+  bodyEl.className = "characters-body";
+  pane.appendChild(bodyEl);
+  container.appendChild(pane);
+  drawBody();
+}
 
-  drawer.appendChild(buildToggleGroup(i18n("Состав"), characters, f.memberIds || [], (ids) => {
-    f.memberIds = ids;
+// Только тело под шапкой — чтобы набор в поиске не терял фокус.
+function drawBody() {
+  const shown = factions.filter(matches).length;
+  metaEl.textContent = shown === factions.length
+    ? i18nPlural(factions.length, ["{n} фракция", "{n} фракции", "{n} фракций"])
+    : i18nPlural(factions.length, ["{shown} из {total} фракции", "{shown} из {total} фракций", "{shown} из {total} фракций"], { shown }, "total");
+  bodyEl.innerHTML = "";
+  bodyEl.appendChild(mode === "overview" ? buildOverview() : buildDossierView());
+}
+
+function buildToolbar() {
+  const pickTemplate = (btn, forceMenu) =>
+    chooseTemplate(templates, btn, addWithTemplate, { forceMenu, onCreateNew: addWithNewTemplate });
+  const { bar, metaEl: meta } = buildEntityToolbar({
+    title: i18n("Фракции"),
+    modes: MODES,
+    mode,
+    onMode: (key) => {
+      mode = key;
+      writePref(MODE_KEY, mode);
+      draw();
+    },
+    placeholder: i18n("Название, тип или тег…"),
+    query,
+    onSearch: (value) => {
+      query = value;
+      drawBody();
+    },
+    addLabel: i18n("+ Фракция"),
+    onAdd: (btn) => pickTemplate(btn, false),
+    onAddMenu: (btn) => pickTemplate(btn, true),
+  });
+  metaEl = meta;
+  return bar;
+}
+
+function openPage(id) {
+  activeId = id;
+  mode = "dossier";
+  writePref(MODE_KEY, mode);
+  draw();
+}
+
+function reorder(list) {
+  factions = list;
+  persist();
+  drawBody();
+}
+
+// ── «Расклад сил» ──────────────────────────────
+
+function buildOverview() {
+  const scroll = document.createElement("div");
+  scroll.className = "cast-scroll";
+  if (!factions.length) {
+    scroll.appendChild(buildEmptyState(i18n("Фракций пока нет – добавь первую."), "shield"));
+    return scroll;
+  }
+  const list = factions.filter(matches);
+  if (!list.length) scroll.appendChild(buildEmptyState(i18n("Ничего не нашлось."), "shield"));
+  else {
+    const grid = buildOverviewSection("", list, {
+      render: buildCard,
+      onOpen: openPage,
+      dragState: { current: null },
+      list: () => factions,
+      onReorder: reorder,
+      gridClass: "fac-grid",
+    });
+    grid.querySelector(".cast-section-head").remove();
+    scroll.appendChild(grid);
+  }
+
+  // Кто ни к кому не примкнул — чтобы было видно, кого ещё можно
+  // втянуть в расклад.
+  const inAny = new Set(factions.flatMap(memberIdsOf));
+  const outside = characters.filter((c) => !inAny.has(c.id));
+  if (outside.length) {
+    const sec = document.createElement("section");
+    sec.className = "cast-section fac-outside";
+    sec.innerHTML = `<div class="cast-section-head"><h3>${escapeHtml(i18n("Вне фракций"))}</h3><span>${outside.length}</span></div>`;
+    const chips = document.createElement("div");
+    chips.className = "fac-members";
+    for (const c of outside) {
+      const chip = document.createElement("button");
+      chip.className = "fac-member";
+      chip.innerHTML = `${personAvatarHtml(c)}${escapeHtml(c.name || i18n("Без имени"))}`;
+      chip.addEventListener("click", () => openEntity("character", c.id));
+      chips.appendChild(chip);
+    }
+    sec.appendChild(chips);
+    scroll.appendChild(sec);
+  }
+  return scroll;
+}
+
+function buildCard(f) {
+  const color = factionTypeInfo(f.type)[3];
+  const leader = charById(f.leaderId);
+  const members = memberIdsOf(f).map(charById).filter(Boolean);
+  const ties = tiesOf(f);
+  const text = blurb(f);
+  const events = eventsOf(f);
+  const card = document.createElement("button");
+  card.className = "cast-card fac-card";
+  card.style.setProperty("--faction-color", color);
+  card.innerHTML = `
+    <div class="cast-card-head">
+      ${tileHtml(f, "cast-avatar cast-avatar-lg", 26)}
+      <div class="cast-card-title">
+        <div class="cast-name fac-name">${escapeHtml(f.name || i18n("Без имени"))}</div>
+        <div class="cast-sub">${escapeHtml(subtitle(f))}</div>
+      </div>
+    </div>
+    ${text ? `<p class="fac-blurb">${escapeHtml(text)}</p>` : ""}
+    ${leader
+      ? `<div class="fac-leader">${personAvatarHtml(leader, "cast-avatar")}<div><small>${escapeHtml(i18n("Глава"))}</small><b>${escapeHtml(leader.name || i18n("Без имени"))}</b>${leader.role ? `<span>${escapeHtml(leader.role)}</span>` : ""}</div></div>`
+      : `<div class="fac-leader empty">${escapeHtml(i18n("Глава не назначен"))}</div>`}
+    <div class="fac-label">${escapeHtml(i18n("Состав · {n}", { n: members.length }))}</div>
+    <div class="fac-members">${members.map((c) => `<span class="fac-member">${personAvatarHtml(c)}${escapeHtml(shortName(c.name))}${c.id === f.leaderId ? `<em>${escapeHtml(i18n("глава"))}</em>` : ""}</span>`).join("") || `<span class="dossier-none">${escapeHtml(i18n("Никого"))}</span>`}</div>
+    ${ties.length ? `<div class="fac-label">${escapeHtml(i18n("Отношения"))}</div>${tiesHtml(ties)}` : ""}
+    <div class="cast-card-foot">
+      <div class="cast-tags">${parseTags(f.tags).map((t) => `<span class="cast-tag">${escapeHtml(t)}</span>`).join("")}</div>
+      <div class="cast-stat">${escapeHtml(events.length ? i18nPlural(events.length, ["{n} событие", "{n} события", "{n} событий"]) : i18n("в сюжете не встречается"))}</div>
+    </div>
+  `;
+  return card;
+}
+
+// ── «Досье» ────────────────────────────────────
+
+function buildDossierView() {
+  const shown = factions.filter(matches);
+  if (!factions.some((f) => f.id === activeId)) activeId = (shown[0] || factions[0])?.id || null;
+  const groups = [{
+    title: "",
+    items: shown.map((f) => ({ item: f, leadHtml: tileHtml(f, "cast-avatar cast-avatar-sm", 15), sub: i18n(factionTypeInfo(f.type)[1]) })),
+  }];
+  const list = buildDossierList(groups, activeId, {
+    onPick: (id) => {
+      activeId = id;
+      drawBody();
+    },
+    dragState: { current: null },
+    list: () => factions,
+    onReorder: reorder,
+    emptyText: i18n(factions.length ? "Ничего не нашлось." : "Фракций пока нет."),
+  });
+  const active = factions.find((f) => f.id === activeId);
+  return buildDossierSplit(list, active ? buildPage(active) : buildEmptyState(i18n("Фракций пока нет – добавь первую."), "shield"));
+}
+
+function selectFaction(id) {
+  activeId = id;
+  if (inModal || mode !== "dossier") draw();
+  else drawBody();
+}
+
+function buildPage(f) {
+  const page = document.createElement("div");
+  page.className = "dossier";
+  const members = memberIdsOf(f).map(charById).filter(Boolean);
+
+  // ── Шапка
+  const head = document.createElement("div");
+  head.className = "dossier-head";
+  const [, , iconName, color] = factionTypeInfo(f.type);
+  const tile = document.createElement("div");
+  tile.className = "cast-avatar dossier-avatar";
+  tile.style.background = color;
+  tile.innerHTML = avatarInnerHtml(f, iconSvg(iconName, 44));
+
+  const titleCol = document.createElement("div");
+  titleCol.className = "dossier-title";
+  const nameField = buildNameInput(f, () => {
+    updateListRow(bodyEl, f.id, { name: f.name });
     persist();
-    draw();
-  }));
-
-  const template = templateFor(templates, f.templateId);
-  for (const fl of template?.fields || []) {
-    const field = document.createElement("div");
-    field.className = "field";
-    const lab = document.createElement("label");
-    lab.textContent = fl.label;
-    field.appendChild(lab);
-    const hint = buildFieldHint(fl.type);
-    if (hint) field.appendChild(hint);
-    const input = document.createElement(fl.type === "input" ? "input" : "textarea");
-    input.value = f[fl.key] || "";
-    input.addEventListener("input", () => { f[fl.key] = input.value; persist(); });
-    field.appendChild(input);
-    drawer.appendChild(field);
+  });
+  const sub = document.createElement("div");
+  sub.className = "dossier-subtitle";
+  sub.textContent = subtitle(f);
+  titleCol.append(nameField, sub);
+  if (parseTags(f.tags).length) {
+    const tags = document.createElement("div");
+    tags.className = "cast-tags";
+    tags.innerHTML = parseTags(f.tags).map((t) => `<span class="cast-tag">${escapeHtml(t)}</span>`).join("");
+    titleCol.appendChild(tags);
   }
-
-  drawer.appendChild(
-    buildTagsField(tagsMap, f.tags, (value) => {
-      f.tags = value;
-      persist();
-    })
-  );
 
   const actions = document.createElement("div");
-  actions.className = "drawer-actions";
-  const closeBtn = document.createElement("button");
-  closeBtn.className = "btn";
-  closeBtn.textContent = i18n("Закрыть");
-  closeBtn.addEventListener("click", () => { activeId = null; draw(); });
+  actions.className = "dossier-actions";
   const delBtn = document.createElement("button");
   delBtn.className = "btn danger";
-  delBtn.textContent = i18n("Удалить");
+  delBtn.innerHTML = `${iconSvg("trash", 14)}<span>${escapeHtml(i18n("Удалить"))}</span>`;
   delBtn.addEventListener("click", async () => {
     await pushTrash("faction", f);
     factions = factions.filter((x) => x.id !== f.id);
     activeId = null;
     persist();
+    if (inModal) closeEntityModal();
+    else draw();
+  });
+  actions.appendChild(delBtn);
+  head.append(tile, titleCol, actions);
+  page.appendChild(head);
+
+  // ── Сводка
+  const facts = document.createElement("div");
+  facts.className = "dossier-facts";
+  facts.appendChild(buildFact(i18n("Тип"), buildSelect(FACTION_TYPES.map(([v, l]) => [v, l]), factionTypeInfo(f.type)[0], (value) => {
+    f.type = value;
+    persist();
+    draw();
+  })));
+  const leaderSelect = characterSelect(characters, f.leaderId, i18n("Не назначен"));
+  leaderSelect.addEventListener("change", () => {
+    f.leaderId = leaderSelect.value || null;
+    persist();
     draw();
   });
-  actions.append(closeBtn, delBtn);
-  drawer.appendChild(actions);
+  facts.appendChild(buildFact(i18n("Глава"), leaderSelect));
+  const hqOptions = [["", "Не указана"], ...locations.map((l) => [l.id, l.name || i18n("Без имени")])];
+  facts.appendChild(buildFact(i18n("Штаб-квартира"), buildSelect(hqOptions, f.headquartersId || "", (value) => {
+    f.headquartersId = value || null;
+    persist();
+    draw();
+  })));
+  facts.appendChild(buildFactText(i18n("Численность"), i18nPlural(members.length, ["{n} человек", "{n} человека", "{n} человек"])));
+  page.appendChild(facts);
 
-  return drawer;
+  // ── Основная колонка и боковая
+  const cols = document.createElement("div");
+  cols.className = "dossier-cols";
+  const main = document.createElement("div");
+  main.className = "dossier-main";
+  const side = document.createElement("aside");
+  side.className = "dossier-side";
+
+  main.appendChild(sectionHeading(i18n("Анкета")));
+  main.appendChild(buildTemplateFields(f, templateFor(templates, f.templateId)?.fields || [], [], () => persist()));
+
+  main.appendChild(sectionHeading(i18n("В сюжете")));
+  const events = eventsOf(f);
+  for (const e of events) {
+    const people = (e.characterIds || []).map(charById).filter(Boolean);
+    main.appendChild(buildEventRow(e, people.map((c) => personAvatarHtml(c)).join("")));
+  }
+  if (!events.length) main.appendChild(buildNone(i18n("Событий с её людьми пока нет")));
+
+  main.appendChild(sectionHeading(i18n("Облик и метки")));
+  main.appendChild(buildAvatarsField(f, () => { persist(); draw(); }));
+  main.appendChild(buildTagsField(tagsMap, f.tags, (value) => {
+    f.tags = value;
+    persist();
+  }));
+
+  side.appendChild(sectionHeading(i18n("Состав")));
+  side.appendChild(buildMembers(f));
+
+  side.appendChild(sectionHeading(i18n("Отношения с фракциями")));
+  const ties = tiesOf(f);
+  for (const t of ties) {
+    const row = document.createElement("button");
+    row.className = "fac-tie fac-tie-link";
+    row.style.setProperty("--tie-color", tieColor(t.score));
+    row.innerHTML = `<i></i><b>${escapeHtml(t.faction.name || i18n("Без названия"))}</b><span>${escapeHtml(tieWord(t.score))}</span><small>${escapeHtml(i18n("по связям: {list}", { list: tieDetail(t.rels) }))}</small>`;
+    row.addEventListener("click", () => selectFaction(t.faction.id));
+    side.appendChild(row);
+  }
+  if (!ties.length) side.appendChild(buildNone(i18n("Не видно по связям её людей")));
+
+  side.appendChild(sectionHeading(i18n("Владения")));
+  const hq = locations.find((l) => l.id === f.headquartersId);
+  if (hq) {
+    side.appendChild(buildLinkRow(iconLead(iconSvg(locationTypeInfo(hq.type)[2], 13)), hq.name || i18n("Без имени"), i18n("штаб-квартира"), () => openEntity("location", hq.id)));
+  } else side.appendChild(buildNone(i18n("Штаб-квартира не указана")));
+
+  cols.append(main, side);
+  page.appendChild(cols);
+  return page;
+}
+
+// Состав: глава отдельной пометкой (меняется в сводке), остальных можно
+// убрать крестиком; ниже — выпадающий список, кого добавить.
+function buildMembers(f) {
+  const wrap = document.createElement("div");
+  wrap.className = "fac-member-list";
+  for (const id of memberIdsOf(f)) {
+    const c = charById(id);
+    if (!c) continue;
+    const row = buildLinkRow(personAvatarHtml(c), c.name || i18n("Без имени"), id === f.leaderId ? i18n("глава") : c.role || "", () => openEntity("character", c.id));
+    if (id !== f.leaderId) {
+      const remove = document.createElement("span");
+      remove.className = "fac-member-remove";
+      remove.title = i18n("Убрать из состава");
+      remove.innerHTML = iconSvg("close", 12);
+      remove.addEventListener("click", (e) => {
+        e.stopPropagation();
+        f.memberIds = (f.memberIds || []).filter((x) => x !== id);
+        persist();
+        draw();
+      });
+      row.appendChild(remove);
+    }
+    wrap.appendChild(row);
+  }
+  const taken = new Set(memberIdsOf(f));
+  const candidates = characters.filter((c) => !taken.has(c.id));
+  if (candidates.length) {
+    const add = characterSelect(candidates, null, i18n("+ Добавить в состав…"));
+    add.className = "fac-member-add";
+    add.addEventListener("change", () => {
+      if (!add.value) return;
+      f.memberIds = [...(f.memberIds || []), add.value];
+      persist();
+      draw();
+    });
+    wrap.appendChild(add);
+  }
+  return wrap;
 }

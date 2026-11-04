@@ -1,37 +1,81 @@
 import { apiGet, apiPost, uid } from "./api.js";
 import { debounceSave } from "./save-badge.js";
-import { escapeHtml, buildEmptyState, buildCardFieldsHtml, reorderById, attachCardDrag } from "./chips.js";
+import { escapeHtml, buildEmptyState } from "./chips.js";
 import { pushTrash } from "./trash.js";
-import { LOCATION_TYPES, locationTypeInfo, iconSvg } from "./icons.js";
-import { buildReverseLinks } from "./reverse-links.js";
-import { loadTagsMap, buildTagsField } from "./tags.js";
+import { LOCATION_TYPES, locationTypeInfo, factionTypeInfo, iconSvg } from "./icons.js";
+import { loadTagsMap, buildTagsField, parseTags } from "./tags.js";
 import { buildNameGeneratorButton } from "./name-generator.js";
 import { avatarInnerHtml, buildAvatarsField } from "./avatars.js";
-import { loadTemplates, saveTemplates, templateFor, buildFieldHint } from "./templates.js";
+import { loadTemplates, saveTemplates, templateFor } from "./templates.js";
 import { chooseTemplate } from "./template-choice.js";
 import { openTemplateEditorModal } from "./template-editor-modal.js";
-import { i18n } from "./i18n.js";
+import { closeEntityModal } from "./entity-modal.js";
+import { chapterLabel } from "./books.js";
+import { i18n, i18nPlural } from "./i18n.js";
+import {
+  readPref, writePref, buildSegmented, buildEntityToolbar, buildOverviewSection, buildDossierList, buildDossierSplit,
+  updateListRow, sectionHeading, buildNone, buildFact, buildFactText, buildSelect, buildNameInput, buildTemplateFields,
+  buildLinkRow, iconLead, buildEventRow, openEntity, personAvatarHtml,
+} from "./entity-view.js";
+
+// ══════════════════════════════════════════════
+//  ЛОКАЦИИ
+//
+//  «Обзор» — места карточками, сгруппированными по карте, типу или
+//  вложенности; сверху карточки — кусок карты вокруг метки места.
+//  «Атлас» — список слева, страница места справа: карта с подсвеченной
+//  меткой, анкета, что здесь происходит (события таймлайна), кто здесь
+//  бывает, чья это штаб-квартира, что внутри.
+// ══════════════════════════════════════════════
+
+const MODE_KEY = "fictaris_locations_mode";
+const GROUP_KEY = "fictaris_locations_group";
+const MODES = [
+  ["overview", "Обзор", "Все места карточками"],
+  ["atlas", "Атлас", "Список слева, страница места справа"],
+];
+const GROUPS = [
+  ["map", "По карте"],
+  ["type", "По типу"],
+  ["nesting", "По вложенности"],
+];
 
 let locations = [];
+let characters = [];
 let timeline = [];
 let factions = [];
 let mapData = { maps: {} };
+let manuscript = { chapters: [] };
 let tagsMap = {};
 let templates = [];
 let activeId = null;
 let container = null;
+let inModal = false;
+let query = "";
+let mode = readPref(MODE_KEY, MODES.map(([k]) => k), "overview");
+let groupBy = readPref(GROUP_KEY, GROUPS.map(([k]) => k), "map");
+let bodyEl = null;
+let metaEl = null;
 const save = debounceSave((list) => apiPost("/api/locations", list));
 
 function persist() {
   save(locations);
 }
 
-function addWithTemplate(templateId) {
+function addWithTemplate(templateId, parentId = null) {
   const loc = blank(templateId);
+  loc.parentId = parentId;
   locations.push(loc);
   activeId = loc.id;
+  if (!inModal) {
+    mode = "atlas";
+    writePref(MODE_KEY, mode);
+  }
   persist();
   draw();
+  const name = container.querySelector(".dossier-name");
+  name?.focus();
+  name?.select();
 }
 
 // "+ Новый шаблон…" в меню выбора — см. тот же приём в characters.js.
@@ -60,9 +104,9 @@ function blank(templateId) {
 
 // ── Вложенность (королевство → область → город и т.п.) ─────────
 // parentId — обычная ссылка на другую локацию, как headquartersId у
-// фракции. Проверка циклов — только на выбор родителя в дровере
-// (descendantIds ниже); сам обход дерева ещё и защищён на случай
-// испорченных данных (импорт, ручная правка JSON) — see orderedTree.
+// фракции. Проверка циклов — только на выбор родителя (descendantIds
+// ниже); сам обход дерева ещё и защищён на случай испорченных данных
+// (импорт, ручная правка JSON) — см. orderedTree.
 
 // Все потомки локации (рекурсивно) — чтобы нельзя было выбрать своего
 // же потомка родителем и завести цикл.
@@ -80,12 +124,10 @@ function descendantIds(id) {
   return ids;
 }
 
-// Порядок обхода для сетки: сначала локация, сразу за ней — все её
-// потомки (глубина в depth, красится отступом в CSS) — вместо плоского
-// списка, где город и содержащее его королевство могли оказаться в
-// разных концах сетки. parentId, ссылающийся на несуществующую или
-// удалённую локацию, трактуется как "нет родителя" — не теряем
-// локацию из вида, а поднимаем её на верхний уровень.
+// Порядок обхода: сначала локация, сразу за ней — все её потомки.
+// parentId, ссылающийся на несуществующую или удалённую локацию,
+// трактуется как "нет родителя" — не теряем локацию из вида, а
+// поднимаем её на верхний уровень.
 function orderedTree() {
   const byId = new Set(locations.map((l) => l.id));
   const byParent = new Map();
@@ -106,259 +148,365 @@ function orderedTree() {
   return out;
 }
 
+function parentOf(loc) {
+  return loc.parentId ? locations.find((l) => l.id === loc.parentId) || null : null;
+}
+
 export async function renderLocations(root, focusId) {
   container = root;
-  [locations, timeline, factions, mapData, tagsMap, templates] = await Promise.all([
+  inModal = root.classList.contains("entity-modal-body");
+  [locations, characters, timeline, factions, mapData, manuscript, tagsMap, templates] = await Promise.all([
     apiGet("/api/locations"),
+    apiGet("/api/characters"),
     apiGet("/api/timeline"),
     apiGet("/api/factions"),
     apiGet("/api/map"),
+    apiGet("/api/manuscript"),
     loadTagsMap(),
     loadTemplates("locations"),
   ]);
-  if (focusId && locations.some((l) => l.id === focusId)) activeId = focusId;
+  if (focusId && locations.some((l) => l.id === focusId)) {
+    activeId = focusId;
+    if (!inModal) {
+      mode = "atlas";
+      writePref(MODE_KEY, mode);
+    }
+  }
   draw();
 }
 
-function reverseLinksFor(loc) {
-  const eventRows = timeline
-    .filter((e) => (e.locationIds || []).includes(loc.id))
-    .map((e) => `${e.title}${e.date ? ` (${e.date})` : ""}`);
+// ── Что известно о месте ───────────────────────
 
-  const factionRows = factions
-    .filter((f) => f.headquartersId === loc.id)
-    .map((f) => i18n("{name} (штаб-квартира)", f));
-
-  const pinRows = [];
-  for (const m of Object.values(mapData.maps || {})) {
-    for (const pin of m.pins || []) {
-      if (pin.locationId === loc.id) pinRows.push(i18n("{label} (карта «{name}»)", { label: pin.label, name: m.name }));
-    }
-  }
-
-  return buildReverseLinks([
-    [i18n("Таймлайн"), eventRows],
-    [i18n("Фракции"), factionRows],
-    [i18n("Метки на карте"), pinRows],
-  ]);
+function mapsInOrder() {
+  const maps = mapData.maps || {};
+  const ids = [...(mapData.rootIds || []), ...Object.keys(maps)];
+  return [...new Set(ids)].map((id) => maps[id]).filter(Boolean);
 }
+
+function pinsOf(loc) {
+  const pins = [];
+  for (const m of mapsInOrder()) for (const pin of m.pins || []) if (pin.locationId === loc.id) pins.push({ map: m, pin });
+  return pins;
+}
+
+function placeInfo(loc) {
+  const events = timeline
+    .filter((e) => (e.locationIds || []).includes(loc.id))
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  const hqOf = factions.filter((f) => f.headquartersId === loc.id);
+  const pins = pinsOf(loc);
+  // Кто здесь бывает: участники событий, главы и состав фракций со
+  // штабом здесь, метки персонажей на вложенной карте этого места.
+  const counts = new Map();
+  const bump = (id) => counts.set(id, (counts.get(id) || 0) + 1);
+  for (const e of events) (e.characterIds || []).forEach(bump);
+  for (const f of hqOf) [f.leaderId, ...(f.memberIds || [])].filter(Boolean).forEach(bump);
+  for (const { pin } of pins) {
+    const inner = pin.linkedMapId && mapData.maps?.[pin.linkedMapId];
+    for (const p of inner?.pins || []) if (p.characterId) bump(p.characterId);
+  }
+  const people = [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([id]) => characters.find((c) => c.id === id))
+    .filter(Boolean);
+  const chapters = (manuscript.chapters || []).filter((ch) => (ch.locationIds || []).includes(loc.id));
+  const children = locations.filter((l) => l.parentId === loc.id);
+  return { events, hqOf, pins, people, chapters, children, parent: parentOf(loc) };
+}
+
+function matches(loc) {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  const typeLabel = i18n(locationTypeInfo(loc.type)[1]);
+  return [loc.name, typeLabel, loc.tags, loc.description].some((s) => (s || "").toLowerCase().includes(q));
+}
+
+function tileHtml(loc, cls, size) {
+  const [, , iconName, color] = locationTypeInfo(loc.type);
+  return `<div class="${cls}" style="background:${color}">${avatarInnerHtml(loc, iconSvg(iconName, size))}</div>`;
+}
+
+function subtitle(loc) {
+  const parent = parentOf(loc);
+  const type = i18n(locationTypeInfo(loc.type)[1]);
+  return parent ? `${type} · ${i18n("в составе: {name}", { name: parent.name || i18n("Без имени") })}` : type;
+}
+
+// Первая строка описания для карточки: поле description или первое
+// заполненное многострочное поле шаблона.
+function blurb(loc) {
+  if ((loc.description || "").trim()) return loc.description;
+  const f = (templateFor(templates, loc.templateId)?.fields || []).find((x) => x.type !== "input" && (loc[x.key] || "").trim());
+  return f ? loc[f.key] : "";
+}
+
+function tagsHtml(entity) {
+  return parseTags(entity.tags).map((t) => `<span class="cast-tag">${escapeHtml(t)}</span>`).join("");
+}
+
+function peopleHtml(list, max = 6) {
+  return list.slice(0, max).map((c) => personAvatarHtml(c, "cast-avatar cast-avatar-xs")).join("");
+}
+
+// ── Отрисовка ──────────────────────────────────
 
 function draw() {
   container.innerHTML = "";
-  const view = document.createElement("div");
-  view.className = "characters-view";
-
-  const grid = document.createElement("div");
-  grid.className = "characters-grid";
-
-  if (!locations.length) {
-    const empty = buildEmptyState(i18n("Локаций пока нет – добавь первую."), "pin");
-    empty.style.gridColumn = "1 / -1";
-    grid.appendChild(empty);
+  if (inModal) {
+    const loc = locations.find((l) => l.id === activeId);
+    if (loc) container.appendChild(buildPage(loc));
+    return;
   }
-
-  const dragState = { current: null };
-  for (const { loc, depth } of orderedTree()) {
-    const [, , iconName, color] = locationTypeInfo(loc.type);
-    const parent = loc.parentId && locations.find((l) => l.id === loc.parentId);
-    const template = templateFor(templates, loc.templateId);
-    const fields = (template?.fields || []).map((f) => ({ label: f.label, value: loc[f.key] }));
-    const card = document.createElement("button");
-    card.className = "entity-card loc-card" + (depth ? " loc-child" : "");
-    if (depth) card.style.setProperty("--loc-depth", depth);
-    card.innerHTML = `
-      <div class="entity-card-header">
-        <div class="entity-card-avatar" style="background:${color}">${avatarInnerHtml(loc, iconSvg(iconName, 30))}</div>
-        <div class="entity-card-heading">
-          <div class="char-name">${escapeHtml(loc.name || i18n("Без имени"))}</div>
-          <div class="char-role">${escapeHtml(i18n(locationTypeInfo(loc.type)[1]))}</div>
-          ${parent ? `<div class="loc-parent-badge" title="${escapeHtml(i18n("Открыть родительскую локацию"))}">${escapeHtml(i18n("в составе: {name}", { name: parent.name || i18n("Без имени") }))}</div>` : ""}
-        </div>
-      </div>
-      <div class="entity-card-fields">${buildCardFieldsHtml(fields)}</div>
-    `;
-    // Бейдж родителя — часть той же кликабельной карточки (вложенный
-    // <button> внутри <button> — не валидный HTML), поэтому переход к
-    // предку решается здесь же, по цели клика, а не отдельным элементом.
-    card.addEventListener("click", (e) => {
-      if (parent && e.target.closest(".loc-parent-badge")) { activeId = parent.id; draw(); return; }
-      activeId = loc.id;
-      draw();
-    });
-    // Порядок в сетке — порядок в самом массиве locations: перетаскивание
-    // двигает элемент в этом массиве (orderedTree строит дерево обходом
-    // именно в этом порядке), поэтому перестановка всегда только внутри
-    // своего уровня вложенности — родителя у карточки это не меняет.
-    attachCardDrag(card, loc.id, dragState, (draggedId, targetId) => {
-      locations = reorderById(locations, draggedId, targetId);
-      persist();
-      draw();
-    });
-    grid.appendChild(card);
-  }
-
-  const addCard = document.createElement("button");
-  addCard.className = "entity-card add-card";
-  addCard.textContent = i18n("+ Добавить локацию");
-  addCard.title = i18n("Правая кнопка – выбрать шаблон анкеты или завести новый");
-  addCard.addEventListener("click", () => {
-    chooseTemplate(templates, addCard, addWithTemplate, { onCreateNew: addWithNewTemplate });
-  });
-  addCard.addEventListener("contextmenu", (e) => {
-    e.preventDefault();
-    chooseTemplate(templates, addCard, addWithTemplate, { forceMenu: true, onCreateNew: addWithNewTemplate });
-  });
-  grid.appendChild(addCard);
-
-  view.appendChild(grid);
-
-  const active = locations.find((l) => l.id === activeId);
-  if (active) view.appendChild(buildDrawer(active));
-
-  // Дровер теперь модальное окно по центру экрана (style.css, .drawer) —
-  // клик по затемнению вокруг него (не по самой панели) закрывает его,
-  // как и у обычных модалок в приложении.
-  view.addEventListener("click", (e) => {
-    if (e.target === view) { activeId = null; draw(); }
-  });
-
-  container.appendChild(view);
+  const pane = document.createElement("div");
+  pane.className = "characters-pane";
+  pane.appendChild(buildToolbar());
+  bodyEl = document.createElement("div");
+  bodyEl.className = "characters-body";
+  pane.appendChild(bodyEl);
+  container.appendChild(pane);
+  drawBody();
 }
 
-function buildDrawer(loc) {
-  const drawer = document.createElement("div");
-  drawer.className = "drawer";
+// Только тело под шапкой — чтобы набор в поиске не терял фокус.
+function drawBody() {
+  const shown = locations.filter(matches).length;
+  metaEl.textContent = shown === locations.length
+    ? i18nPlural(locations.length, ["{n} место", "{n} места", "{n} мест"])
+    : i18nPlural(locations.length, ["{shown} из {total} места", "{shown} из {total} мест", "{shown} из {total} мест"], { shown }, "total");
+  bodyEl.innerHTML = "";
+  bodyEl.appendChild(mode === "overview" ? buildOverview() : buildAtlas());
+}
 
+function buildToolbar() {
+  const extra = mode === "overview"
+    ? buildSegmented(GROUPS, groupBy, (key) => {
+      groupBy = key;
+      writePref(GROUP_KEY, groupBy);
+      draw();
+    })
+    : null;
+  const pickTemplate = (btn, forceMenu) =>
+    chooseTemplate(templates, btn, (id) => addWithTemplate(id), { forceMenu, onCreateNew: addWithNewTemplate });
+  const { bar, metaEl: meta } = buildEntityToolbar({
+    title: i18n("Локации"),
+    modes: MODES,
+    mode,
+    onMode: (key) => {
+      mode = key;
+      writePref(MODE_KEY, mode);
+      draw();
+    },
+    extra,
+    placeholder: i18n("Название, тип или тег…"),
+    query,
+    onSearch: (value) => {
+      query = value;
+      drawBody();
+    },
+    addLabel: i18n("+ Локация"),
+    onAdd: (btn) => pickTemplate(btn, false),
+    onAddMenu: (btn) => pickTemplate(btn, true),
+  });
+  metaEl = meta;
+  return bar;
+}
+
+function openPage(id) {
+  activeId = id;
+  mode = "atlas";
+  writePref(MODE_KEY, mode);
+  draw();
+}
+
+function reorder(list) {
+  locations = list;
+  persist();
+  drawBody();
+}
+
+// ── «Обзор» ────────────────────────────────────
+
+function buildOverview() {
+  const scroll = document.createElement("div");
+  scroll.className = "cast-scroll";
+  if (!locations.length) {
+    scroll.appendChild(buildEmptyState(i18n("Локаций пока нет – добавь первую."), "pin"));
+    return scroll;
+  }
+  const list = locations.filter(matches);
+  if (!list.length) {
+    scroll.appendChild(buildEmptyState(i18n("Ничего не нашлось."), "pin"));
+    return scroll;
+  }
+  const dragState = { current: null };
+  const addSection = (title, members) => {
+    if (!members.length) return;
+    scroll.appendChild(buildOverviewSection(title, members, {
+      render: buildCard,
+      onOpen: openPage,
+      dragState,
+      list: () => locations,
+      onReorder: reorder,
+      gridClass: "cast-grid loc-grid",
+    }));
+  };
+
+  if (groupBy === "map") {
+    // Место на нескольких картах — в группе первой из них, без повторов.
+    const placed = new Set();
+    for (const m of mapsInOrder()) {
+      const members = list.filter((l) => !placed.has(l.id) && (m.pins || []).some((p) => p.locationId === l.id));
+      members.forEach((l) => placed.add(l.id));
+      addSection(m.name || i18n("Без названия"), members);
+    }
+    addSection(i18n("Не отмечены на карте"), list.filter((l) => !placed.has(l.id)));
+  } else if (groupBy === "type") {
+    for (const [type, label] of LOCATION_TYPES) {
+      addSection(i18n(label), list.filter((l) => locationTypeInfo(l.type)[0] === type));
+    }
+  } else {
+    // Верхний уровень с вложенными — своей группой (само место и всё,
+    // что внутри, по порядку дерева); одиночки — общей группой.
+    const tree = orderedTree();
+    const shown = new Set(list.map((l) => l.id));
+    const loose = [];
+    for (const { loc, depth } of tree) {
+      if (depth) continue;
+      const ids = new Set([loc.id, ...descendantIds(loc.id)]);
+      const members = tree.filter((x) => ids.has(x.loc.id) && shown.has(x.loc.id)).map((x) => x.loc);
+      if (ids.size > 1) addSection(loc.name || i18n("Без имени"), members);
+      else if (shown.has(loc.id)) loose.push(loc);
+    }
+    addSection(i18n("Отдельные места"), loose);
+  }
+  return scroll;
+}
+
+// Кусок карты над карточкой: вся карта вдвое крупнее рамки, сдвинута
+// так, чтобы метка места стояла по центру; соседние метки — точками с
+// подписью.
+function miniMapHtml({ map, pin }) {
+  const dots = (map.pins || []).map((p) => `
+    <i class="${p === pin ? "on" : ""}" style="left:${p.x}%;top:${p.y}%">${p === pin ? "" : `<b>${escapeHtml(p.label || "")}</b>`}</i>
+  `).join("");
+  return `
+    <div class="loc-minimap">
+      <div class="loc-minimap-inner" style="transform:translate(-${pin.x}%,-${pin.y}%)"><img src="/${map.imageRelPath}" alt="">${dots}</div>
+      <span>${escapeHtml(map.name || "")}</span>
+    </div>
+  `;
+}
+
+function buildCard(loc) {
+  const info = placeInfo(loc);
+  const [, , iconName, color] = locationTypeInfo(loc.type);
+  const text = blurb(loc);
+  const stats = [
+    info.events.length && i18nPlural(info.events.length, ["{n} событие", "{n} события", "{n} событий"]),
+    info.chapters.length && i18nPlural(info.chapters.length, ["{n} глава", "{n} главы", "{n} глав"]),
+  ].filter(Boolean).join(" · ");
+  const card = document.createElement("button");
+  card.className = "cast-card loc-card";
+  card.innerHTML = `
+    ${info.pins[0] && info.pins[0].map.imageRelPath
+      ? miniMapHtml(info.pins[0])
+      : `<div class="loc-minimap loc-minimap-none" style="--type-color:${color}">${iconSvg(iconName, 32)}<span>${escapeHtml(i18n("не отмечено на карте"))}</span></div>`}
+    <div class="loc-card-body">
+      <div class="cast-card-head">
+        ${tileHtml(loc, "cast-avatar cast-avatar-md", 18)}
+        <div class="cast-card-title">
+          <div class="cast-name">${escapeHtml(loc.name || i18n("Без имени"))}</div>
+          <div class="cast-sub">${escapeHtml(subtitle(loc))}</div>
+        </div>
+      </div>
+      ${text ? `<p class="loc-blurb">${escapeHtml(text)}</p>` : ""}
+      ${info.hqOf.length ? `<div class="loc-hq">${iconSvg("shield", 13)}${escapeHtml(i18n("Штаб: {names}", { names: info.hqOf.map((f) => f.name).join(", ") }))}</div>` : ""}
+      <div class="cast-card-foot">
+        <div class="dossier-avatars">${peopleHtml(info.people, 5)}</div>
+        <div class="cast-stat">${escapeHtml(stats || i18n("в сюжете не встречается"))}</div>
+      </div>
+    </div>
+  `;
+  return card;
+}
+
+// ── «Атлас» ────────────────────────────────────
+
+function buildAtlas() {
+  const shown = locations.filter(matches);
+  if (!locations.some((l) => l.id === activeId)) activeId = (shown[0] || locations[0])?.id || null;
+  const groups = LOCATION_TYPES.map(([type, label]) => ({
+    title: i18n(label),
+    items: shown.filter((l) => locationTypeInfo(l.type)[0] === type).map((l) => ({
+      item: l,
+      leadHtml: tileHtml(l, "cast-avatar cast-avatar-sm", 15),
+      sub: parentOf(l)?.name || blurb(l),
+    })),
+  }));
+  const list = buildDossierList(groups, activeId, {
+    onPick: (id) => {
+      activeId = id;
+      drawBody();
+    },
+    dragState: { current: null },
+    list: () => locations,
+    onReorder: reorder,
+    emptyText: i18n(locations.length ? "Ничего не нашлось." : "Локаций пока нет."),
+  });
+  const active = locations.find((l) => l.id === activeId);
+  return buildDossierSplit(list, active ? buildPage(active) : buildEmptyState(i18n("Локаций пока нет – добавь первую."), "pin"));
+}
+
+function selectPlace(id) {
+  activeId = id;
+  if (inModal || mode !== "atlas") draw();
+  else drawBody();
+}
+
+function buildPage(loc) {
+  const info = placeInfo(loc);
+  const page = document.createElement("div");
+  page.className = "dossier";
+
+  // ── Шапка
+  const head = document.createElement("div");
+  head.className = "dossier-head";
+  const [, , iconName, color] = locationTypeInfo(loc.type);
+  const tile = document.createElement("div");
+  tile.className = "cast-avatar dossier-avatar";
+  tile.style.background = color;
+  tile.innerHTML = avatarInnerHtml(loc, iconSvg(iconName, 44));
+
+  const titleCol = document.createElement("div");
+  titleCol.className = "dossier-title";
   const nameRow = document.createElement("div");
   nameRow.className = "drawer-name-row";
-  const nameField = document.createElement("input");
-  nameField.value = loc.name;
-  nameField.className = "drawer-name-field";
-  nameField.addEventListener("input", () => {
-    loc.name = nameField.value;
+  const onName = () => {
+    updateListRow(bodyEl, loc.id, { name: loc.name });
     persist();
-  });
-  nameRow.appendChild(nameField);
-  nameRow.appendChild(
-    buildNameGeneratorButton((name) => {
-      nameField.value = name;
-      loc.name = name;
-      persist();
-    }, "place")
-  );
-  drawer.appendChild(nameRow);
-
-  const typeField = document.createElement("div");
-  typeField.className = "field";
-  typeField.style.marginTop = "14px";
-  const typeLabel = document.createElement("label");
-  typeLabel.textContent = i18n("Тип");
-  typeField.appendChild(typeLabel);
-  const typeSelect = document.createElement("select");
-  for (const [value, label] of LOCATION_TYPES) {
-    const opt = document.createElement("option");
-    opt.value = value;
-    opt.textContent = i18n(label);
-    if (loc.type === value) opt.selected = true;
-    typeSelect.appendChild(opt);
+  };
+  const nameField = buildNameInput(loc, onName);
+  nameRow.append(nameField, buildNameGeneratorButton((name) => {
+    nameField.value = name;
+    loc.name = name;
+    onName();
+  }, "place"));
+  const sub = document.createElement("div");
+  sub.className = "dossier-subtitle";
+  sub.textContent = subtitle(loc);
+  titleCol.append(nameRow, sub);
+  if (parseTags(loc.tags).length) {
+    const tags = document.createElement("div");
+    tags.className = "cast-tags";
+    tags.innerHTML = tagsHtml(loc);
+    titleCol.appendChild(tags);
   }
-  typeSelect.addEventListener("change", () => {
-    loc.type = typeSelect.value;
-    persist();
-    draw();
-  });
-  typeField.appendChild(typeSelect);
-  drawer.appendChild(typeField);
-
-  const parentField = document.createElement("div");
-  parentField.className = "field";
-  const parentLabel = document.createElement("label");
-  parentLabel.textContent = i18n("Родительская локация");
-  parentField.appendChild(parentLabel);
-  const parentSelect = document.createElement("select");
-  const noneOpt = document.createElement("option");
-  noneOpt.value = "";
-  noneOpt.textContent = i18n("– нет (верхний уровень) –");
-  parentSelect.appendChild(noneOpt);
-  const excluded = descendantIds(loc.id);
-  excluded.add(loc.id);
-  for (const other of locations) {
-    if (excluded.has(other.id)) continue;
-    const opt = document.createElement("option");
-    opt.value = other.id;
-    opt.textContent = other.name || i18n("Без имени");
-    if (loc.parentId === other.id) opt.selected = true;
-    parentSelect.appendChild(opt);
-  }
-  parentSelect.addEventListener("change", () => {
-    loc.parentId = parentSelect.value || null;
-    persist();
-    draw();
-  });
-  parentField.appendChild(parentSelect);
-  drawer.appendChild(parentField);
-
-  drawer.appendChild(buildAvatarsField(loc, () => { persist(); draw(); }));
-
-  const template = templateFor(templates, loc.templateId);
-  for (const f of template?.fields || []) {
-    const field = document.createElement("div");
-    field.className = "field";
-    const lab = document.createElement("label");
-    lab.textContent = f.label;
-    field.appendChild(lab);
-    const hint = buildFieldHint(f.type);
-    if (hint) field.appendChild(hint);
-    const input = document.createElement(f.type === "input" ? "input" : "textarea");
-    input.value = loc[f.key] || "";
-    input.addEventListener("input", () => {
-      loc[f.key] = input.value;
-      persist();
-    });
-    field.appendChild(input);
-    drawer.appendChild(field);
-  }
-
-  drawer.appendChild(
-    buildTagsField(tagsMap, loc.tags, (value) => {
-      loc.tags = value;
-      persist();
-    })
-  );
-
-  // Дочерние локации — тем же приёмом, что у детей персонажа
-  // (characters.js): просто список имён, без отдельной кнопки перехода —
-  // щёлкнуть по нужной проще прямо в сетке (она уже стоит рядом, отступом
-  // ниже).
-  const kids = locations.filter((l) => l.parentId === loc.id);
-  if (kids.length) {
-    const kidsField = document.createElement("div");
-    kidsField.className = "field";
-    const kidsLabel = document.createElement("label");
-    kidsLabel.textContent = i18n("Локации внутри");
-    kidsField.appendChild(kidsLabel);
-    const kidsValue = document.createElement("div");
-    kidsValue.className = "readonly-value";
-    kidsValue.textContent = kids.map((k) => k.name || i18n("Без имени")).join(", ");
-    kidsField.appendChild(kidsValue);
-    drawer.appendChild(kidsField);
-  }
-
-  const reverse = reverseLinksFor(loc);
-  if (reverse) drawer.appendChild(reverse);
 
   const actions = document.createElement("div");
-  actions.className = "drawer-actions";
-  const closeBtn = document.createElement("button");
-  closeBtn.className = "btn";
-  closeBtn.textContent = i18n("Закрыть");
-  closeBtn.addEventListener("click", () => {
-    activeId = null;
-    draw();
-  });
+  actions.className = "dossier-actions";
   const delBtn = document.createElement("button");
   delBtn.className = "btn danger";
-  delBtn.textContent = i18n("Удалить");
+  delBtn.innerHTML = `${iconSvg("trash", 14)}<span>${escapeHtml(i18n("Удалить"))}</span>`;
   delBtn.addEventListener("click", async () => {
     await pushTrash("location", loc);
     locations = locations.filter((x) => x.id !== loc.id);
@@ -367,10 +515,116 @@ function buildDrawer(loc) {
     for (const l of locations) if (l.parentId === loc.id) l.parentId = null;
     activeId = null;
     persist();
-    draw();
+    if (inModal) closeEntityModal();
+    else draw();
   });
-  actions.append(closeBtn, delBtn);
-  drawer.appendChild(actions);
+  actions.appendChild(delBtn);
+  head.append(tile, titleCol, actions);
+  page.appendChild(head);
 
-  return drawer;
+  // ── Сводка
+  const facts = document.createElement("div");
+  facts.className = "dossier-facts";
+  facts.appendChild(buildFact(i18n("Тип"), buildSelect(LOCATION_TYPES.map(([v, l]) => [v, l]), locationTypeInfo(loc.type)[0], (value) => {
+    loc.type = value;
+    persist();
+    draw();
+  })));
+  const excluded = descendantIds(loc.id);
+  excluded.add(loc.id);
+  const parentOptions = [["", "– верхний уровень –"], ...locations.filter((l) => !excluded.has(l.id)).map((l) => [l.id, l.name || i18n("Без имени")])];
+  facts.appendChild(buildFact(i18n("Входит в"), buildSelect(parentOptions, loc.parentId || "", (value) => {
+    loc.parentId = value || null;
+    persist();
+    draw();
+  })));
+  facts.appendChild(buildFactText(i18n("На карте"), [...new Set(info.pins.map((x) => x.map.name))].join(", ")));
+  facts.appendChild(buildFactText(i18n("Внутри"), info.children.length ? i18nPlural(info.children.length, ["{n} место", "{n} места", "{n} мест"]) : ""));
+  page.appendChild(facts);
+
+  // ── Основная колонка и боковая
+  const cols = document.createElement("div");
+  cols.className = "dossier-cols";
+  const main = document.createElement("div");
+  main.className = "dossier-main";
+  const side = document.createElement("aside");
+  side.className = "dossier-side";
+
+  main.appendChild(buildMapBlock(info));
+  main.appendChild(sectionHeading(i18n("Анкета")));
+  main.appendChild(buildTemplateFields(loc, templateFor(templates, loc.templateId)?.fields || [], [], () => persist()));
+
+  main.appendChild(sectionHeading(i18n("Что здесь происходит")));
+  for (const e of info.events) {
+    const people = (e.characterIds || []).map((id) => characters.find((c) => c.id === id)).filter(Boolean);
+    main.appendChild(buildEventRow(e, peopleHtml(people, 8)));
+  }
+  if (!info.events.length) main.appendChild(buildNone(i18n("Событий здесь пока нет")));
+
+  main.appendChild(sectionHeading(i18n("Облик и метки")));
+  main.appendChild(buildAvatarsField(loc, () => { persist(); draw(); }));
+  main.appendChild(buildTagsField(tagsMap, loc.tags, (value) => {
+    loc.tags = value;
+    persist();
+  }));
+
+  side.appendChild(sectionHeading(i18n("Кто здесь бывает")));
+  for (const c of info.people) {
+    side.appendChild(buildLinkRow(personAvatarHtml(c), c.name || i18n("Без имени"), c.role || "", () => openEntity("character", c.id)));
+  }
+  if (!info.people.length) side.appendChild(buildNone(i18n("Пока никого")));
+
+  side.appendChild(sectionHeading(i18n("Фракции")));
+  for (const f of info.hqOf) {
+    side.appendChild(buildLinkRow(iconLead(iconSvg(factionTypeInfo(f.type)[2], 13)), f.name || i18n("Без названия"), i18n("штаб-квартира"), () => openEntity("faction", f.id)));
+  }
+  if (!info.hqOf.length) side.appendChild(buildNone(i18n("Ничья не штаб-квартира")));
+
+  side.appendChild(sectionHeading(i18n("Вложенность")));
+  side.appendChild(info.parent
+    ? buildLinkRow(iconLead(iconSvg("folder", 13)), info.parent.name || i18n("Без имени"), i18n("входит в"), () => selectPlace(info.parent.id))
+    : buildLinkRow(iconLead(iconSvg("folder", 13)), i18n("Верхний уровень"), i18n("входит в")));
+  for (const { pin } of info.pins) {
+    const inner = pin.linkedMapId && mapData.maps?.[pin.linkedMapId];
+    if (inner) side.appendChild(buildLinkRow(iconLead(iconSvg("map", 13)), inner.name || i18n("Без названия"), i18n("своя карта")));
+  }
+  for (const k of info.children) {
+    side.appendChild(buildLinkRow(iconLead(iconSvg(locationTypeInfo(k.type)[2], 13)), k.name || i18n("Без имени"), i18n(locationTypeInfo(k.type)[1]), () => selectPlace(k.id)));
+  }
+  const addInside = document.createElement("button");
+  addInside.className = "btn rel-mini-add";
+  addInside.textContent = i18n("+ Место внутри");
+  addInside.addEventListener("click", () => addWithTemplate(loc.templateId, loc.id));
+  side.appendChild(addInside);
+
+  side.appendChild(sectionHeading(i18n("Главы")));
+  for (const ch of info.chapters) {
+    side.appendChild(buildLinkRow(iconLead(iconSvg("manuscript", 13)), chapterLabel(ch, manuscript.books), "", () => openEntity("chapter", ch.id)));
+  }
+  if (!info.chapters.length) side.appendChild(buildNone(i18n("Не указано ни в одной главе")));
+
+  cols.append(main, side);
+  page.appendChild(cols);
+  return page;
+}
+
+// Карта на странице места — вся, с подсвеченной меткой; соседние метки
+// подписаны. Мест на нескольких картах — первая из них.
+function buildMapBlock(info) {
+  const wrap = document.createElement("div");
+  const first = info.pins.find((x) => x.map.imageRelPath);
+  if (!first) {
+    wrap.className = "loc-map loc-map-none";
+    wrap.innerHTML = `${iconSvg("map", 22)}<span>${escapeHtml(i18n("Место пока не отмечено ни на одной карте – метку ставят во вкладке «Карта»"))}</span>`;
+    return wrap;
+  }
+  wrap.className = "loc-map";
+  const dots = (first.map.pins || []).map((p) => `
+    <i class="${p === first.pin ? "on" : ""}" style="left:${p.x}%;top:${p.y}%"><b>${escapeHtml(p.label || "")}</b></i>
+  `).join("");
+  wrap.innerHTML = `
+    <div class="loc-map-inner"><img src="/${first.map.imageRelPath}" alt="">${dots}</div>
+    <span class="loc-map-caption">${iconSvg("map", 13)}${escapeHtml(first.map.name || "")}</span>
+  `;
+  return wrap;
 }

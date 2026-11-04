@@ -1,19 +1,24 @@
 import { apiGet, apiPost, uid } from "./api.js";
 import { flattenBoards, cardCharacterIds } from "./board-data.js";
 import { debounceSave } from "./save-badge.js";
-import { escapeHtml, characterSelect, buildEmptyState, reorderById, attachCardDrag } from "./chips.js";
+import { escapeHtml, characterSelect, buildEmptyState } from "./chips.js";
 import { pushTrash } from "./trash.js";
 import { loadTagsMap, buildTagsField, parseTags, stringifyTags } from "./tags.js";
 import { buildNameGeneratorButton } from "./name-generator.js";
 import { avatarInnerHtml, buildAvatarsField } from "./avatars.js";
 import { iconSvg } from "./icons.js";
-import { loadTemplates, saveTemplates, templateFor, buildFieldHint } from "./templates.js";
+import { loadTemplates, saveTemplates, templateFor } from "./templates.js";
 import { chooseTemplate } from "./template-choice.js";
 import { openTemplateEditorModal } from "./template-editor-modal.js";
 import { closeEntityModal } from "./entity-modal.js";
 import { findMentionedIds } from "./mentions.js";
 import { chapterLabel } from "./books.js";
 import { i18n, i18nPlural } from "./i18n.js";
+import {
+  readPref, writePref, buildSegmented, buildEntityToolbar, buildOverviewSection, buildDossierList, buildDossierSplit,
+  updateListRow, sectionHeading, buildNone, buildFact, buildFactText, buildSelect, buildNameInput, buildTemplateFields,
+  buildLinkRow, iconLead, openEntity, shortName, initials, personAvatarHtml,
+} from "./entity-view.js";
 import {
   PARENT_KINDS, PARTNER_KINDS, GENDERS, parentKind, setParentKind, forgetParent, partnerKind, setPartnerKind, forgetPartner,
   isDead, relativesOf, familyComponents, surnameHouseName,
@@ -39,7 +44,6 @@ const PALETTE = [
   "#6a8fae", "#9a9250", "#b5636b", "#5a8a5f",
 ];
 
-// Выбор режима и группировки — предпочтение этого устройства, не мира.
 const MODE_KEY = "fictaris_characters_mode";
 const GROUP_KEY = "fictaris_characters_group";
 const MODES = [
@@ -73,10 +77,6 @@ const TIERS = [
 // карточки доски, метки) нужно, чтобы без явной отметки считаться главным.
 const MAIN_SCORE = 4;
 
-// Титулы не дают букву аватарке: у «Лорда Эдвина» и «Леди Миры» не
-// должно быть одинаковое «Л».
-const HONORIFICS = /^(лорд|леди|сир|сэр|король|королева|князь|княгиня|принц|принцесса|мастер|старый|старая|lord|lady|sir|king|queen|prince|princess|master|old)\s+/i;
-
 let characters = [];
 let relationships = [];
 let tagsMap = {};
@@ -99,23 +99,6 @@ let bodyEl = null;
 let metaEl = null;
 const save = debounceSave((list) => apiPost("/api/characters", list));
 const saveRelationships = debounceSave((list) => apiPost("/api/relationships", list));
-
-function readPref(key, allowed, fallback) {
-  try {
-    const v = localStorage.getItem(key);
-    return allowed.includes(v) ? v : fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-function writePref(key, value) {
-  try {
-    localStorage.setItem(key, value);
-  } catch {
-    // приватное окно и т.п. — выбор просто не запомнится
-  }
-}
 
 function persist() {
   save(characters);
@@ -166,15 +149,6 @@ function blank(templateId) {
     parentIds: [],
     templateId: templateId || templates[0]?.id || "default",
   };
-}
-
-function shortName(name) {
-  const rest = (name || "").trim().replace(HONORIFICS, "");
-  return rest.split(/\s+/)[0] || (name || "").trim();
-}
-
-function initials(name) {
-  return (shortName(name) || "?").slice(0, 1).toUpperCase();
 }
 
 export async function renderCharacters(root, focusId) {
@@ -315,10 +289,6 @@ function kinLine(c, max) {
     .join(" · ");
 }
 
-function avatarHtml(c, cls) {
-  return `<div class="${cls}" style="background:${c.color}">${avatarInnerHtml(c, escapeHtml(initials(c.name)))}</div>`;
-}
-
 function deadMark(c) {
   return isDead(c) ? ` <span class="cast-dagger" title="${escapeHtml(i18n("Умер(ла)"))}">†</span>` : "";
 }
@@ -354,75 +324,37 @@ function drawBody() {
   bodyEl.appendChild(mode === "cast" ? buildCast() : buildDossierView());
 }
 
-function buildSegmented(options, value, onPick) {
-  const seg = document.createElement("div");
-  seg.className = "segmented";
-  for (const [key, label, title] of options) {
-    const btn = document.createElement("button");
-    btn.className = "segmented-btn" + (key === value ? " active" : "");
-    btn.textContent = i18n(label);
-    if (title) btn.title = i18n(title);
-    btn.addEventListener("click", () => onPick(key));
-    seg.appendChild(btn);
-  }
-  return seg;
-}
-
 function buildToolbar() {
-  const bar = document.createElement("div");
-  bar.className = "timeline-toolbar";
-
-  const title = document.createElement("div");
-  title.className = "timeline-heading";
-  title.textContent = i18n("Персонажи");
-
-  metaEl = document.createElement("div");
-  metaEl.className = "timeline-meta";
-
-  const modes = buildSegmented(MODES, mode, (key) => {
-    mode = key;
-    writePref(MODE_KEY, mode);
-    draw();
-  });
-  bar.append(title, metaEl, modes);
-
-  if (mode === "cast") {
-    bar.appendChild(buildSegmented(GROUPS, groupBy, (key) => {
+  const extra = mode === "cast"
+    ? buildSegmented(GROUPS, groupBy, (key) => {
       groupBy = key;
       writePref(GROUP_KEY, groupBy);
       draw();
-    }));
-  }
-
-  const spacer = document.createElement("div");
-  spacer.style.flex = "1";
-
-  const search = document.createElement("input");
-  search.type = "search";
-  search.className = "characters-search";
-  search.placeholder = i18n("Имя, роль или тег…");
-  search.value = query;
-  search.addEventListener("input", () => {
-    query = search.value;
-    drawBody();
+    })
+    : null;
+  const pickTemplate = (btn, forceMenu) =>
+    chooseTemplate(templates, btn, addWithTemplate, { forceMenu, onCreateNew: addWithNewTemplate });
+  const { bar, metaEl: meta } = buildEntityToolbar({
+    title: i18n("Персонажи"),
+    modes: MODES,
+    mode,
+    onMode: (key) => {
+      mode = key;
+      writePref(MODE_KEY, mode);
+      draw();
+    },
+    extra,
+    placeholder: i18n("Имя, роль или тег…"),
+    query,
+    onSearch: (value) => {
+      query = value;
+      drawBody();
+    },
+    addLabel: i18n("+ Персонаж"),
+    onAdd: (btn) => pickTemplate(btn, false),
+    onAddMenu: (btn) => pickTemplate(btn, true),
   });
-
-  const addBtn = document.createElement("button");
-  addBtn.className = "btn characters-add-btn";
-  addBtn.textContent = i18n("+ Персонаж");
-  addBtn.title = i18n("Правая кнопка – выбрать шаблон анкеты или завести новый");
-  addBtn.addEventListener("click", () => {
-    chooseTemplate(templates, addBtn, addWithTemplate, { onCreateNew: addWithNewTemplate });
-  });
-  // Правая кнопка форсирует меню выбора шаблона, даже если он пока один —
-  // иначе "+ Новый шаблон…" был бы недостижим, пока не заведён хотя бы
-  // второй шаблон (см. комментарий в template-choice.js).
-  addBtn.addEventListener("contextmenu", (e) => {
-    e.preventDefault();
-    chooseTemplate(templates, addBtn, addWithTemplate, { forceMenu: true, onCreateNew: addWithNewTemplate });
-  });
-
-  bar.append(spacer, search, addBtn);
+  metaEl = meta;
   return bar;
 }
 
@@ -451,23 +383,13 @@ function buildCast() {
   const dragState = { current: null };
   const addSection = (title, members, render) => {
     if (!members.length) return;
-    const sec = document.createElement("section");
-    sec.className = "cast-section";
-    sec.innerHTML = `<div class="cast-section-head"><h3>${escapeHtml(title)}</h3><span>${members.length}</span></div>`;
-    const grid = document.createElement("div");
-    grid.className = "cast-grid";
-    for (const c of members) {
-      const card = render(c);
-      card.addEventListener("click", () => openDossier(c.id));
-      attachCardDrag(card, c.id, dragState, (draggedId, targetId) => {
-        characters = reorderById(characters, draggedId, targetId);
-        persist();
-        drawBody();
-      });
-      grid.appendChild(card);
-    }
-    sec.appendChild(grid);
-    scroll.appendChild(sec);
+    scroll.appendChild(buildOverviewSection(title, members, {
+      render,
+      onOpen: openDossier,
+      dragState,
+      list: () => characters,
+      onReorder: reorder,
+    }));
   };
   const byTier = (c) => (tierOf(c) === "main" ? buildMainCard(c) : buildPlainCard(c));
 
@@ -514,7 +436,7 @@ function buildMainCard(c) {
   card.className = "cast-card cast-card-main";
   card.innerHTML = `
     <div class="cast-card-head">
-      ${avatarHtml(c, "cast-avatar cast-avatar-lg")}
+      ${personAvatarHtml(c, "cast-avatar cast-avatar-lg")}
       <div class="cast-card-title">
         <div class="cast-name">${escapeHtml(c.name || i18n("Без имени"))}${deadMark(c)}</div>
         ${c.role ? `<div class="cast-role">${escapeHtml(c.role)}</div>` : ""}
@@ -536,7 +458,7 @@ function buildPlainCard(c) {
   const card = document.createElement("button");
   card.className = "cast-card cast-card-plain" + (isDead(c) ? " dead" : "");
   card.innerHTML = `
-    ${avatarHtml(c, "cast-avatar")}
+    ${personAvatarHtml(c, "cast-avatar")}
     <div class="cast-card-title">
       <div class="cast-name-sm">${escapeHtml(c.name || i18n("Без имени"))}${deadMark(c)}</div>
       ${c.role ? `<div class="cast-role">${escapeHtml(c.role)}</div>` : ""}
@@ -549,77 +471,36 @@ function buildPlainCard(c) {
 // ── «Досье» ────────────────────────────────────
 
 function buildDossierView() {
-  const split = document.createElement("div");
-  split.className = "dossier-split";
-
-  const list = document.createElement("div");
-  list.className = "dossier-list";
   const shown = characters.filter(matches);
   if (!characters.some((c) => c.id === activeId)) activeId = (shown[0] || characters[0])?.id || null;
-
-  const dragState = { current: null };
-  for (const [key, label] of TIERS) {
-    const members = shown.filter((c) => tierOf(c) === key);
-    if (!members.length) continue;
-    const head = document.createElement("div");
-    head.className = "dossier-list-group";
-    head.innerHTML = `${escapeHtml(i18n(label))}<span>${members.length}</span>`;
-    list.appendChild(head);
-    for (const c of members) {
-      const row = document.createElement("button");
-      row.className = "dossier-row" + (c.id === activeId ? " active" : "") + (isDead(c) ? " dead" : "");
-      row.dataset.id = c.id;
-      row.innerHTML = `
-        ${avatarHtml(c, "cast-avatar cast-avatar-sm")}
-        <div class="dossier-row-text">
-          <div class="dossier-row-name">${escapeHtml(c.name || i18n("Без имени"))}${deadMark(c)}</div>
-          <div class="dossier-row-role">${escapeHtml(c.role || "")}</div>
-        </div>
-      `;
-      row.addEventListener("click", () => {
-        activeId = c.id;
-        drawBody();
-      });
-      attachCardDrag(row, c.id, dragState, (draggedId, targetId) => {
-        characters = reorderById(characters, draggedId, targetId);
-        persist();
-        drawBody();
-      });
-      list.appendChild(row);
-    }
-  }
-  if (!shown.length) {
-    const none = document.createElement("div");
-    none.className = "dossier-none";
-    none.textContent = i18n(characters.length ? "Никого не нашлось." : "Персонажей пока нет.");
-    list.appendChild(none);
-  }
-
-  const detail = document.createElement("div");
-  detail.className = "dossier-detail";
+  const groups = TIERS.map(([key, label]) => ({
+    title: i18n(label),
+    items: shown.filter((c) => tierOf(c) === key).map((c) => ({
+      item: c,
+      leadHtml: personAvatarHtml(c, "cast-avatar cast-avatar-sm"),
+      sub: c.role,
+      dead: isDead(c),
+      nameSuffix: deadMark(c),
+    })),
+  }));
+  const list = buildDossierList(groups, activeId, {
+    onPick: (id) => {
+      activeId = id;
+      drawBody();
+    },
+    dragState: { current: null },
+    list: () => characters,
+    onReorder: reorder,
+    emptyText: i18n(characters.length ? "Никого не нашлось." : "Персонажей пока нет."),
+  });
   const active = characters.find((c) => c.id === activeId);
-  if (active) detail.appendChild(buildDossier(active));
-  else detail.appendChild(buildEmptyState(i18n("Персонажей пока нет – добавь первого."), "user"));
-
-  split.append(list, detail);
-  return split;
+  return buildDossierSplit(list, active ? buildDossier(active) : buildEmptyState(i18n("Персонажей пока нет – добавь первого."), "user"));
 }
 
-// Многострочное поле досье растёт по тексту, а не прокручивается внутри.
-function autoGrow(textarea) {
-  const fit = () => {
-    textarea.style.height = "auto";
-    textarea.style.height = `${textarea.scrollHeight + 2}px`;
-  };
-  textarea.addEventListener("input", fit);
-  requestAnimationFrame(fit);
-}
-
-function sideHeading(text) {
-  const h = document.createElement("h4");
-  h.className = "dossier-heading";
-  h.textContent = text;
-  return h;
+function reorder(list) {
+  characters = list;
+  persist();
+  drawBody();
 }
 
 function buildDossier(c) {
@@ -629,9 +510,6 @@ function buildDossier(c) {
   const fields = template?.fields || [];
   const roleField = fields.find((f) => f.key === "role");
   const ageField = fields.find((f) => f.key === "age");
-
-  // Имя и роль меняют строку в списке слева сразу, без перерисовки.
-  const listRow = () => bodyEl?.querySelector(`.dossier-row[data-id="${CSS.escape(c.id)}"]`);
 
   // ── Шапка
   const head = document.createElement("div");
@@ -645,20 +523,13 @@ function buildDossier(c) {
   titleCol.className = "dossier-title";
   const nameRow = document.createElement("div");
   nameRow.className = "drawer-name-row";
-  const nameField = document.createElement("input");
-  nameField.className = "dossier-name";
-  nameField.value = c.name || "";
-  nameField.placeholder = i18n("Без имени");
+  // Имя и роль меняют строку в списке слева сразу, без перерисовки.
   const onName = () => {
-    const row = listRow();
-    if (row) row.querySelector(".dossier-row-name").textContent = c.name || i18n("Без имени");
+    updateListRow(bodyEl, c.id, { name: c.name });
     if (!c.images?.[0]) avatar.textContent = initials(c.name);
     persist();
   };
-  nameField.addEventListener("input", () => {
-    c.name = nameField.value;
-    onName();
-  });
+  const nameField = buildNameInput(c, onName);
   nameRow.append(nameField, buildNameGeneratorButton((name) => {
     nameField.value = name;
     c.name = name;
@@ -673,8 +544,7 @@ function buildDossier(c) {
     role.placeholder = i18n("Роль в истории");
     role.addEventListener("input", () => {
       c.role = role.value;
-      const row = listRow();
-      if (row) row.querySelector(".dossier-row-role").textContent = c.role;
+      updateListRow(bodyEl, c.id, { sub: c.role });
       persist();
     });
     titleCol.appendChild(role);
@@ -715,36 +585,10 @@ function buildDossier(c) {
   const side = document.createElement("aside");
   side.className = "dossier-side";
 
-  main.appendChild(sideHeading(i18n("Анкета")));
-  const grid = document.createElement("div");
-  grid.className = "dossier-fields";
-  for (const f of fields) {
-    if (f === roleField || f === ageField) continue;
-    const field = document.createElement("label");
-    field.className = "dossier-field" + (f.type === "input" ? "" : " wide");
-    const lab = document.createElement("span");
-    lab.className = "dossier-field-label";
-    lab.textContent = f.label;
-    field.appendChild(lab);
-    const hint = buildFieldHint(f.type);
-    if (hint) field.appendChild(hint);
-    const input = document.createElement(f.type === "input" ? "input" : "textarea");
-    input.value = c[f.key] || "";
-    input.placeholder = i18n("Не заполнено");
-    if (f.type !== "input") {
-      input.rows = 1;
-      autoGrow(input);
-    }
-    input.addEventListener("input", () => {
-      c[f.key] = input.value;
-      persist();
-    });
-    field.appendChild(input);
-    grid.appendChild(field);
-  }
-  main.appendChild(grid);
+  main.appendChild(sectionHeading(i18n("Анкета")));
+  main.appendChild(buildTemplateFields(c, fields, ["role", "age"], () => persist()));
 
-  main.appendChild(sideHeading(i18n("Облик и метки")));
+  main.appendChild(sectionHeading(i18n("Облик и метки")));
   const colorRow = document.createElement("div");
   colorRow.className = "color-row";
   for (const color of PALETTE) {
@@ -765,32 +609,16 @@ function buildDossier(c) {
     persist();
   }));
 
-  side.appendChild(sideHeading(i18n("Отношения")));
+  side.appendChild(sectionHeading(i18n("Отношения")));
   side.appendChild(buildRelationshipsField(c));
-  side.appendChild(sideHeading(i18n("Семья")));
+  side.appendChild(sectionHeading(i18n("Семья")));
   side.appendChild(buildFamily(c));
-  side.appendChild(sideHeading(i18n("В сюжете")));
+  side.appendChild(sectionHeading(i18n("В сюжете")));
   side.appendChild(buildAppearances(c));
 
   cols.append(main, side);
   page.appendChild(cols);
   return page;
-}
-
-function buildFact(label, control) {
-  const cell = document.createElement("label");
-  cell.className = "dossier-fact";
-  const span = document.createElement("span");
-  span.textContent = label;
-  cell.append(span, control);
-  return cell;
-}
-
-function buildFactText(label, text) {
-  const value = document.createElement("div");
-  value.className = "dossier-fact-value";
-  value.textContent = text || "–";
-  return buildFact(label, value);
 }
 
 function buildFacts(c, ageField) {
@@ -810,7 +638,7 @@ function buildFacts(c, ageField) {
 
   // Пол — необязателен; нужен Родословной, чтобы писать «отец», «сестра»,
   // «мачеха», а не «родитель», «брат или сестра».
-  facts.appendChild(buildFact(i18n("Пол"), buildKindSelect(GENDERS, c.gender || "", (value) => {
+  facts.appendChild(buildFact(i18n("Пол"), buildSelect(GENDERS, c.gender || "", (value) => {
     if (value) c.gender = value;
     else delete c.gender;
     persist();
@@ -819,7 +647,7 @@ function buildFacts(c, ageField) {
 
   const roleNames = ROLE_TAGS.map(([name]) => name);
   const autoLabel = TIERS.find(([k]) => k === (isDead(c) ? "gone" : autoTier(c)))[1];
-  const role = buildKindSelect(
+  const role = buildSelect(
     [["", i18n("Сам решит: {tier}", { tier: i18n(autoLabel).toLowerCase() })], ...roleNames.map((n) => [n, n])],
     findTag(c, roleNames),
     (value) => {
@@ -831,7 +659,7 @@ function buildFacts(c, ageField) {
   role.title = i18n("Пока не выбрано, главными считаются те, у кого больше всего сцен, событий и связей");
   facts.appendChild(buildFact(i18n("Роль в сюжете"), role));
 
-  facts.appendChild(buildFact(i18n("Статус"), buildKindSelect(
+  facts.appendChild(buildFact(i18n("Статус"), buildSelect(
     [["", "не указан"], ...STATUS_TAGS.map((n) => [n, n])],
     findTag(c, STATUS_TAGS),
     (value) => {
@@ -870,22 +698,13 @@ function buildFamily(c) {
     : [];
   const kin = groups.flat();
   for (const x of kin) {
-    const row = document.createElement("button");
-    row.className = "dossier-link-row";
-    row.innerHTML = `${avatarHtml(x.c, "cast-avatar cast-avatar-xs")}<span>${escapeHtml(x.c.name || i18n("Без имени"))}</span><small>${escapeHtml(x.label)}</small>`;
-    row.addEventListener("click", () => {
+    wrap.appendChild(buildLinkRow(personAvatarHtml(x.c, "cast-avatar cast-avatar-xs"), x.c.name || i18n("Без имени"), x.label, () => {
       activeId = x.c.id;
       if (inModal) draw();
       else drawBody();
-    });
-    wrap.appendChild(row);
+    }));
   }
-  if (!kin.length) {
-    const none = document.createElement("div");
-    none.className = "dossier-none";
-    none.textContent = i18n("Родня не указана");
-    wrap.appendChild(none);
-  }
+  if (!kin.length) wrap.appendChild(buildNone(i18n("Родня не указана")));
 
   const edit = document.createElement("details");
   edit.className = "dossier-family-edit";
@@ -900,28 +719,15 @@ function buildAppearances(c) {
   const p = plot.get(c.id);
   const wrap = document.createElement("div");
   wrap.className = "dossier-appearances";
-  const row = (icon, text, note, onClick) => {
-    const el = document.createElement(onClick ? "button" : "div");
-    el.className = "dossier-link-row";
-    el.innerHTML = `<span class="dossier-row-icon">${iconSvg(icon, 13)}</span><span>${escapeHtml(text)}</span>${note ? `<small>${escapeHtml(note)}</small>` : ""}`;
-    if (onClick) el.addEventListener("click", onClick);
-    wrap.appendChild(el);
-  };
-  for (const ch of p.chapters) {
-    row("manuscript", chapterLabel(ch, manuscript.books), "", () => {
-      document.dispatchEvent(new CustomEvent("fictaris:open-chapter", { detail: { id: ch.id } }));
-    });
-  }
+  const row = (icon, text, note, onClick) => wrap.appendChild(buildLinkRow(iconLead(iconSvg(icon, 13)), text, note, onClick));
+  for (const ch of p.chapters) row("manuscript", chapterLabel(ch, manuscript.books), "", () => openEntity("chapter", ch.id));
   for (const e of p.events) row("timeline", e.title || i18n("Без названия"), e.date || "");
-  for (const x of p.facs) row("factions", x.faction.name || i18n("Без названия"), x.leader ? i18n("глава") : "");
+  for (const x of p.facs) {
+    row("factions", x.faction.name || i18n("Без названия"), x.leader ? i18n("глава") : "", () => openEntity("faction", x.faction.id));
+  }
   for (const card of p.boardCards) row("board", card.title || i18n("Без названия"), "");
   for (const x of p.pins) row("map", x.pin.label || i18n("Метка"), x.map.name || "");
-  if (!wrap.children.length) {
-    const none = document.createElement("div");
-    none.className = "dossier-none";
-    none.textContent = i18n("Пока нигде не встречается");
-    wrap.appendChild(none);
-  }
+  if (!wrap.children.length) wrap.appendChild(buildNone(i18n("Пока нигде не встречается")));
   return wrap;
 }
 
@@ -1021,20 +827,6 @@ function buildRelationshipsField(c) {
 // приёмный / предполагаемый, у пары — её вид (kinship.js). Состав строки
 // меняется вместе с выбором, поэтому обе части перерисовываются своими
 // локальными функциями, а не одним onChange наружу.
-function buildKindSelect(options, value, onChange) {
-  const select = document.createElement("select");
-  select.className = "kin-kind-select";
-  for (const [key, label] of options) {
-    const opt = document.createElement("option");
-    opt.value = key;
-    opt.textContent = i18n(label);
-    opt.selected = key === value;
-    select.appendChild(opt);
-  }
-  select.addEventListener("change", () => onChange(select.value));
-  return select;
-}
-
 function buildKindRow(row, name, select) {
   const item = document.createElement("label");
   item.className = "parent-adopt-chip";
@@ -1064,7 +856,7 @@ function buildParentsField(c) {
     for (const pid of c.parentIds || []) {
       const p = characters.find((x) => x.id === pid);
       if (!p) continue;
-      buildKindRow(kindsRow, p.name, buildKindSelect(PARENT_KINDS, parentKind(c, pid), (kind) => {
+      buildKindRow(kindsRow, p.name, buildSelect(PARENT_KINDS, parentKind(c, pid), (kind) => {
         setParentKind(c, pid, kind);
         persist();
       }));
@@ -1119,7 +911,7 @@ function buildPartnersField(c) {
     for (const pid of c.partnerIds || []) {
       const other = characters.find((x) => x.id === pid);
       if (!other) continue;
-      buildKindRow(kindsRow, other.name, buildKindSelect(PARTNER_KINDS, partnerKind(c, pid), (kind) => {
+      buildKindRow(kindsRow, other.name, buildSelect(PARTNER_KINDS, partnerKind(c, pid), (kind) => {
         setPartnerKind(c, other, kind);
         persist();
       }));

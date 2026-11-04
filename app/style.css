@@ -754,8 +754,9 @@ body.focus-mode .sidebar { display: none; }
   align-content: start;
 }
 
-/* Персонажи (characters.js) — шапка вкладки и два режима: «Состав»
-   (группы карточек) и «Досье» (список + страница персонажа). */
+/* Персонажи, локации, фракции (characters.js, locations.js, factions.js,
+   общее — entity-view.js): шапка вкладки и два режима — обзор карточками
+   и досье (список + страница). */
 .characters-pane { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; container-type: inline-size; }
 .characters-body { flex: 1; min-height: 0; display: flex; }
 .characters-search {
@@ -788,6 +789,7 @@ body.focus-mode .sidebar { display: none; }
 }
 .cast-avatar-lg { --size: 56px; }
 .cast-avatar-sm { --size: 30px; }
+.cast-avatar-md { --size: 36px; }
 .cast-avatar-xs { --size: 22px; }
 .cast-dagger { color: var(--text-faint); font-weight: 400; }
 .dead .cast-avatar { filter: grayscale(0.7) brightness(0.8); }
@@ -869,6 +871,7 @@ body.focus-mode .sidebar { display: none; }
 }
 .dossier-name { font-family: var(--font-book); font-size: 2rem; font-weight: 600; line-height: 1.2; }
 .dossier-role { font-family: var(--font-ui); font-size: 0.95rem; color: var(--text-dim); }
+.dossier-subtitle { font-size: 0.95rem; color: var(--text-dim); }
 .dossier-name:hover, .dossier-role:hover { border-color: var(--border); }
 .dossier-name:focus, .dossier-role:focus { outline: none; border-color: var(--accent); background: var(--panel-alt); }
 .dossier-actions { align-self: flex-start; display: flex; gap: 6px; }
@@ -938,13 +941,76 @@ body.focus-mode .sidebar { display: none; }
 }
 button.dossier-link-row { cursor: pointer; }
 button.dossier-link-row:hover { background: var(--panel); }
-.dossier-link-row > span:not(.dossier-row-icon) { flex: 1; min-width: 0; }
+.dossier-link-text { flex: 1; min-width: 0; }
 .dossier-link-row small { color: var(--text-faint); font-size: 0.75rem; text-align: right; }
 .dossier-row-icon { display: flex; color: var(--text-faint); }
 .dossier-family-edit { margin-top: 10px; }
 .dossier-family-edit summary { cursor: pointer; color: var(--text-dim); font-size: 0.82rem; padding: 4px 0; }
 .dossier-family-edit summary:hover { color: var(--text); }
 .dossier-family-edit[open] summary { margin-bottom: 10px; }
+
+.dossier-avatars { display: flex; }
+.dossier-avatars .cast-avatar { box-shadow: 0 0 0 2px var(--card); border-radius: 50%; }
+.dossier-avatars .cast-avatar + .cast-avatar { margin-left: -5px; }
+.dossier-event { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 14px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.dossier-event-date { padding-top: 2px; font-size: 0.8rem; color: var(--text-faint); }
+.dossier-event-body { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.dossier-event-body b { font-size: 0.92rem; font-weight: 600; }
+.dossier-event-body p { margin: 0; font-size: 0.84rem; color: var(--text-dim); }
+.dossier-main > .dossier-heading + .dossier-none { margin-bottom: 4px; }
+
+/* Локации: карточка с куском карты сверху, страница с картой целиком. */
+.loc-card { flex-direction: column; padding: 0; overflow: hidden; border-radius: 12px; align-self: stretch; }
+.loc-card-body { flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 14px 16px; }
+.loc-card .cast-card-head { margin-bottom: 0; }
+.loc-blurb { margin: 0; font-size: 0.86rem; line-height: 1.45; }
+.loc-hq { display: inline-flex; align-items: center; gap: 6px; font-size: 0.8rem; color: var(--text-dim); }
+.loc-minimap { position: relative; height: 130px; overflow: hidden; border-bottom: 1px solid var(--border); background: var(--panel-alt); }
+.loc-minimap > span { position: absolute; left: 12px; bottom: 8px; z-index: 1; font-size: 0.75rem; color: var(--text-dim); }
+.loc-minimap:not(.loc-minimap-none)::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to bottom, transparent 50%, rgba(20, 17, 13, 0.75)); }
+.loc-minimap-inner { position: absolute; left: 50%; top: 50%; width: 220%; }
+.loc-minimap-inner img { display: block; width: 100%; filter: sepia(0.2) brightness(0.8); }
+.loc-minimap-inner i, .loc-map-inner i { position: absolute; width: 8px; height: 8px; margin: -4px 0 0 -4px; border-radius: 50%; background: #5a4a30; box-shadow: 0 0 0 1px #f3ead9; }
+.loc-minimap-inner i b, .loc-map-inner i b { position: absolute; left: 12px; top: -6px; white-space: nowrap; font-family: var(--font-ui); font-size: 0.75rem; font-weight: 600; color: #3a2f1e; }
+.loc-minimap-inner i.on, .loc-map-inner i.on { width: 14px; height: 14px; margin: -7px 0 0 -7px; background: var(--accent); box-shadow: 0 0 0 4px rgba(201, 148, 74, 0.4), 0 0 0 1px #000; }
+.loc-map-inner i.on b { left: 20px; top: -3px; font-size: 0.82rem; color: #14110d; }
+.loc-minimap-none { display: flex; align-items: center; justify-content: center; color: color-mix(in srgb, var(--type-color) 70%, transparent); background: repeating-linear-gradient(135deg, var(--panel-alt) 0 10px, var(--panel) 10px 20px); }
+.loc-map { position: relative; overflow: hidden; border: 1px solid var(--border); border-radius: 10px; }
+.loc-map-inner { position: relative; }
+.loc-map-inner img { display: block; width: 100%; }
+.loc-map-caption { position: absolute; left: 10px; bottom: 10px; display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 6px; background: rgba(20, 17, 13, 0.8); font-size: 0.78rem; color: var(--text-dim); }
+.loc-map-none { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; min-height: 120px; padding: 16px; background: var(--panel-alt); color: var(--text-faint); font-size: 0.85rem; text-align: center; }
+.dossier-main > .loc-map + .dossier-heading { margin-top: 22px; }
+
+/* Фракции: «Расклад сил» — крупные карточки, ниже кто вне фракций. */
+.fac-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 16px; align-items: start; }
+.fac-card { flex-direction: column; gap: 12px; padding: 18px; border-radius: 12px; border-top: 3px solid var(--faction-color); }
+.fac-card:hover { border-top-color: var(--faction-color); }
+.fac-card .cast-card-head { margin-bottom: 0; }
+.fac-name { font-size: 1.35rem; }
+.fac-blurb { margin: 0; font-family: var(--font-book); font-size: 1rem; line-height: 1.45; color: var(--text-dim); }
+.fac-leader { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 8px; background: var(--panel-alt); }
+.fac-leader small { display: block; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-faint); }
+.fac-leader b { display: block; font-size: 0.95rem; }
+.fac-leader span { font-size: 0.78rem; color: var(--text-dim); }
+.fac-leader.empty { color: var(--placeholder); font-size: 0.85rem; font-style: italic; }
+.fac-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-faint); }
+.fac-members { display: flex; flex-wrap: wrap; gap: 6px; }
+.fac-member { display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 3px 10px 3px 4px; border: 1px solid var(--border); border-radius: 15px; background: none; color: var(--text); font-family: var(--font-ui); font-size: 0.82rem; }
+.fac-member .cast-avatar { border-radius: 50%; }
+button.fac-member { cursor: pointer; }
+button.fac-member:hover { border-color: var(--accent); }
+.fac-member em { font-style: normal; font-size: 0.72rem; color: var(--accent); }
+.fac-outside { margin-top: 28px; }
+.fac-tie { display: grid; grid-template-columns: 10px auto 1fr; column-gap: 8px; align-items: center; padding: 4px 0; font-size: 0.86rem; text-align: left; }
+.fac-tie i { width: 8px; height: 8px; border-radius: 50%; background: var(--tie-color); }
+.fac-tie span { font-size: 0.8rem; color: var(--tie-color); }
+.fac-tie small { grid-column: 2 / -1; font-size: 0.75rem; color: var(--text-faint); }
+.fac-tie-link { width: 100%; padding: 6px; margin: 0 -6px; border: none; border-radius: 6px; background: none; color: var(--text); font-family: var(--font-ui); cursor: pointer; }
+.fac-tie-link:hover { background: var(--panel); }
+.fac-member-remove { display: flex; padding: 4px; border-radius: 4px; color: var(--text-faint); }
+.fac-member-remove:hover { color: var(--color-3); background: var(--panel-alt); }
+.fac-member-add { width: 100%; margin-top: 8px; }
 
 @container (max-width: 860px) {
   .dossier-cols { grid-template-columns: minmax(0, 1fr); gap: 0; }
@@ -964,7 +1030,8 @@ button.dossier-link-row:hover { background: var(--panel); }
   .dossier-list { width: auto; max-height: 180px; border-right: none; border-bottom: 1px solid var(--border); }
   .dossier-detail { padding: 20px 16px 40px; }
   .cast-scroll { padding: 16px; }
-  .cast-grid { grid-template-columns: minmax(0, 1fr); }
+  .cast-grid, .fac-grid { grid-template-columns: minmax(0, 1fr); }
+  .dossier-event { grid-template-columns: minmax(0, 1fr); gap: 2px; }
   .characters-search { flex: 1; width: auto; }
 }
 
@@ -972,16 +1039,7 @@ button.dossier-link-row:hover { background: var(--panel); }
 
 .add-card { align-items: center; justify-content: center; text-align: center; padding: 14px; }
 
-/* Карточка персонажа/локации/фракции (characters.js/locations.js/
-   factions.js) — раньше короткая строка "имя + роль", а вся анкета
-   пряталась за отдельной модалкой-просмотром (открыть — прочитать —
-   закрыть — открыть редактор, три шага ради одного взгляда на поля).
-   Теперь то же содержимое анкеты сразу на карточке: шапка с аватаркой
-   не тянется на всю карточку, а просто строка сверху,
-   ниже — поля шаблона. Высота карточки фиксирована (ровная сетка), кто
-   не поместился — скрыт до наведения (.entity-card-fields ниже), а не
-   обрезан навсегда. Клик по карточке сразу открывает редактор (.drawer) —
-   отдельного режима "только посмотреть" больше нет. */
+/* Карточка-плитка в сетке карт и холстов (map.js, canvas.js). */
 .entity-card {
   display: flex;
   flex-direction: column;
@@ -996,72 +1054,6 @@ button.dossier-link-row:hover { background: var(--panel); }
 }
 
 .entity-card:hover { border-color: var(--accent); }
-
-.entity-card-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 14px;
-  border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
-}
-
-.entity-card-avatar {
-  width: 44px;
-  height: 44px;
-  border-radius: 8px;
-  flex-shrink: 0;
-  display: flex; align-items: center; justify-content: center;
-  font-family: var(--font-ui);
-  font-weight: 600;
-  font-size: 1.05rem;
-  color: #14110d;
-  overflow: hidden;
-}
-
-.entity-card-heading { min-width: 0; }
-
-/* Поля шаблона прямо на карточке — не всегда влезают в фиксированную
-   высоту (.entity-card), особенно у анкеты персонажа с 6-8 полями.
-   overflow: hidden по умолчанию (карточка не "разъезжается" в сетке
-   под соседей), а прокрутка появляется только когда навёл мышь и
-   явно собрался читать дальше, а не листать сетку глазами. */
-.entity-card-fields {
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-  padding: 10px 14px 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.entity-card:hover .entity-card-fields { overflow-y: auto; }
-
-/* Не поместившееся — плавно гаснет к низу карточки, а не обрезается
-   посреди строки; при наведении поля прокручиваются целиком (выше), и
-   затухание снимается. */
-.entity-card-fields {
-  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 36px), transparent);
-  mask-image: linear-gradient(to bottom, #000 calc(100% - 36px), transparent);
-}
-.entity-card:hover .entity-card-fields { -webkit-mask-image: none; mask-image: none; }
-
-.entity-card-field-label {
-  font-size: 0.68rem;
-  color: var(--text-faint);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  margin-bottom: 2px;
-}
-
-.entity-card-field-value {
-  font-size: 0.85rem;
-  color: var(--text);
-  white-space: pre-wrap;
-  line-height: 1.4;
-  overflow-wrap: anywhere;
-}
 
 /* Галерея изображений в дровере (app/js/avatars.js) — первое становится
    .char-avatar-img на лицевой стороне карточки (см. выше), остальные —
@@ -1178,24 +1170,6 @@ button.btn.icon-btn.gallery-nav:hover { background: rgba(0, 0, 0, 0.6); }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-
-/* Вложенность локаций (locations.js, orderedTree) — карточка-потомок
-   получает цветную полосу и отступ слева, пропорциональный глубине,
-   вместо честного дерева со связями: сама сетка карточек (.characters-grid)
-   остаётся как есть, отступ — единственное, что показывает вложенность. */
-.loc-child {
-  border-left: 3px solid var(--accent);
-  padding-left: calc(10px + (var(--loc-depth, 1) - 1) * 10px);
-}
-.loc-parent-badge {
-  margin-top: 2px;
-  font-size: 0.72rem;
-  color: var(--text-faint);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.loc-parent-badge:hover { color: var(--accent-hover); text-decoration: underline; }
 
 .add-card {
   border: 1px dashed var(--border);
@@ -3998,33 +3972,6 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
   color: var(--text-dim);
   font-size: 0.85rem;
   line-height: 1.7;
-}
-
-/* ── Реверс-связи в карточках ──────────────────── */
-
-.reverse-links {
-  margin-top: 20px;
-  padding-top: 14px;
-  border-top: 1px solid var(--border);
-}
-
-.reverse-links-title {
-  font-size: 0.75rem;
-  color: var(--text-faint);
-  margin-bottom: 8px;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-}
-
-.reverse-links-group {
-  font-size: 0.85rem;
-  color: var(--text-dim);
-  line-height: 1.6;
-}
-
-.reverse-links-group strong {
-  color: var(--text);
-  font-weight: 600;
 }
 
 /* ── Телефон ───────────────────────────────── */
