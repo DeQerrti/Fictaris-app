@@ -36,8 +36,11 @@ export function initShortcuts(onOpenModule) {
 
     for (const [module, binding] of Object.entries(customBindings)) {
       if (matches(e, binding)) {
+        // Скрытый в Настройках раздел клавишей не открываем. У Проверки,
+        // Корзины и Настроек своего пункта в списке нет — для них клавиша
+        // работает всегда.
         const btn = document.querySelector(`.nav-item[data-module="${module}"]`);
-        if (btn && !btn.hidden) {
+        if (!btn?.classList.contains("nav-item-hidden")) {
           e.preventDefault();
           onOpenModule(module);
         }
@@ -47,7 +50,7 @@ export function initShortcuts(onOpenModule) {
 
     const digitMatch = /^Digit([1-9])$/.exec(e.code);
     if (digitMatch) {
-      const visible = Array.from(document.querySelectorAll(".nav-item[data-module]:not([hidden])"));
+      const visible = navOrder();
       const btn = visible[Number(digitMatch[1]) - 1];
       if (btn) {
         e.preventDefault();
@@ -55,6 +58,12 @@ export function initShortcuts(onOpenModule) {
       }
     }
   });
+}
+
+// Разделы в том порядке, в каком они стоят в сайдбаре, без скрытых —
+// по нему цифры 1—9 (и подписи цифр в Настройках).
+export function navOrder() {
+  return Array.from(document.querySelectorAll(".sidebar .nav-item[data-module]:not(.nav-item-hidden)"));
 }
 
 export async function loadShortcuts() {

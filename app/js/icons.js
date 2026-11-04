@@ -75,6 +75,11 @@ const PATHS = {
   // оформление, note — шаблоны анкет).
   globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/>',
   keyboard: '<rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M6 14h12"/>',
+
+  // Сайдбар: поиск, кнопка «Вид панели», стрелки переключателя мира.
+  search: '<circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/>',
+  sidebar: '<rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9 4.5v15"/>',
+  chevronUpDown: '<path d="M8 10l4-4 4 4M8 14l4 4 4-4"/>',
 };
 
 // Пункт сайдбара → ключ иконки выше. locations/factions переиспользуют
@@ -112,6 +117,18 @@ export function applyNavIcons() {
   // без-подписи, что и у неё.
   const statsBtn = document.getElementById("statsBtn");
   if (statsBtn && !statsBtn.innerHTML) statsBtn.innerHTML = iconSvg("barChart", 16);
+  // Проверка и Корзина — тоже окна поверх экрана, а не вкладки; у них
+  // в разметке уже есть значок-счётчик, иконку ставим перед ним.
+  for (const [id, icon] of [["continuityBtn", "checkShield"], ["trashBtn", "trash"]]) {
+    const btn = document.getElementById(id);
+    if (btn && !btn.querySelector("svg")) btn.insertAdjacentHTML("afterbegin", iconSvg(icon, 16));
+  }
+  const modeBtn = document.getElementById("sidebarMode");
+  if (modeBtn && !modeBtn.innerHTML) modeBtn.innerHTML = iconSvg("sidebar", 16);
+  const searchIcon = document.querySelector(".sb-search-icon");
+  if (searchIcon && !searchIcon.innerHTML) searchIcon.innerHTML = iconSvg("search", 15);
+  const chev = document.getElementById("sbWorldChev");
+  if (chev && !chev.innerHTML) chev.innerHTML = iconSvg("chevronUpDown", 14);
 
   document.querySelectorAll(".nav-item[data-module]").forEach((btn) => {
     const key = NAV_ICONS[btn.dataset.module];

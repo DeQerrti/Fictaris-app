@@ -12,10 +12,8 @@ import { renderStats } from "./stats.js";
 import { renderFamilyTree } from "./family-tree.js";
 import { renderCanvas } from "./canvas.js";
 import { renderKnowledge } from "./knowledge.js";
-import { renderContinuity } from "./continuity.js";
 import { fillWithDemoData, maybeRunHistoryCleanup } from "./data-panel.js";
 import { renderSettings } from "./settings-panel.js";
-import { renderTrash, trashCount } from "./trash.js";
 import { initProjectSwitcher } from "./project-switcher.js";
 import { initUpdateBanner } from "./update-banner.js";
 import { applyTheme } from "./theme.js";
@@ -30,6 +28,7 @@ import { loadLang, i18n } from "./i18n.js";
 import { initEntityModal, openEntityModal, refreshEntityModal } from "./entity-modal.js";
 import { initExternalChanges } from "./external-changes.js";
 import { recordRecent } from "./recent-nav.js";
+import { initSidebarOverview, refreshSidebar, openPanel } from "./sidebar-overview.js";
 
 const MODULES = {
   manuscript: renderManuscript,
@@ -44,8 +43,6 @@ const MODULES = {
   canvas: renderCanvas,
   knowledge: renderKnowledge,
   stats: renderStats,
-  continuity: renderContinuity,
-  trash: renderTrash,
   settings: renderSettings,
 };
 
@@ -70,7 +67,15 @@ const statsBtn = document.getElementById("statsBtn");
 let openRequestId = 0;
 let currentModuleName = null;
 
+// Проверка и Корзина — окна из нижней строки сайдбара, а не вкладки
+// (sidebar-overview.js): своя клавиша или ссылка на них открывает окно.
+const PANEL_MODULES = ["continuity", "trash"];
+
 async function openModule(name, arg) {
+  if (PANEL_MODULES.includes(name)) {
+    openPanel(name, document.getElementById(name === "trash" ? "trashBtn" : "continuityBtn"));
+    return;
+  }
   const requestId = ++openRequestId;
   currentModuleName = name;
   // Фокус-режим рукописи прячет сайдбар классом на body (manuscript.js) —
@@ -156,13 +161,6 @@ document.addEventListener("fictaris:open-chapter", (e) => {
   else openEntityModal("manuscript", e.detail.id);
 });
 
-const trashBadge = document.getElementById("trashBadge");
-async function refreshTrashBadge() {
-  const n = await trashCount().catch(() => 0);
-  trashBadge.textContent = n > 0 ? String(n) : "";
-}
-document.addEventListener("fictaris:trash-changed", refreshTrashBadge);
-
 // Файлы проекта поправили снаружи (external-changes.js) — открытый
 // раздел перечитывает данные тем же рендером. Без arg: тот ведёт к
 // карточке, с которой раздел когда-то открыли, а не к той, что открыта
@@ -175,7 +173,7 @@ async function reloadAfterExternalChange() {
     content.scrollTop = scroll;
   }
   refreshEntityModal();
-  refreshTrashBadge();
+  refreshSidebar();
 }
 initExternalChanges(reloadAfterExternalChange);
 
@@ -204,7 +202,7 @@ async function boot() {
     ? Object.keys(MODULES).find((key) => key !== "settings" && !MODAL_ONLY_MODULES.includes(key) && !hidden.includes(key)) || "settings"
     : "manuscript";
   openModule(defaultModule);
-  refreshTrashBadge();
+  initSidebarOverview({ openModule, openEntityModal, getCurrent: () => currentModuleName });
   initProjectSwitcher();
   maybeShowOnboarding({ onFillDemo: fillWithDemoData });
   // На телефоне обновления проверяет сам mobile.bundle.js (полностью на

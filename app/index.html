@@ -47,35 +47,52 @@
     <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
     <nav class="sidebar">
       <div class="sidebar-resize-handle" id="sidebarResizeHandle"></div>
-      <div class="brand-row">
-        <div class="brand">Fictaris</div>
-        <div class="brand-row-actions">
-          <button class="sidebar-collapse-btn" id="sidebarCollapse" data-i18n aria-label="Свернуть список разделов до иконок"></button>
-          <button class="sidebar-pin" id="sidebarPin" data-i18n aria-label="Закрепить меню"></button>
+      <div class="sb-head">
+        <div class="project-switcher">
+          <button class="sb-world" id="projectBtn" data-i18n title="Сменить мир">
+            <img class="sb-appicon" src="/icons/icon-512.png" alt="">
+            <span class="sb-world-text">
+              <span class="sb-world-name" id="projectName">…</span>
+              <span class="sb-world-sub" id="sbWorldSub"></span>
+            </span>
+            <span class="sb-world-chev" id="sbWorldChev"></span>
+          </button>
+          <div class="project-menu" id="projectMenu"></div>
         </div>
+        <button class="sb-search" id="sbSearch" data-i18n title="Найти или перейти" aria-label="Найти или перейти"><span class="sb-search-icon"></span><span class="sb-search-text" id="sbSearchText"></span><kbd class="sb-kbd">/</kbd></button>
       </div>
       <div class="sidebar-nav">
-        <button class="nav-item active" data-module="manuscript">Рукопись</button>
-        <button class="nav-item" data-module="board">Доска</button>
-        <button class="nav-item" data-module="characters">Персонажи</button>
-        <button class="nav-item" data-module="locations">Локации</button>
-        <button class="nav-item" data-module="factions">Фракции</button>
-        <button class="nav-item" data-module="timeline">Таймлайн</button>
-        <button class="nav-item" data-module="map">Карта</button>
-        <button class="nav-item" data-module="graph">Отношения</button>
-        <button class="nav-item" data-module="familytree">Родословная</button>
-        <button class="nav-item" data-module="canvas">Холст</button>
-        <div class="sidebar-spacer"></div>
-        <button class="nav-item" data-module="continuity">Проверка</button>
-        <button class="nav-item" data-module="trash">Корзина <span class="trash-badge" id="trashBadge"></span></button>
-      </div>
-      <div class="project-switcher">
-        <div class="project-switcher-row">
-          <button class="project-current" id="projectBtn">…</button>
-          <button class="settings-btn" id="statsBtn" data-i18n title="Статистика" aria-label="Статистика"></button>
-          <button class="settings-btn" id="settingsBtn" data-i18n data-module="settings" title="Настройки" aria-label="Настройки"></button>
+        <div class="sb-now" id="sbNow" hidden></div>
+        <div class="nav-group-label" data-section="plot"></div>
+        <div class="sb-section" data-section="plot">
+          <button class="nav-item active" data-module="manuscript">Рукопись</button>
+          <div class="sb-books" id="sbBooks"></div>
+          <button class="nav-item" data-module="board">Доска</button>
         </div>
-        <div class="project-menu" id="projectMenu"></div>
+        <div class="nav-group-label" data-section="world"></div>
+        <div class="sb-section sb-tiles" data-section="world">
+          <button class="nav-item nav-tile" data-module="characters">Персонажи</button>
+          <button class="nav-item nav-tile" data-module="locations">Локации</button>
+          <button class="nav-item nav-tile" data-module="factions">Фракции</button>
+          <button class="nav-item nav-tile" data-module="timeline">Таймлайн</button>
+        </div>
+        <div class="nav-group-label" data-section="views"></div>
+        <div class="sb-section sb-views" data-section="views">
+          <button class="nav-item nav-view" data-module="map">Карта</button>
+          <button class="nav-item nav-view" data-module="familytree">Родословная</button>
+          <button class="nav-item nav-view" data-module="graph">Отношения</button>
+          <button class="nav-item nav-view" data-module="canvas">Холст</button>
+        </div>
+        <div class="sb-recent" id="sbRecent" hidden></div>
+        <div class="sidebar-spacer"></div>
+      </div>
+      <div class="sb-foot">
+        <button class="settings-btn sb-foot-btn" id="continuityBtn" data-i18n title="Проверка мира" aria-label="Проверка мира"><span class="sb-foot-badge warn" id="continuityBadge"></span></button>
+        <button class="settings-btn sb-foot-btn" id="trashBtn" data-i18n title="Корзина" aria-label="Корзина"><span class="sb-foot-badge" id="trashBadge"></span></button>
+        <button class="settings-btn sb-foot-btn" id="statsBtn" data-i18n title="Статистика" aria-label="Статистика"></button>
+        <button class="settings-btn sb-foot-btn" id="settingsBtn" data-i18n data-module="settings" title="Настройки" aria-label="Настройки"></button>
+        <span class="sb-foot-spacer"></span>
+        <button class="settings-btn sb-foot-btn" id="sidebarMode" data-i18n title="Вид панели" aria-label="Вид панели"></button>
       </div>
       <div class="save-badge" id="saveBadge" data-i18n title="Статус последнего сохранения на диск в папке проекта – «Сохранено» значит, что все изменения уже записаны в файлы">Сохранено</div>
     </nav>

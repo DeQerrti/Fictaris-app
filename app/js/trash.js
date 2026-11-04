@@ -1,7 +1,8 @@
 import { apiGet, apiPost, uid } from "./api.js";
 import { migrateBoards } from "./board-data.js";
 import { escapeHtml, buildEmptyState } from "./chips.js";
-import { i18n } from "./i18n.js";
+import { iconSvg } from "./icons.js";
+import { i18n, i18nPlural } from "./i18n.js";
 
 const TRASH_LIMIT = 200;
 
@@ -75,15 +76,22 @@ async function restoreEntry(entry) {
   else await restoreArrayItem(typeInfo()[entry.type].listPath, entry.item);
 }
 
-export async function trashCount() {
-  return (await apiGet("/api/trash")).length;
-}
-
+// Окно из нижней строки сайдбара (sidebar-overview.js), не вкладка:
+// список короткий, на весь экран он только пустовал.
 export async function renderTrash(root) {
   const trash = await apiGet("/api/trash");
   root.innerHTML = "";
   const wrap = document.createElement("div");
   wrap.className = "trash-panel";
+
+  const head = document.createElement("div");
+  head.className = "sb-pop-head";
+  head.innerHTML = `<span class="sb-pop-title"></span><span class="sb-pop-meta"></span>`;
+  head.querySelector(".sb-pop-title").textContent = i18n("Корзина");
+  const meta = head.querySelector(".sb-pop-meta");
+  const updateMeta = (n) => { meta.textContent = n ? i18nPlural(n, ["{n} запись", "{n} записи", "{n} записей"]) : ""; };
+  updateMeta(trash.length);
+  wrap.appendChild(head);
 
   if (!trash.length) {
     const empty = buildEmptyState(i18n("Корзина пуста."), "trash");
@@ -93,13 +101,21 @@ export async function renderTrash(root) {
   }
 
   for (const entry of trash) {
-    wrap.appendChild(buildRow(entry, trash));
+    wrap.appendChild(buildRow(entry, trash, (left) => {
+      updateMeta(left);
+      if (!left) wrap.appendChild(buildEmptyState(i18n("Корзина пуста."), "trash"));
+    }));
   }
 
   root.appendChild(wrap);
 }
 
-function buildRow(entry, trash) {
+function removeFrom(trash, entry) {
+  const i = trash.indexOf(entry);
+  if (i >= 0) trash.splice(i, 1);
+}
+
+function buildRow(entry, trash, onRemoved) {
   const info = typeInfo()[entry.type];
   const row = document.createElement("div");
   row.className = "trash-row";
@@ -107,7 +123,7 @@ function buildRow(entry, trash) {
   const meta = document.createElement("div");
   meta.className = "trash-meta";
   const date = new Date(entry.deletedAt);
-  meta.innerHTML = `<span class="trash-type">${escapeHtml(info?.label || entry.type)}</span> · ${escapeHtml(info?.displayName(entry.item) || "?")} <span class="trash-date">${date.toLocaleString()}</span>`;
+  meta.innerHTML = `<span class="trash-name">${escapeHtml(info?.displayName(entry.item) || "?")}</span><span class="trash-date"><span class="trash-type">${escapeHtml(info?.label || entry.type)}</span> · ${date.toLocaleString([], { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>`;
   row.appendChild(meta);
 
   const actions = document.createElement("div");
@@ -115,32 +131,35 @@ function buildRow(entry, trash) {
 
   const restoreBtn = document.createElement("button");
   restoreBtn.className = "btn";
-  restoreBtn.textContent = i18n("Восстановить");
+  restoreBtn.textContent = i18n("Вернуть");
   restoreBtn.addEventListener("click", async () => {
     await restoreEntry(entry);
-    const next = trash.filter((e) => e.id !== entry.id);
-    await apiPost("/api/trash", next);
+    removeFrom(trash, entry);
+    await apiPost("/api/trash", trash);
     document.dispatchEvent(new CustomEvent("fictaris:trash-changed"));
     row.remove();
+    onRemoved(trash.length);
   });
   actions.appendChild(restoreBtn);
 
   const forgetBtn = document.createElement("button");
-  forgetBtn.className = "btn danger";
-  forgetBtn.textContent = i18n("Удалить навсегда");
+  forgetBtn.className = "btn danger trash-forget";
+  forgetBtn.innerHTML = iconSvg("close", 13);
+  forgetBtn.title = i18n("Удалить навсегда");
   forgetBtn.addEventListener("click", async () => {
     if (forgetBtn.dataset.confirm === "1") {
-      const next = trash.filter((e) => e.id !== entry.id);
-      await apiPost("/api/trash", next);
+      removeFrom(trash, entry);
+      await apiPost("/api/trash", trash);
       document.dispatchEvent(new CustomEvent("fictaris:trash-changed"));
       row.remove();
+      onRemoved(trash.length);
       return;
     }
     forgetBtn.dataset.confirm = "1";
     forgetBtn.textContent = i18n("Точно?");
     setTimeout(() => {
       forgetBtn.dataset.confirm = "";
-      forgetBtn.textContent = i18n("Удалить навсегда");
+      forgetBtn.innerHTML = iconSvg("close", 13);
     }, 3000);
   });
   actions.appendChild(forgetBtn);

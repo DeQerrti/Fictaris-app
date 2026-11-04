@@ -5,19 +5,8 @@ import { THEME_PRESETS, CUSTOM_COLOR_TOKENS, saveTheme } from "./theme.js";
 import { escapeHtml } from "./chips.js";
 import { iconSvg } from "./icons.js";
 import { defaultLabels, saveLabels, resetLabels } from "./labels.js";
-import {
-  getHiddenTabs,
-  setTabHidden,
-  getTabOrder,
-  setTabOrder,
-  getGroupsConfig,
-  setGroupLabel,
-  deleteGroup,
-  createGroup,
-  getTabGroupMap,
-  setTabGroup,
-} from "./visibility.js";
-import { captureKey, saveShortcut, clearShortcut } from "./shortcuts.js";
+import { getHiddenTabs, setTabHidden, getTabOrder, setTabOrder, TAB_SECTIONS } from "./visibility.js";
+import { captureKey, saveShortcut, clearShortcut, navOrder } from "./shortcuts.js";
 import { DEFAULT_TAGS_MAP, CATEGORY_LABELS, parseTags, stringifyTags, loadCategoryLabels, saveCategoryLabel, newCategoryId, deleteCategory } from "./tags.js";
 import { KIND_LABELS, loadTemplates, saveTemplates, blankField } from "./templates.js";
 import { defaultMonths, loadCalendar, saveCalendar } from "./calendar.js";
@@ -332,7 +321,8 @@ async function buildZoomSection() {
 // Название приложения и три служебных пункта (настройки, проверка,
 // корзина) сюда не попадают — их нельзя ни переименовать, ни спрятать
 // (см. LOCKED_NAV_KEYS в labels.js и комментарий в visibility.js).
-const UNGROUPED = "__none__";
+// Секции — те же, что в сайдбаре (TAB_SECTIONS); перетаскивать можно
+// только внутри секции.
 
 async function buildLabelsSection() {
   const section = document.createElement("div");
@@ -362,173 +352,44 @@ async function renderLabelsBody(body) {
   const current = window.SITE_LABELS || defaults;
   const hidden = new Set(await getHiddenTabs());
   const order = await getTabOrder();
-  const { order: groupOrder, labels: groupLabels } = await getGroupsConfig();
-  const tabGroup = await getTabGroupMap();
 
-  const byGroup = new Map();
-  for (const id of [...groupOrder, UNGROUPED]) byGroup.set(id, []);
-  for (const key of order) byGroup.get(tabGroup[key] || UNGROUPED)?.push(key);
-
-  let dragKey = null;
+  let drag = null; // { key, sectionId }
 
   function collectFullOrder() {
-    const result = [];
-    for (const id of [...groupOrder, UNGROUPED]) {
-      const container = body.querySelector(`[data-group-body="${id}"]`);
-      if (!container) continue;
-      for (const el of container.children) result.push(el.dataset.key);
-    }
-    return result;
+    return [...body.querySelectorAll("[data-key]")].map((el) => el.dataset.key);
   }
 
-  function attachRowDrag(row, key, container, groupId) {
-    row.draggable = true;
-    row.dataset.key = key;
-    row.addEventListener("dragstart", () => { dragKey = key; });
-    row.addEventListener("dragover", (e) => e.preventDefault());
-    row.addEventListener("drop", async (e) => {
-      e.preventDefault();
-      if (dragKey === null || dragKey === key) return;
-      const dragRow = body.querySelector(`[data-key="${dragKey}"]`);
-      if (!dragRow) return;
-      const fromGroup = dragRow.parentElement?.dataset.groupBody;
-      container.insertBefore(dragRow, row);
-      await setTabOrder(collectFullOrder());
-      if (fromGroup !== groupId) await setTabGroup(dragKey, groupId === UNGROUPED ? null : groupId);
-    });
-  }
-
-  for (const id of groupOrder) {
-    const keys = byGroup.get(id) || [];
+  for (const section of TAB_SECTIONS) {
     const header = document.createElement("div");
     header.className = "labels-group-header";
-
     const nameSpan = document.createElement("span");
     nameSpan.className = "labels-group-name";
-    nameSpan.textContent = groupLabels[id] || id;
-    nameSpan.title = i18n("Клик – переименовать группу");
-    nameSpan.addEventListener("click", () => {
-      const input = document.createElement("input");
-      input.className = "labels-group-name-input";
-      input.value = groupLabels[id] || "";
-      input.placeholder = id;
-      nameSpan.replaceWith(input);
-      input.focus();
-      input.select();
-      const commit = async () => {
-        const value = input.value.trim();
-        if (value && value !== groupLabels[id]) await setGroupLabel(id, value);
-        renderLabelsBody(body);
-      };
-      input.addEventListener("blur", commit);
-      input.addEventListener("keydown", (e) => {
-        if (e.key === "Enter") input.blur();
-        else if (e.key === "Escape") { input.value = groupLabels[id] || ""; input.blur(); }
-      });
-    });
+    nameSpan.textContent = section.label();
     header.appendChild(nameSpan);
-
-    const delBtn = document.createElement("button");
-    delBtn.className = "btn danger labels-group-del";
-    delBtn.innerHTML = iconSvg("trash", 14);
-    delBtn.title = i18n("Убрать подпись группы (пункты останутся, просто без заголовка)");
-    delBtn.addEventListener("click", () => {
-      if (delBtn.dataset.confirm === "1") {
-        deleteGroup(id).then(() => renderLabelsBody(body));
-        return;
-      }
-      delBtn.dataset.confirm = "1";
-      delBtn.textContent = i18n("Точно?");
-      setTimeout(() => { delBtn.dataset.confirm = ""; delBtn.innerHTML = iconSvg("trash", 14); }, 3000);
-    });
-    header.appendChild(delBtn);
-
     body.appendChild(header);
 
     const container = document.createElement("div");
     container.className = "labels-grid";
-    container.dataset.groupBody = id;
-    container.addEventListener("dragover", (e) => e.preventDefault());
-    container.addEventListener("drop", async (e) => {
-      if (e.target !== container) return; // строки сами обрабатывают drop на себя — этот только для пустого места контейнера
-      e.preventDefault();
-      if (dragKey === null) return;
-      const dragRow = body.querySelector(`[data-key="${dragKey}"]`);
-      if (!dragRow) return;
-      const fromGroup = dragRow.parentElement?.dataset.groupBody;
-      container.appendChild(dragRow);
-      await setTabOrder(collectFullOrder());
-      if (fromGroup !== id) await setTabGroup(dragKey, id === UNGROUPED ? null : id);
-    });
-
-    for (const key of keys) {
+    for (const key of order.filter((k) => section.keys.includes(k))) {
       const row = buildLabelRow(key, defaults.nav[key], current.nav[key], hidden.has(key), (value) => saveLabels({ nav: { [key]: value } }));
-      attachRowDrag(row, key, container, id);
+      row.draggable = true;
+      row.dataset.key = key;
+      row.addEventListener("dragstart", () => { drag = { key, sectionId: section.id }; });
+      row.addEventListener("dragover", (e) => {
+        if (drag?.sectionId === section.id) e.preventDefault();
+      });
+      row.addEventListener("drop", async (e) => {
+        e.preventDefault();
+        if (!drag || drag.sectionId !== section.id || drag.key === key) return;
+        const dragRow = container.querySelector(`[data-key="${drag.key}"]`);
+        if (!dragRow) return;
+        container.insertBefore(dragRow, row);
+        await setTabOrder(collectFullOrder());
+      });
       container.appendChild(row);
     }
     body.appendChild(container);
   }
-
-  const ungroupedKeys = byGroup.get(UNGROUPED) || [];
-  const ungroupedContainer = document.createElement("div");
-  ungroupedContainer.className = "labels-grid";
-  ungroupedContainer.dataset.groupBody = UNGROUPED;
-  ungroupedContainer.addEventListener("dragover", (e) => e.preventDefault());
-  ungroupedContainer.addEventListener("drop", async (e) => {
-    if (e.target !== ungroupedContainer) return;
-    e.preventDefault();
-    if (dragKey === null) return;
-    const dragRow = body.querySelector(`[data-key="${dragKey}"]`);
-    if (!dragRow) return;
-    const fromGroup = dragRow.parentElement?.dataset.groupBody;
-    ungroupedContainer.appendChild(dragRow);
-    await setTabOrder(collectFullOrder());
-    if (fromGroup !== UNGROUPED) await setTabGroup(dragKey, null);
-  });
-  if (ungroupedKeys.length) {
-    const header = document.createElement("div");
-    header.className = "labels-group-header";
-    const nameSpan = document.createElement("span");
-    nameSpan.className = "labels-group-name";
-    nameSpan.textContent = i18n("Без раздела");
-    header.appendChild(nameSpan);
-    body.appendChild(header);
-  }
-  for (const key of ungroupedKeys) {
-    const row = buildLabelRow(key, defaults.nav[key], current.nav[key], hidden.has(key), (value) => saveLabels({ nav: { [key]: value } }));
-    attachRowDrag(row, key, ungroupedContainer, UNGROUPED);
-    ungroupedContainer.appendChild(row);
-  }
-  body.appendChild(ungroupedContainer);
-
-  // Стартовых групп («Сюжет»/«Мир»/«Инструменты»/«Обзор») четыре — не
-  // всем хватает, а удалить можно все разом (кнопка есть у каждой) и
-  // остаться совсем без группировки. "+ Группа" заводит свою (visibility.js,
-  // createGroup) тем же инлайн-полем, что и переименование существующей.
-  const addGroupRow = document.createElement("div");
-  addGroupRow.className = "labels-group-header";
-  const addGroupBtn = document.createElement("button");
-  addGroupBtn.className = "btn";
-  addGroupBtn.textContent = i18n("+ Группа");
-  addGroupBtn.addEventListener("click", () => {
-    const input = document.createElement("input");
-    input.className = "labels-group-name-input";
-    input.placeholder = i18n("Название группы");
-    addGroupBtn.replaceWith(input);
-    input.focus();
-    const commit = async () => {
-      const value = input.value.trim();
-      if (value) await createGroup(value);
-      renderLabelsBody(body);
-    };
-    input.addEventListener("blur", commit);
-    input.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") input.blur();
-      else if (e.key === "Escape") { input.value = ""; input.blur(); }
-    });
-  });
-  addGroupRow.appendChild(addGroupBtn);
-  body.appendChild(addGroupRow);
 }
 
 function buildLabelRow(key, defaultValue, currentValue, isHidden, onSave) {
@@ -580,7 +441,8 @@ async function buildShortcutsSection() {
   const list = document.createElement("div");
   list.className = "shortcuts-list";
 
-  Object.keys(defaults.nav).forEach((key, index) => {
+  const digits = new Map(navOrder().slice(0, 9).map((btn, i) => [btn.dataset.module, String(i + 1)]));
+  Object.keys(defaults.nav).forEach((key) => {
     const row = document.createElement("div");
     row.className = "shortcut-row";
 
@@ -589,7 +451,7 @@ async function buildShortcutsSection() {
 
     const keyBtn = document.createElement("button");
     keyBtn.className = "btn shortcut-key";
-    const defaultLabel = index < 9 ? String(index + 1) : "–";
+    const defaultLabel = digits.get(key) || "–";
     keyBtn.textContent = custom[key] ? bindingLabel(custom[key]) : defaultLabel;
 
     const clearBtn = document.createElement("button");

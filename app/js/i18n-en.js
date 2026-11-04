@@ -604,11 +604,29 @@ export const EN_DICT = {
   "Глава": "Chapter",
   "Карточка": "Card",
 
-  // ── Сайдбар (sidebar.js) ──
-  "Меню закреплено – нажми, чтобы сворачивать его и разворачивать по наведению":
-    "Menu is pinned – click to make it collapse and expand on hover",
-  "Меню сворачивается – нажми, чтобы закрепить его открытым":
-    "Menu auto-collapses – click to pin it open",
+  // ── Сайдбар (sidebar.js, sidebar-overview.js) ──
+  "Вид панели": "Panel view",
+  "Развёрнута": "Expanded",
+  "Подписи, счётчики, «Сейчас пишу»": "Labels, counts, “Now writing”",
+  "Только иконки": "Icons only",
+  "Узкая полоса, подсказки при наведении": "Narrow strip, tooltips on hover",
+  "Прятать": "Auto-hide",
+  "Выезжает при наведении на край, как панель задач": "Slides out when you hover the edge, like a taskbar",
+  "Сменить мир": "Switch world",
+  "Найти или перейти": "Find or go to",
+  "Найти или перейти…": "Find or go to…",
+  "Наглядно": "Visual",
+  "Сейчас пишу": "Now writing",
+  "Продолжить": "Continue",
+  "Сегодня {n} слов": "Today {n} word|Today {n} words",
+  "Проверка мира": "World check",
+  "{n} замечаний": "{n} issue|{n} issues",
+  "{n} записей": "{n} item|{n} items",
+  "персонаж": "character",
+  "место": "place",
+  "фракция": "faction",
+  "раздел": "section",
+  "рукопись": "manuscript",
 
   // ── Первый запуск (onboarding.js) ──
   "Добро пожаловать в Fictaris": "Welcome to Fictaris",
@@ -841,8 +859,6 @@ export const EN_DICT = {
   "Загрузить шаблон из файла – добавится новой вкладкой": "Load a template from a file – it will appear as a new tab",
 
   "Недавнее": "Recent",
-  "Свернуть список разделов до одних иконок": "Collapse the section list to icons only",
-  "Список свёрнут до иконок – нажми, чтобы вернуть подписи": "List collapsed to icons – click to bring back labels",
 
   "Форматирование": "Formatting",
   "Жирный": "Bold",
@@ -967,11 +983,6 @@ export const EN_DICT = {
   "Шаблоны анкет": "Form templates",
   "Палитра": "Palette",
   "Сбросить палитру": "Reset palette",
-  "Клик – переименовать группу": "Click to rename the group",
-  "Убрать подпись группы (пункты останутся, просто без заголовка)": "Remove the group label (items stay, just without a heading)",
-  "Без раздела": "Ungrouped",
-  "+ Группа": "+ Group",
-  "Название группы": "Group name",
   "Перетащи, чтобы изменить порядок": "Drag to reorder",
   "Новый тип тега": "New tag type",
   "Название типа": "Type name",
@@ -1002,7 +1013,6 @@ export const EN_DICT = {
   "Сюжет": "Story",
   "Мир": "World",
   "Инструменты": "Tools",
-  "Новая группа": "New group",
   "Обновлено с диска: {files}": "Reloaded from disk: {files}",
   "Загрузить с диска": "Load from disk",
   "Несохранённые правки в приложении будут отброшены": "Unsaved edits in the app will be discarded",
@@ -1037,8 +1047,6 @@ export const EN_DICT = {
   "Едва заметный текст": "Faint text",
   "Плейсхолдеры, декоративные детали": "Placeholders, decorative details",
   "Меню": "Menu",
-  "Свернуть список разделов до иконок": "Collapse the section list to icons",
-  "Закрепить меню": "Pin the menu",
   "Настройки": "Settings",
   "Статус последнего сохранения на диск в папке проекта – «Сохранено» значит, что все изменения уже записаны в файлы": "Status of the last save to the project folder – “Saved” means all changes are already written to files",
   "Места": "Places",

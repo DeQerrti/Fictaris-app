@@ -153,26 +153,19 @@ html, body {
 #app { display: flex; height: 100vh; }
 
 .sidebar {
-  width: var(--sidebar-width, 240px);
+  width: var(--sidebar-width, 264px);
   flex-shrink: 0;
   background: var(--panel-alt);
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  padding: 16px 10px;
+  padding: 12px 10px 8px;
   position: relative;
 }
 
 /* Список разделов — единственная часть сайдбара, которая скроллится
-   сама по себе, если разделов больше, чем помещается по высоте окна
-   (в маленьком/не-развёрнутом окне пунктов внизу иначе было бы не
-   достать вообще — #app зажат в 100vh, а у .sidebar раньше не было ни
-   overflow, ни min-height:0, так что лишнее просто обрезалось краем
-   окна без прокрутки). Шапка (brand-row) и переключатель проекта/
-   настройки/бейдж сохранения остаются на местах — это одна из причин,
-   почему прокручиваемая область — отдельный блок, а не весь .sidebar
-   целиком: скролл всего сайдбара унёс бы куда-то и логотип, и кнопку
-   настроек, самую нужную вещь, если проекты вообще спрятаны внизу. */
+   сама по себе, если разделов больше, чем помещается по высоте окна.
+   Шапка (мир и поиск) и нижняя строка значков остаются на местах. */
 .sidebar-nav {
   flex: 1;
   min-height: 0;
@@ -185,103 +178,149 @@ html, body {
    остаётся только сам текст. */
 body.focus-mode .sidebar { display: none; }
 
-.brand-row {
+/* ── Сайдбар: мир и поиск (sidebar-overview.js) ── */
+.sb-head { display: flex; flex-direction: column; gap: 8px; margin-bottom: 6px; }
+.project-switcher { position: relative; }
+.sb-world {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-  padding-right: 4px;
+  gap: 10px;
+  width: 100%;
+  padding: 6px;
+  border: none;
+  border-radius: 10px;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.sb-world:hover { background: var(--panel); }
+.sb-appicon { width: 36px; height: 36px; border-radius: 9px; flex-shrink: 0; box-shadow: inset 0 0 0 1px var(--border); }
+.sb-world-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.sb-world-name {
+  font-family: var(--font-book);
+  font-weight: 600;
+  font-size: 1rem;
+  color: var(--text);
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sb-world-sub { font-size: 0.76rem; color: var(--text-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sb-world-chev { display: flex; color: var(--text-faint); flex-shrink: 0; }
+
+.sb-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text-faint);
+  font-family: inherit;
+  font-size: 0.84rem;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.sb-search:hover { border-color: var(--text-faint); color: var(--text-dim); }
+.sb-search-icon { display: flex; flex-shrink: 0; }
+.sb-search-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.sb-kbd { font-family: var(--font-mono); font-size: 0.7rem; border: 1px solid var(--border); border-radius: 4px; padding: 0 6px; color: var(--text-faint); }
+
+/* Меню миров — под карточкой мира. */
+.project-menu {
+  display: none;
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 30;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  max-height: min(60vh, 420px);
+  overflow-y: auto;
 }
 
-.brand-row-actions {
+
+/* ── Сайдбар: нижняя строка значков ──
+   Проверка, Корзина, Статистика, Настройки и «Вид панели». Значки —
+   .settings-btn (тот же размер и подсветка активного), число замечаний
+   и записей — кружком в углу. */
+.settings-btn {
+  position: relative;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: none;
+  border: none;
+  border-radius: 7px;
+  color: var(--text-faint);
+  cursor: pointer;
+}
+.settings-btn:hover { color: var(--text); background: var(--panel); }
+.settings-btn.active { color: var(--accent-hover); background: var(--panel); }
+
+.sb-foot {
   display: flex;
   align-items: center;
   gap: 2px;
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+  margin-top: 6px;
 }
-
-.brand {
-  font-family: var(--font-book);
-  font-weight: 600;
-  font-size: 1.25rem;
-  color: var(--accent-hover);
-  padding: 6px 10px 4px;
+.sb-foot-spacer { flex: 1; }
+.sb-foot-badge {
+  position: absolute;
+  top: 0;
+  right: -2px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  box-sizing: border-box;
+  border-radius: 8px;
+  background: var(--border);
+  color: var(--text);
+  font: 600 0.62rem/16px var(--font-ui);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  pointer-events: none;
 }
+.sb-foot-badge:empty { display: none; }
+.sb-foot-badge.warn { background: #a4483c; color: #fff; }
 
-/* Значок настроек — рядом с переключателем проекта в самом низу
-   сайдбара (как в Обсидиане), вместо отдельного текстового пункта в
-   общем списке разделов (см. main.js: сознательно не .nav-item, чтобы
-   не сбивать нумерацию цифровых горячих клавиш). Разметка — в
-   .project-switcher-row ниже. */
-.settings-btn {
-  flex-shrink: 0;
+/* Меню «Вид панели» (sidebar.js). */
+.context-menu.sb-mode-popover { padding: 6px; width: 260px; }
+.sb-mode-title { font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-faint); padding: 4px 8px 6px; }
+.sb-mode-opt {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  background: none;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  padding: 8px;
   border: none;
   border-radius: 6px;
+  background: none;
   color: var(--text-dim);
-  font-size: 1.05rem;
+  font-family: inherit;
+  text-align: left;
   cursor: pointer;
 }
-
-.settings-btn:hover { color: var(--text); background: var(--panel); }
-
-.settings-btn.active {
-  color: var(--accent-hover);
-  background: var(--panel);
-}
-
-/* Закрепление/авто-скрытие сайдбара (панель задач Windows) и
-   растягивание (перетаскивание правого края, как в Обсидиане) — оба
-   ограничены @media (min-width: 861px) ниже: на телефоне у сайдбара
-   своя раскладка (выезжающий поверх экрана ящик, «Телефон» ниже по
-   файлу), и обе фичи там были бы просто помехой. */
-.sidebar-pin {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  background: none;
-  border: none;
-  border-radius: 6px;
-  color: var(--text-faint);
-  font-size: 0.8rem;
-  cursor: pointer;
-}
-
-/* Шеврон вместо эмодзи-булавки — эмодзи выбивался из остальных иконок
-   приложения (все они рисованные SVG/символьные, не системный набор
-   эмодзи). Направление меняется по состоянию: вправо — авто-скрытие
-   включено (сайдбар можно свернуть), развёрнут на 180° — закреплено. */
-.sidebar-pin svg { transition: transform 0.15s ease; transform: rotate(45deg); }
-.sidebar-pin.pinned svg { transform: none; }
-.sidebar-pin:hover { background: var(--panel); color: var(--text); }
-.sidebar-pin.pinned { color: var(--accent); }
-
-/* Тумблер режима "только иконки" (sidebar.js, #app.sidebar-collapsed
-   ниже) — рядом с булавкой авто-скрытия, тот же размер и поведение. */
-.sidebar-collapse-btn {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  background: none;
-  border: none;
-  border-radius: 6px;
-  color: var(--text-faint);
-  cursor: pointer;
-}
-.sidebar-collapse-btn:hover { background: var(--panel); color: var(--text); }
-.sidebar-collapse-btn.active { color: var(--accent); }
-.sidebar-collapse-btn svg { transition: transform 0.15s ease; }
+.sb-mode-opt:hover { background: var(--panel-alt); }
+.sb-mode-radio { width: 14px; height: 14px; margin-top: 2px; border-radius: 50%; border: 1.5px solid var(--text-faint); box-sizing: border-box; flex-shrink: 0; }
+.sb-mode-opt.active .sb-mode-radio { border: 4px solid var(--accent); }
+.sb-mode-label { display: block; color: var(--text); font-size: 0.86rem; }
+.sb-mode-hint { display: block; color: var(--text-faint); font-size: 0.74rem; margin-top: 2px; }
 
 @media (min-width: 861px) {
   .sidebar-resize-handle {
@@ -297,12 +336,10 @@ body.focus-mode .sidebar { display: none; }
   .sidebar-resize-handle:hover,
   .sidebar-resize-handle.dragging { background: var(--accent); opacity: 0.5; }
 
-  /* Открепленный сайдбар сжимается до тонкой полосы у края окна и
-     разворачивается поверх содержимого при наведении — не сдвигая его,
-     в отличие от обычного (закреплённого) состояния, где он — часть
-     раскладки. top учитывает высоту рамки окна в Electron
-     (--app-titlebar, см. electron/chrome.js) — вне Electron она не
-     определена и равна 0. */
+  /* «Прятать»: сайдбар сжимается до тонкой полосы у края окна и
+     разворачивается поверх содержимого при наведении — не сдвигая его.
+     top учитывает высоту рамки окна в Electron (--app-titlebar, см.
+     electron/chrome.js) — вне Electron она не определена и равна 0. */
   #app.sidebar-autohide .sidebar {
     position: fixed;
     top: var(--app-titlebar, 0);
@@ -318,8 +355,8 @@ body.focus-mode .sidebar { display: none; }
   }
 
   #app.sidebar-autohide .sidebar:hover {
-    width: var(--sidebar-width, 240px);
-    padding: 16px 10px;
+    width: var(--sidebar-width, 264px);
+    padding: 12px 10px 8px;
     overflow: visible;
     border-right: 1px solid var(--border);
     box-shadow: 4px 0 24px rgba(0, 0, 0, 0.4);
@@ -329,104 +366,41 @@ body.focus-mode .sidebar { display: none; }
      меню просвечивал бы даже через 10-пиксельную щель. */
   #app.sidebar-autohide .sidebar > * { opacity: 0; pointer-events: none; transition: opacity 0.08s ease; }
   #app.sidebar-autohide .sidebar:hover > * { opacity: 1; pointer-events: auto; transition-delay: 0.05s; }
-
-  /* Растягивать есть смысл только закреплённый сайдбар — открепленный и
-     так разворачивается по наведению на всю сохранённую ширину. */
   #app.sidebar-autohide .sidebar-resize-handle { display: none; }
 
-  /* Режим "только иконки" — независимое от закрепления/авто-скрытия
-     третье состояние (см. комментарий в sidebar.js): постоянно узкая
-     полоса вместо auto-hide-по-наведению. Переключатель проекта в 56px
-     не помещается без обрезки — прячем, вернуть можно тем же тумблером. */
-  #app.sidebar-collapsed .sidebar { width: 56px; min-width: 56px; }
-  #app.sidebar-collapsed .brand-row { justify-content: center; }
-  #app.sidebar-collapsed .brand { display: none; }
-  #app.sidebar-collapsed .nav-item { text-align: center; padding: 9px 4px; }
-  #app.sidebar-collapsed .nav-icon { margin-right: 0; }
-  #app.sidebar-collapsed .nav-label,
-  #app.sidebar-collapsed .trash-badge,
-  #app.sidebar-collapsed .nav-group-label,
-  #app.sidebar-collapsed .project-current { display: none; }
-  #app.sidebar-collapsed .project-switcher-row { justify-content: center; }
-  #app.sidebar-collapsed .sidebar-pin,
+  /* «Только иконки» — постоянно узкая полоса: от карточек и плиток
+     остаются значки в столбик, секции разделены чертой, подписи — в
+     подсказке при наведении (title). */
+  #app.sidebar-collapsed .sidebar { width: 56px; min-width: 56px; padding: 12px 6px 8px; }
   #app.sidebar-collapsed .sidebar-resize-handle { display: none; }
-  #app.sidebar-collapsed .sidebar-collapse-btn svg { transform: rotate(180deg); }
-
-  /* Открепление (авто-скрытие) и режим "только иконки" — оба сами по
-     себе управляют шириной .sidebar, и без этого блока сталкиваются:
-     у #app.sidebar-collapsed .sidebar { width: 56px } и
-     #app.sidebar-autohide .sidebar { width: 10px } одинаковая
-     специфичность, побеждает та, что ниже по файлу — 56px перебивал
-     тонкую полоску авто-скрытия даже когда мышь не наведена (сама
-     полоска пряталась, а невидимый 56-пиксельный короб оставался), а
-     при наведении сайдбар всё равно раскрывался на полную сохранённую
-     ширину (var(--sidebar-width)) вместо узкой иконочной — подписи
-     ведь спрятаны, но место под них никто не отбирал, и иконки
-     повисали посередине пустой панели. Здесь оба класса в одном
-     селекторе — специфичность выше обоих правил по отдельности,
-     побеждает независимо от порядка в файле. */
-  #app.sidebar-autohide.sidebar-collapsed .sidebar { width: 10px; min-width: 10px; }
-  #app.sidebar-autohide.sidebar-collapsed .sidebar:hover { width: 56px; padding: 16px 6px; }
+  #app.sidebar-collapsed .sb-world { justify-content: center; padding: 4px 0; }
+  #app.sidebar-collapsed .sb-appicon { width: 32px; height: 32px; }
+  #app.sidebar-collapsed .sb-world-text,
+  #app.sidebar-collapsed .sb-world-chev,
+  #app.sidebar-collapsed .sb-search-text,
+  #app.sidebar-collapsed .sb-kbd,
+  #app.sidebar-collapsed .sb-now,
+  #app.sidebar-collapsed .sb-books,
+  #app.sidebar-collapsed .sb-recent,
+  #app.sidebar-collapsed .nav-label,
+  #app.sidebar-collapsed .nav-count,
+  #app.sidebar-collapsed .sb-foot-spacer { display: none; }
+  #app.sidebar-collapsed .sb-search { justify-content: center; padding: 8px 0; border-color: transparent; background: none; }
+  #app.sidebar-collapsed .project-menu { right: auto; width: 240px; }
+  #app.sidebar-collapsed .nav-group-label { height: 1px; padding: 0; margin: 8px 8px; background: var(--border); font-size: 0; }
+  #app.sidebar-collapsed .sb-tiles,
+  #app.sidebar-collapsed .sb-views { display: flex; flex-direction: column; gap: 0; padding: 0; }
+  #app.sidebar-collapsed .nav-item,
+  #app.sidebar-collapsed .nav-item.nav-tile,
+  #app.sidebar-collapsed .nav-item.nav-view { display: flex; justify-content: center; padding: 9px 0; background: none; border: none; border-left: 3px solid transparent; border-radius: 4px; }
+  #app.sidebar-collapsed .nav-item.active { background: var(--panel); border-left-color: var(--accent); }
+  #app.sidebar-collapsed .nav-item-hidden { display: none; }
+  #app.sidebar-collapsed .nav-icon { margin-right: 0; }
+  #app.sidebar-collapsed .sb-foot { flex-direction: column; gap: 2px; }
 }
 
 @media (max-width: 860px) {
-  .sidebar-pin, .sidebar-resize-handle, .sidebar-collapse-btn { display: none; }
-}
-
-/* Переключатель проекта теперь в самом низу сайдбара, под «Корзиной» —
-   верхняя граница отделяет его от списка разделов над ним. Значок
-   настроек — в той же строке, справа от названия проекта (см.
-   .settings-btn выше). */
-.project-switcher {
-  position: relative;
-  margin-top: 8px;
-  padding: 14px 10px 12px;
-  border-top: 1px solid var(--border);
-}
-
-.project-switcher-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.project-current {
-  flex: 1;
-  min-width: 0;
-  text-align: left;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  color: var(--text-dim);
-  font-size: 0.78rem;
-  padding: 6px 8px;
-  cursor: pointer;
-  font-family: inherit;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.project-current:hover { border-color: var(--accent); color: var(--text); }
-
-/* Открывается вверх, а не вниз: кнопка и так в самом низу сайдбара —
-   вниз меню упёрлось бы в край окна и обрезалось (или "проваливалось"
-   за пределы видимой области). Тот же приём, что у переключателя
-   хранилища в Обсидиане. */
-.project-menu {
-  display: none;
-  position: absolute;
-  left: 10px;
-  right: 10px;
-  bottom: calc(100% + 2px);
-  z-index: 30;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 6px;
-  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.4);
-  max-height: min(60vh, 420px);
-  overflow-y: auto;
+  .sidebar-resize-handle, #sidebarMode { display: none; }
 }
 
 .project-row {
@@ -647,9 +621,55 @@ body.focus-mode .sidebar { display: none; }
 
 .nav-item:hover { color: var(--text); background: var(--panel); }
 
+/* Число справа (sidebar-overview.js): глав в книге, карточек, людей… */
+.nav-count {
+  float: right;
+  margin-left: 8px;
+  font-size: 0.74rem;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.6;
+}
+
+/* «Мир» — плитки в два столбца: иконка и крупное число сверху,
+   подпись снизу. */
+.sb-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 0 2px; }
+.nav-item.nav-tile {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas: "icon count" "label label";
+  align-items: center;
+  row-gap: 6px;
+  padding: 9px 10px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: var(--panel);
+  font-size: 0.82rem;
+}
+.nav-tile .nav-icon { grid-area: icon; margin: 0; }
+.nav-tile .nav-label { grid-area: label; overflow: hidden; text-overflow: ellipsis; }
+.nav-tile .nav-count {
+  grid-area: count;
+  float: none;
+  justify-self: end;
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.nav-item.nav-tile:hover { border-color: var(--border); background: var(--panel); }
+.nav-item.nav-tile.active { border-color: var(--accent); background: var(--card); }
+
+/* «Наглядно» — компактные строки в два столбца: виды мира, а не его
+   содержимое, крупное число им ни к чему. */
+.sb-views { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 4px; }
+.nav-item.nav-view { padding: 7px 6px; font-size: 0.8rem; text-overflow: ellipsis; }
+.nav-item.nav-view .nav-icon { margin-right: 5px; }
+.nav-item.nav-view .nav-count { display: none; }
+
 /* Иконка перед подписью (icons.js, applyNavIcons) — inline-flex, а не
    переводить .nav-item целиком на flex: содержимое кнопки (текст,
-   у «Корзины» ещё и .trash-badge) и так уже течёт в строку само по
+   число .nav-count) и так уже течёт в строку само по
    себе, менять модель разметки ради одной иконки незачем. */
 .nav-icon {
   display: inline-flex;
@@ -685,19 +705,113 @@ body.focus-mode .sidebar { display: none; }
 
 .sidebar-spacer { flex: 1; }
 
-/* Подписи групп в сайдбаре (пункт "Мир"/"Сюжет"/"Инструменты"/"Обзор")
-   — расставляет applyTabOrder в visibility.js динамически, по текущему
-   порядку вкладок, а не фиксированной вёрсткой: порядок можно
-   перетаскивать в Настройках, и подписи должны переставляться вместе
-   с пунктами, а не оставаться на месте. */
+/* Секцию, в которой все разделы скрыты в Настройках, прячем целиком
+   (visibility.js) — у плиток и строк свой display, атрибут hidden сам
+   по себе его не перебьёт. */
+.sidebar [hidden] { display: none !important; }
+
+/* ── Сайдбар: «Сейчас пишу», книги, недавнее ── */
+.sb-now {
+  margin: 4px 2px 6px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--card);
+}
+.sb-now-k { font-size: 0.66rem; letter-spacing: 0.09em; text-transform: uppercase; color: var(--text-faint); }
+.sb-now-title {
+  margin: 4px 0 3px;
+  font-family: var(--font-book);
+  font-weight: 600;
+  font-size: 1rem;
+  color: var(--text);
+  line-height: 1.25;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.sb-now-meta { display: flex; align-items: center; gap: 10px; font-size: 0.76rem; color: var(--text-faint); }
+.sb-now-status { display: inline-flex; align-items: center; gap: 5px; }
+.sb-now-goal { display: flex; flex-direction: column; gap: 5px; margin-top: 9px; font-size: 0.76rem; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.sb-now-bar { display: block; height: 4px; border-radius: 2px; background: var(--border); overflow: hidden; }
+.sb-now-bar i { display: block; height: 100%; border-radius: 2px; background: var(--accent); }
+.sb-now.goal-hit .sb-now-bar i { background: #6fa772; }
+.sb-now-btn { width: 100%; margin-top: 10px; justify-content: center; }
+
+.sb-books { display: flex; flex-direction: column; margin: -2px 0 2px; }
+.sb-book {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 10px 5px 34px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--text-faint);
+  font-family: inherit;
+  font-size: 0.82rem;
+  text-align: left;
+  cursor: pointer;
+}
+.sb-book:hover { background: var(--panel); color: var(--text); }
+.sb-book.active { color: var(--text); }
+.sb-book-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sb-book .nav-count { float: none; }
+
+.sb-recent { display: flex; flex-direction: column; }
+.sb-recent-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 5px 10px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--text-dim);
+  font-family: inherit;
+  font-size: 0.84rem;
+  text-align: left;
+  cursor: pointer;
+}
+.sb-recent-row:hover { background: var(--panel); color: var(--text); }
+.cast-avatar.sb-recent-avatar { --size: 20px; border-radius: 50%; }
+.sb-recent-icon { display: flex; justify-content: center; width: 20px; color: var(--text-faint); flex-shrink: 0; }
+.sb-recent-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sb-recent-kind { font-size: 0.72rem; color: var(--text-faint); flex-shrink: 0; }
+
+/* ── Окна Проверки и Корзины (sidebar-overview.js, openPanel) ──
+   Карточка рядом с сайдбаром, по высоте содержимого — не модалка на
+   весь экран. */
+.context-menu.sb-pop { padding: 0; width: 400px; max-width: calc(100vw - 24px); }
+.sb-pop-body { max-height: min(70vh, 560px); overflow-y: auto; }
+.sb-pop-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 12px 14px 10px;
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+}
+.sb-pop-title { font-family: var(--font-book); font-weight: 600; font-size: 1.02rem; color: var(--text); }
+.sb-pop-meta { font-size: 0.76rem; color: var(--text-faint); font-variant-numeric: tabular-nums; }
+.sb-pop-empty { padding: 18px 14px; color: var(--text-faint); font-size: 0.85rem; }
+.sb-pop .empty-state { margin: 0; padding: 22px 14px; }
+
+/* Заголовки секций сайдбара («Сюжет», «Мир», «Наглядно», «Недавнее») —
+   текст ставит sidebar-overview.js (перевод). */
 .nav-group-label {
-  padding: 10px 10px 2px;
-  font-size: 0.68rem;
+  padding: 14px 10px 5px;
+  font-size: 0.66rem;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.09em;
   color: var(--text-faint);
 }
-.nav-group-label:first-child { padding-top: 0; }
 
 /* Скрыт: сам статус (какие данные записаны на диск, "Сохранение…"/
    "Сохранено") остаётся полезным сигналом внутри save-badge.js —
@@ -1679,25 +1793,7 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--text-faint);
-  cursor: pointer;
   flex: 1;
-}
-.labels-group-name:hover { color: var(--text-dim); }
-.labels-group-name-input {
-  flex: 1;
-  background: var(--panel-alt);
-  border: 1px solid var(--accent);
-  border-radius: 6px;
-  color: var(--text);
-  font-size: 0.8rem;
-  padding: 3px 8px;
-}
-.labels-group-del {
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  font-size: 0.75rem;
-  line-height: 1;
 }
 
 .label-row-drag {
@@ -3329,56 +3425,28 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
   font-size: 0.78rem;
 }
 
-/* ── Корзина ───────────────────────────────── */
+/* ── Корзина (окно из сайдбара) ─────────────── */
 
-.trash-badge {
-  font-family: var(--font-ui); font-variant-numeric: tabular-nums;
-  font-size: 0.7rem;
-  color: var(--accent-hover);
-}
-
-.trash-panel {
-  flex: 1;
-  overflow-y: auto;
-  padding: 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  max-width: 640px;
-}
+.trash-panel { display: flex; flex-direction: column; }
 
 .trash-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 10px 14px;
+  gap: 10px;
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--border);
 }
+.trash-row:last-child { border-bottom: none; }
 
-.trash-meta {
-  font-size: 0.85rem;
-  color: var(--text-dim);
-}
+.trash-meta { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.trash-name { color: var(--text); font-size: 0.86rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.trash-type { color: var(--accent-hover); }
+.trash-date { color: var(--text-faint); font-size: 0.72rem; font-variant-numeric: tabular-nums; }
 
-.trash-type {
-  color: var(--accent-hover);
-  font-weight: 600;
-}
-
-.trash-date {
-  color: var(--text-faint);
-  font-family: var(--font-ui); font-variant-numeric: tabular-nums;
-  font-size: 0.72rem;
-}
-
-.trash-actions {
-  display: flex;
-  gap: 6px;
-  flex-shrink: 0;
-}
+.trash-actions { display: flex; gap: 4px; flex-shrink: 0; }
+.trash-actions .btn { padding: 4px 10px; font-size: 0.78rem; }
+.trash-actions .trash-forget { min-width: 28px; padding: 4px 6px; display: inline-flex; align-items: center; justify-content: center; }
 
 /* ── Данные (экспорт/импорт/демо) ─────────────── */
 
@@ -4061,25 +4129,27 @@ button.cboard-chip:hover { color: var(--accent-hover); }
   .cboard-hint { display: none; }
 }
 
-/* ── Проверка согласованности ─────────────────── */
+/* ── Проверка мира (окно из сайдбара) ────────── */
 
-.continuity-panel {
-  flex: 1;
-  overflow-y: auto;
-  padding: 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  max-width: 720px;
-}
-
-.continuity-list {
-  margin: 0;
-  padding-left: 20px;
+.continuity-panel { display: flex; flex-direction: column; }
+.continuity-section { padding: 8px 6px 6px; }
+.continuity-section + .continuity-section { border-top: 1px solid var(--border); }
+.continuity-section-title { padding: 2px 8px 4px; font-size: 0.68rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-faint); }
+.continuity-row {
+  display: block;
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 6px;
+  background: none;
   color: var(--text-dim);
-  font-size: 0.85rem;
-  line-height: 1.7;
+  font-family: inherit;
+  font-size: 0.83rem;
+  line-height: 1.4;
+  text-align: left;
 }
+button.continuity-row { cursor: pointer; }
+button.continuity-row:hover { background: var(--panel-alt); color: var(--text); }
 
 /* ── Телефон ───────────────────────────────── */
 /* Sidebar и .drawer — два места, общих для всего приложения (drawer

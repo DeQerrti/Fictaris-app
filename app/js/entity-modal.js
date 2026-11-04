@@ -1,4 +1,5 @@
 import { i18n } from "./i18n.js";
+import { recordRecent } from "./recent-nav.js";
 
 // ══════════════════════════════════════════════
 //  МОДАЛКА КАРТОЧКИ
@@ -71,6 +72,8 @@ export async function openEntityModal(moduleName, focusId, options = {}) {
   document.addEventListener("keydown", onEscape);
 
   current = { render, body, focusId };
+  // Карточка, открытая поверх экрана, — тоже «недавнее» (сайдбар).
+  if (typeof focusId === "string" && ["characters", "locations", "factions", "manuscript"].includes(moduleName)) recordRecent(moduleName, focusId);
   await render(body, focusId);
 }
 

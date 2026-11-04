@@ -160,7 +160,8 @@ async function openMenu() {
 export async function initProjectSwitcher() {
   const info = await apiGet("/api/app/info").catch(() => ({ vaults: [], currentVaultId: null }));
   const current = (info.vaults || []).find((v) => v.id === info.currentVaultId);
-  btn.textContent = current ? current.name : i18n("Проект");
+  const nameEl = document.getElementById("projectName");
+  if (nameEl) nameEl.textContent = current ? current.name : i18n("Проект");
 
   btn.addEventListener("click", (e) => {
     e.stopPropagation();
@@ -168,6 +169,6 @@ export async function initProjectSwitcher() {
     else openMenu();
   });
   document.addEventListener("click", (e) => {
-    if (!menu.contains(e.target) && e.target !== btn) closeMenu();
+    if (!menu.contains(e.target) && !btn.contains(e.target)) closeMenu();
   });
 }

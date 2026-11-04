@@ -36,4 +36,6 @@ export function recordRecent(module, id) {
   } catch {
     /* приватный режим/квота — недавнее просто не запомнится, не критично */
   }
+  // «Недавнее» в сайдбаре (sidebar-overview.js) перерисовывается само.
+  document.dispatchEvent(new CustomEvent("fictaris:recent-changed"));
 }

@@ -1,14 +1,16 @@
 import { i18n } from "./i18n.js";
-import { iconSvg } from "./icons.js";
+import { openPopover, closeMenu } from "./context-menu.js";
 
 // ══════════════════════════════════════════════
-//  САЙДБАР — авто-скрытие и изменение ширины
+//  САЙДБАР — вид панели и изменение ширины
 //
-//  Два независимых способа управлять пространством сайдбара, оба по
-//  образцам с рабочего стола: авто-скрытие (Windows) — сайдбар сжимается
-//  до тонкой полосы и разворачивается поверх контента при наведении, не
-//  сдвигая его (сам разворот — чистый CSS, :hover в style.css); и
-//  растягивание (Обсидиан) — перетаскивание правого края меняет
+//  Вид панели — одна кнопка внизу с тремя вариантами: развёрнута,
+//  только иконки (узкая полоса, как в VS Code) и «прятать» — сайдбар
+//  сжимается до тонкой полосы и разворачивается поверх контента при
+//  наведении, как панель задач Windows (сам разворот — чистый CSS,
+//  :hover в style.css). Раньше это были две одинаковые на вид кнопки у
+//  логотипа, и что каждая делает, было не понять. Отдельно —
+//  растягивание (Обсидиан): перетаскивание правого края меняет
 //  постоянную ширину.
 //
 //  Оба хранятся в localStorage, а не в site-settings.json: это
@@ -21,14 +23,12 @@ import { iconSvg } from "./icons.js";
 const WIDTH_KEY = "fictaris_sidebar_width";
 const PINNED_KEY = "fictaris_sidebar_pinned";
 const COLLAPSED_KEY = "fictaris_sidebar_collapsed";
-const MIN_WIDTH = 160;
+const MIN_WIDTH = 220;
 const MAX_WIDTH = 420;
-// Было 200 — уже с полутора десятками пунктов меню (характеры, локации,
-// карта сюжета, знания и т.д.) это тесно: длинные подписи переносятся
-// на вторую строку ("Глава N. …" в списке глав рукописи). 240 — нижняя
-// граница диапазона, который в 2026-м считается разумным для боковой
-// панели такого рода (240—300px), не крайняя ширина сама по себе.
-const DEFAULT_WIDTH = 240;
+// Плитки «Мира» в два столбца и карточка «Сейчас пишу» с названием
+// главы — уже 240 тесновато; 264 — по-прежнему в разумных для такой
+// панели 240—300px.
+const DEFAULT_WIDTH = 264;
 
 function clampWidth(w) {
   return Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, w));
@@ -50,60 +50,63 @@ function readCollapsed() {
   return localStorage.getItem(COLLAPSED_KEY) === "1";
 }
 
+const MODES = [
+  ["full", "Развёрнута", "Подписи, счётчики, «Сейчас пишу»"],
+  ["icons", "Только иконки", "Узкая полоса, подсказки при наведении"],
+  ["hide", "Прятать", "Выезжает при наведении на край, как панель задач"],
+];
+
+// Те же два ключа localStorage, что и раньше, — выбранный вид у тех, кто
+// уже настроил панель, не сбрасывается.
+function readMode() {
+  if (!readPinned()) return "hide";
+  return readCollapsed() ? "icons" : "full";
+}
+
+function writeMode(mode) {
+  localStorage.setItem(PINNED_KEY, mode === "hide" ? "0" : "1");
+  localStorage.setItem(COLLAPSED_KEY, mode === "icons" ? "1" : "0");
+}
+
 export function initSidebar() {
   const appEl = document.getElementById("app");
   const sidebar = document.querySelector(".sidebar");
   const handle = document.getElementById("sidebarResizeHandle");
-  const pinBtn = document.getElementById("sidebarPin");
-  const collapseBtn = document.getElementById("sidebarCollapse");
+  const modeBtn = document.getElementById("sidebarMode");
   if (!appEl || !sidebar) return;
 
   document.documentElement.style.setProperty("--sidebar-width", `${readWidth()}px`);
 
-  // Булавка, а не вторая стрелка: рядом уже стоит стрелка «свернуть до
-  // иконок», и две одинаковые ‹ ‹ было не различить.
-  if (pinBtn) pinBtn.innerHTML = iconSvg("pushpin", 14);
-  let pinned = readPinned();
-  function applyPinned() {
-    appEl.classList.toggle("sidebar-autohide", !pinned);
-    if (!pinBtn) return;
-    pinBtn.classList.toggle("pinned", pinned);
-    pinBtn.title = pinned
-      ? i18n("Меню закреплено – нажми, чтобы сворачивать его и разворачивать по наведению")
-      : i18n("Меню сворачивается – нажми, чтобы закрепить его открытым");
+  let mode = readMode();
+  function applyMode() {
+    appEl.classList.toggle("sidebar-autohide", mode === "hide");
+    appEl.classList.toggle("sidebar-collapsed", mode === "icons");
   }
-  applyPinned();
+  applyMode();
 
-  pinBtn?.addEventListener("click", () => {
-    pinned = !pinned;
-    localStorage.setItem(PINNED_KEY, pinned ? "1" : "0");
-    applyPinned();
-  });
-
-  // ── Иконка-режим (третье состояние, независимое от закрепления и
-  //    авто-скрытия выше) — постоянно узкая полоса с одними иконками,
-  //    как в VS Code/Notion, вместо разворота по наведению на весь
-  //    сайдбар: для тех, кто уже помнит порядок разделов и хочет
-  //    вернуть экран содержимому, не наводя мышь на самый край окна
-  //    ради каждого клика. Переключатель проекта в этом режиме не
-  //    помещается без обрезки и просто прячется — открыть его обратно
-  //    можно тем же тумблером (см. #app.sidebar-collapsed в style.css).
-  if (collapseBtn) collapseBtn.innerHTML = iconSvg("chevronLeft", 14);
-  let collapsed = readCollapsed();
-  function applyCollapsed() {
-    appEl.classList.toggle("sidebar-collapsed", collapsed);
-    if (!collapseBtn) return;
-    collapseBtn.classList.toggle("active", collapsed);
-    collapseBtn.title = collapsed
-      ? i18n("Список свёрнут до иконок – нажми, чтобы вернуть подписи")
-      : i18n("Свернуть список разделов до одних иконок");
-  }
-  applyCollapsed();
-
-  collapseBtn?.addEventListener("click", () => {
-    collapsed = !collapsed;
-    localStorage.setItem(COLLAPSED_KEY, collapsed ? "1" : "0");
-    applyCollapsed();
+  modeBtn?.addEventListener("click", () => {
+    const list = document.createElement("div");
+    list.className = "sb-mode-menu";
+    const title = document.createElement("div");
+    title.className = "sb-mode-title";
+    title.textContent = i18n("Вид панели");
+    list.appendChild(title);
+    for (const [key, label, hint] of MODES) {
+      const opt = document.createElement("button");
+      opt.className = "sb-mode-opt" + (key === mode ? " active" : "");
+      opt.innerHTML = `<span class="sb-mode-radio"></span><span><span class="sb-mode-label"></span><span class="sb-mode-hint"></span></span>`;
+      opt.querySelector(".sb-mode-label").textContent = i18n(label);
+      opt.querySelector(".sb-mode-hint").textContent = i18n(hint);
+      opt.addEventListener("click", () => {
+        mode = key;
+        writeMode(mode);
+        applyMode();
+        closeMenu();
+      });
+      list.appendChild(opt);
+    }
+    const rect = modeBtn.getBoundingClientRect();
+    openPopover(rect.right + 8, rect.bottom, list, "sb-mode-popover");
   });
 
   // ── Растягивание (перетаскивание правого края) ──
