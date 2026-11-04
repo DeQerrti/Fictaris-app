@@ -2,6 +2,8 @@ import { escapeHtml, reorderById, attachCardDrag } from "./chips.js";
 import { buildFieldHint } from "./templates.js";
 import { avatarInnerHtml } from "./avatars.js";
 import { i18n } from "./i18n.js";
+import { iconSvg } from "./icons.js";
+import { openTemplatesPanel } from "./world-panels.js";
 
 // ══════════════════════════════════════════════
 //  ОБЗОР И ДОСЬЕ
@@ -64,9 +66,10 @@ export function buildSegmented(options, value, onPick) {
 }
 
 // Шапка вкладки: заголовок, счётчик, режимы, свои переключатели (extra),
-// поиск и «+ Добавить». metaEl заполняет сама вкладка — счётчик зависит
+// поиск, «Поля анкеты» (шаблоны этого раздела — fieldsKind, боковой
+// панелью) и «+ Добавить». metaEl заполняет сама вкладка — счётчик зависит
 // от поиска и перерисовывается вместе с телом, а не со всей шапкой.
-export function buildEntityToolbar({ title, modes, mode, onMode, extra, placeholder, query, onSearch, addLabel, onAdd, onAddMenu }) {
+export function buildEntityToolbar({ title, modes, mode, onMode, extra, placeholder, query, onSearch, addLabel, onAdd, onAddMenu, fieldsKind }) {
   const bar = document.createElement("div");
   bar.className = "timeline-toolbar";
 
@@ -103,7 +106,17 @@ export function buildEntityToolbar({ title, modes, mode, onMode, extra, placehol
     onAddMenu(addBtn);
   });
 
-  bar.append(spacer, search, addBtn);
+  bar.append(spacer, search);
+  if (fieldsKind) {
+    const fieldsBtn = document.createElement("button");
+    fieldsBtn.className = "btn";
+    fieldsBtn.innerHTML = `${iconSvg("note", 14)}<span></span>`;
+    fieldsBtn.querySelector("span").textContent = i18n("Поля анкеты");
+    fieldsBtn.title = i18n("Шаблоны анкет этого раздела – какие поля есть у карточки");
+    fieldsBtn.addEventListener("click", () => openTemplatesPanel(fieldsKind));
+    bar.appendChild(fieldsBtn);
+  }
+  bar.appendChild(addBtn);
   return { bar, metaEl };
 }
 

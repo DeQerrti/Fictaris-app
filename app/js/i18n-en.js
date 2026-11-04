@@ -593,8 +593,6 @@ export const EN_DICT = {
   "Экспортировать мир в PDF": "Export world as PDF",
   "Экспортировать мир как сайт": "Export world as a site",
   "Настройки → Оформление": "Settings → Appearance",
-  "Настройки → Шаблоны анкет": "Settings → Form templates",
-  "Настройки → Горячие клавиши": "Settings → Keyboard shortcuts",
   "Ничего не найдено": "Nothing found",
   "Без названия": "Untitled",
   "Персонаж": "Character",
@@ -603,6 +601,25 @@ export const EN_DICT = {
   "Событие": "Event",
   "Глава": "Chapter",
   "Карточка": "Card",
+
+  // ── Настройки-окно и боковые панели (settings-panel.js, world-panels.js) ──
+  "Этот мир": "This world",
+  "Настройки → Разделы и клавиши": "Settings → Sections and keys",
+  "Разделы": "Sections",
+  "Окна": "Windows",
+  "Название, видимость и клавиша. Строки перетаскиваются внутри своей секции, цифры 1–9 идут по порядку в сайдбаре.": "Name, visibility and key. Drag rows within their section; keys 1–9 follow the sidebar order.",
+  "Нажми и затем нужную клавишу": "Click, then press the key you want",
+  "Папка проекта": "Project folder",
+  "Все данные мира – обычные файлы в этой папке. Их можно копировать, хранить в облаке и править снаружи.": "All world data is plain files in this folder. You can copy them, keep them in the cloud and edit them outside the app.",
+  "Папка не выбрана": "No folder selected",
+  "Открыть в проводнике": "Show in file manager",
+  "Настроить теги": "Manage tags",
+  "Словарь тегов этого мира – общий для персонажей, мест и фракций": "This world's tag dictionary – shared by characters, places and factions",
+  "Поля анкеты": "Form fields",
+  "Шаблоны анкет этого раздела – какие поля есть у карточки": "Form templates of this section – which fields a card has",
+  "Шаблоны анкет: какие поля есть у карточки": "Form templates: which fields a card has",
+  "Календарь мира": "World calendar",
+  "Свои месяцы и длина года для таймлайна": "Your own months and year length for the timeline",
 
   // ── Сайдбар (sidebar.js, sidebar-overview.js) ──
   "Вид панели": "Panel view",
@@ -685,12 +702,10 @@ export const EN_DICT = {
   "Масштаб окна: ": "Window zoom: ",
   "100%": "100%",
 
-  "Подписи интерфейса": "Interface labels",
   "Показать раздел": "Show section",
   "Скрыть раздел": "Hide section",
   "Сбросить все подписи": "Reset all labels",
 
-  "Горячие клавиши": "Keyboard shortcuts",
   "Сбросить на клавишу по умолчанию": "Reset to the default key",
   "Нажми клавишу…": "Press a key…",
 

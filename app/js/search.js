@@ -7,6 +7,7 @@ import { exportSiteZip } from "./export-site.js";
 import { i18n } from "./i18n.js";
 import { chapterLabel } from "./books.js";
 import { readRecent } from "./recent-nav.js";
+import { openTagsPanel, openTemplatesPanel, openCalendarPanel } from "./world-panels.js";
 
 // ══════════════════════════════════════════════
 //  ГЛОБАЛЬНЫЙ ПОИСК И КОМАНДНАЯ ПАЛИТРА
@@ -59,16 +60,28 @@ function commandList() {
       run: (navigate) => navigate("settings", "appearance"),
     },
     {
-      id: "cmd-settings-templates",
-      label: i18n("Настройки → Шаблоны анкет"),
-      icon: "note",
-      run: (navigate) => navigate("settings", "templates"),
+      id: "cmd-settings-sections",
+      label: i18n("Настройки → Разделы и клавиши"),
+      icon: "keyboard",
+      run: (navigate) => navigate("settings", "sections"),
     },
     {
-      id: "cmd-settings-shortcuts",
-      label: i18n("Настройки → Горячие клавиши"),
-      icon: "keyboard",
-      run: (navigate) => navigate("settings", "shortcuts"),
+      id: "cmd-templates",
+      label: i18n("Поля анкеты"),
+      icon: "note",
+      run: () => openTemplatesPanel("characters"),
+    },
+    {
+      id: "cmd-tags",
+      label: i18n("Теги"),
+      icon: "pushpin",
+      run: () => openTagsPanel(),
+    },
+    {
+      id: "cmd-calendar",
+      label: i18n("Календарь мира"),
+      icon: "clock",
+      run: () => openCalendarPanel(),
     },
   ];
 }

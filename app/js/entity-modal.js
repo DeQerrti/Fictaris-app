@@ -55,6 +55,7 @@ export async function openEntityModal(moduleName, focusId, options = {}) {
 
   const panel = document.createElement("div");
   panel.className = "entity-modal-panel";
+  if (options.panelClass) panel.classList.add(options.panelClass);
 
   const closeBtn = document.createElement("button");
   closeBtn.className = "entity-modal-close";

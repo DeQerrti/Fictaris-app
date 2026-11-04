@@ -28,7 +28,11 @@ import { loadLang, i18n } from "./i18n.js";
 import { initEntityModal, openEntityModal, refreshEntityModal } from "./entity-modal.js";
 import { initExternalChanges } from "./external-changes.js";
 import { recordRecent } from "./recent-nav.js";
+import { hasPendingSaves } from "./save-badge.js";
 import { initSidebarOverview, refreshSidebar, openPanel } from "./sidebar-overview.js";
+
+// Только окна поверх экрана — ни вкладкой, ни разделом «по умолчанию».
+const MODAL_ONLY_MODULES = ["stats", "knowledge", "settings"];
 
 const MODULES = {
   manuscript: renderManuscript,
@@ -68,14 +72,43 @@ let openRequestId = 0;
 let currentModuleName = null;
 
 // Проверка и Корзина — окна из нижней строки сайдбара, а не вкладки
-// (sidebar-overview.js): своя клавиша или ссылка на них открывает окно.
+// (sidebar-overview.js); Настройки и Статистика — окна поверх экрана.
+// Своя клавиша, поиск или ссылка на них открывают окно.
 const PANEL_MODULES = ["continuity", "trash"];
+
+function openSettings(tab) {
+  openEntityModal("settings", tab, { panelClass: "settings-window" });
+}
+
+// С какого раздела открывать приложение — с того, где закрыли (своё на
+// каждый мир; предпочтение устройства, не данные мира). В первый раз —
+// Рукопись.
+const LAST_MODULE_KEY = "fictaris_last_module";
+let vaultId = "";
+
+function rememberModule(name) {
+  try {
+    localStorage.setItem(`${LAST_MODULE_KEY}:${vaultId}`, name);
+  } catch {
+    /* приватный режим — просто не запомним */
+  }
+}
+
+function lastModule() {
+  try {
+    return localStorage.getItem(`${LAST_MODULE_KEY}:${vaultId}`);
+  } catch {
+    return null;
+  }
+}
 
 async function openModule(name, arg) {
   if (PANEL_MODULES.includes(name)) {
     openPanel(name, document.getElementById(name === "trash" ? "trashBtn" : "continuityBtn"));
     return;
   }
+  if (name === "settings") return openSettings(arg);
+  if (name === "stats") return openEntityModal("stats");
   const requestId = ++openRequestId;
   currentModuleName = name;
   // Фокус-режим рукописи прячет сайдбар классом на body (manuscript.js) —
@@ -83,7 +116,6 @@ async function openModule(name, arg) {
   // страницы, скрывшей навигацию, можно было бы только через Esc.
   document.body.classList.remove("focus-mode");
   navItems.forEach((btn) => btn.classList.toggle("active", btn.dataset.module === name));
-  settingsBtn.classList.toggle("active", name === "settings");
   // Клик мышью оставляет активный фокус на нажатой кнопке — саму подсветку
   // выбора это не портит (она через .active, не :focus), но при живом
   // переключении по горячим клавишам старая кнопка иначе продолжает
@@ -91,20 +123,35 @@ async function openModule(name, arg) {
   // blur — самый надёжный способ снять этот контур независимо от того,
   // какая кнопка успела получить фокус до этого.
   const focused = document.activeElement;
-  if (focused instanceof HTMLElement && (focused.classList.contains("nav-item") || focused === settingsBtn)) {
+  if (focused instanceof HTMLElement && focused.classList.contains("nav-item")) {
     focused.blur();
   }
   content.innerHTML = "";
   await MODULES[name](content, arg);
   if (requestId !== openRequestId) return; // за это время выбрали другой модуль — не перетираем его
   appEl.classList.remove("sidebar-open"); // на телефоне — сайдбар выезжающий, после выбора закрываем
-  if (name !== "settings") recordRecent(name, typeof arg === "string" ? arg : null);
+  recordRecent(name, typeof arg === "string" ? arg : null);
+  if (MODULES[name] && !MODAL_ONLY_MODULES.includes(name)) rememberModule(name);
 }
 
 navItems.forEach((btn) => {
   btn.addEventListener("click", () => openModule(btn.dataset.module));
 });
-settingsBtn.addEventListener("click", () => openModule("settings"));
+settingsBtn.addEventListener("click", () => openSettings());
+// Ctrl+, — как в большинстве программ.
+document.addEventListener("keydown", (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key === ",") {
+    e.preventDefault();
+    openSettings();
+  }
+});
+// Боковая панель (теги, поля анкеты, календарь) закрылась — раздел под
+// ней перечитывает данные.
+document.addEventListener("fictaris:reload-module", () => {
+  setTimeout(() => {
+    if (currentModuleName && !hasPendingSaves()) reloadAfterExternalChange();
+  }, 700);
+});
 // Статистика больше не вкладка (одинокая узкая колонка с цифрами
 // посреди пустого экрана) — модалка поверх текущего места, тем же
 // entity-modal.js, что и карточка персонажа по клику на @упоминание.
@@ -117,7 +164,7 @@ sidebarBackdrop.addEventListener("click", () => appEl.classList.remove("sidebar-
 // связи открывает персонажа charA, у которого она правится в дровере
 // (characters.js, мини-редактор связей); search.js кладёт этот id в
 // entry.id и не должен ничего знать про то, что раздел удалён. «Знания» —
-// тоже больше не раздел, а модалка (см. MODAL_ONLY_MODULES ниже) —
+// тоже больше не раздел, а модалка (см. MODAL_ONLY_MODULES выше) —
 // переход туда из поиска открывает её тем же способом, что и кнопка
 // «Знания» в рукописи, а не разворачивает во весь #content.
 initSearch((module, focusId) => {
@@ -192,15 +239,17 @@ async function boot() {
     return;
   }
   const hidden = await getHiddenTabs();
-  // "stats"/"knowledge" в MODULES только для модалки (statsBtn выше,
-  // «Знания» в меню «⋯» рукописи, entity-modal.js) — своего пункта в
-  // сайдбаре у них нет, так что как запасной модуль по умолчанию они не
-  // годятся: незачем открывать такую заглушку без возможности с неё
-  // куда-то переключиться кликом.
-  const MODAL_ONLY_MODULES = ["stats", "knowledge"];
-  const defaultModule = hidden.includes("manuscript")
-    ? Object.keys(MODULES).find((key) => key !== "settings" && !MODAL_ONLY_MODULES.includes(key) && !hidden.includes(key)) || "settings"
-    : "manuscript";
+  // Окна (MODAL_ONLY_MODULES) своего пункта в сайдбаре не имеют — как
+  // раздел при запуске они не годятся. Скрытый в Настройках раздел —
+  // тоже нет.
+  vaultId = info.currentVaultId || info.vaultPath || "";
+  const last = lastModule();
+  const usable = (key) => MODULES[key] && !MODAL_ONLY_MODULES.includes(key) && !hidden.includes(key);
+  const defaultModule = usable(last)
+    ? last
+    : usable("manuscript")
+      ? "manuscript"
+      : Object.keys(MODULES).find(usable) || "manuscript";
   openModule(defaultModule);
   initSidebarOverview({ openModule, openEntityModal, getCurrent: () => currentModuleName });
   initProjectSwitcher();

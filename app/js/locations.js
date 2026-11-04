@@ -290,6 +290,7 @@ function buildToolbar() {
     chooseTemplate(templates, btn, (id) => addWithTemplate(id), { forceMenu, onCreateNew: addWithNewTemplate });
   const { bar, metaEl: meta } = buildEntityToolbar({
     title: i18n("Локации"),
+    fieldsKind: "locations",
     modes: MODES,
     mode,
     onMode: (key) => {

@@ -1,5 +1,6 @@
 import { apiGet, apiPost } from "./api.js";
 import { i18n } from "./i18n.js";
+import { openTagsPanel } from "./world-panels.js";
 
 // ══════════════════════════════════════════════
 //  ТЕГИ
@@ -125,7 +126,16 @@ export function buildTagsField(tagsMap, value, onChange) {
   const field = document.createElement("div");
   field.className = "field tags-field";
   const label = document.createElement("label");
+  label.className = "tags-field-label";
   label.textContent = i18n("Теги");
+  // Словарь тегов правится прямо отсюда — боковой панелью, карточка
+  // остаётся на месте (раньше — только в Настройках).
+  const manageBtn = document.createElement("button");
+  manageBtn.type = "button";
+  manageBtn.className = "tags-manage-btn";
+  manageBtn.textContent = i18n("Настроить теги");
+  manageBtn.addEventListener("click", () => openTagsPanel());
+  label.appendChild(manageBtn);
   field.appendChild(label);
 
   let current = new Set(parseTags(value));
@@ -163,7 +173,7 @@ export function buildTagsField(tagsMap, value, onChange) {
 
   // Подписи типов — сперва дефолтные (синхронно, сразу видно что-то на
   // экране), затем настоящие (с переименованиями/своими типами из
-  // Настроек → Теги) — как только промис разрешится, перерисовываем.
+  // словаря тегов — «Настроить теги») — как только промис разрешится, перерисовываем.
   // buildTagsField сама по себе синхронная (её сразу же appendChild'ят
   // в drawer, ждать асинхронно с этим местом неудобно), поэтому не
   // await, а фоновое обновление.

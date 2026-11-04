@@ -247,6 +247,7 @@ function buildToolbar() {
     chooseTemplate(templates, btn, addWithTemplate, { forceMenu, onCreateNew: addWithNewTemplate });
   const { bar, metaEl: meta } = buildEntityToolbar({
     title: i18n("Фракции"),
+    fieldsKind: "factions",
     modes: MODES,
     mode,
     onMode: (key) => {

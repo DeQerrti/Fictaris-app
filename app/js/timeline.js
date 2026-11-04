@@ -7,6 +7,7 @@ import { pushTrash } from "./trash.js";
 import { buildExportPngButton } from "./png-export.js";
 import { loadCalendar, absoluteDay, formatDate, yearLength } from "./calendar.js";
 import { openPopover } from "./context-menu.js";
+import { openCalendarPanel } from "./world-panels.js";
 import { avatarInnerHtml } from "./avatars.js";
 import { i18n, i18nPlural } from "./i18n.js";
 
@@ -229,12 +230,19 @@ function buildToolbar() {
 
   const exportBtn = buildExportPngButton(() => container.querySelector(".timeline-export-target"), i18n("таймлайн"));
 
+  // Свой календарь — данные мира, правится здесь же, боковой панелью.
+  const calendarBtn = document.createElement("button");
+  calendarBtn.className = "btn";
+  calendarBtn.innerHTML = `${iconSvg("clock", 14)}<span>${escapeHtml(i18n("Календарь мира"))}</span>`;
+  calendarBtn.title = i18n("Свои месяцы и длина года для таймлайна");
+  calendarBtn.addEventListener("click", () => openCalendarPanel());
+
   const addBtn = document.createElement("button");
   addBtn.className = "btn accent";
   addBtn.textContent = i18n("+ Событие");
   addBtn.addEventListener("click", addEvent);
 
-  bar.append(title, meta, spacer, switcher, filterBtn, exportBtn, addBtn);
+  bar.append(title, meta, spacer, switcher, filterBtn, calendarBtn, exportBtn, addBtn);
   return bar;
 }
 

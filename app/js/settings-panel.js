@@ -50,17 +50,19 @@ export async function renderSettings(root, focusTab) {
   root.innerHTML = "";
   const info = await apiGet("/api/app/info").catch(() => ({}));
 
+  // Настройки — окно поверх экрана (main.js, openEntityModal), не
+  // вкладка. Две группы: само приложение и этот мир. Теги, шаблоны анкет
+  // и календарь — данные мира, они открываются там, где ими пользуются
+  // (поле тегов, шапки Персонажей/Локаций/Фракций, Таймлайн), боковой
+  // панелью (side-panel.js).
   const TABS = [
-    ["appearance", () => i18n("Оформление"), () => buildAppearanceSection()],
-    ["app", () => i18n("Приложение"), () => buildAppSection(info)],
-    ["labels", () => i18n("Подписи интерфейса"), () => buildLabelsSection()],
-    ["shortcuts", () => i18n("Горячие клавиши"), () => buildShortcutsSection()],
-    ["tags", () => i18n("Теги"), () => buildTagsSection()],
-    ["templates", () => i18n("Шаблоны анкет"), () => buildTemplatesSection()],
-    ["calendar", () => i18n("Календарь"), () => buildCalendarSection()],
-    ["sync", () => i18n("Синхронизация"), () => buildSyncSection()],
-    ["data", () => i18n("Данные"), () => buildDataSections()],
+    ["appearance", () => i18n("Оформление"), () => buildAppearanceSection(), "eye", "app"],
+    ["app", () => i18n("Приложение"), () => buildAppSection(info), "settings", "app"],
+    ["sections", () => i18n("Разделы"), () => buildSectionsSection(), "columns", "app"],
+    ["sync", () => i18n("Синхронизация"), () => buildSyncSection(), "upload", "world"],
+    ["data", () => i18n("Данные"), () => [buildFolderSection(info), ...buildDataSections()], "download", "world"],
   ];
+  const GROUP_TITLES = { app: () => i18n("Приложение"), world: () => i18n("Этот мир") };
   if (focusTab && TABS.some(([key]) => key === focusTab)) activeSettingsTab = focusTab;
   else if (!TABS.some(([key]) => key === activeSettingsTab)) activeSettingsTab = "appearance";
 
@@ -69,26 +71,43 @@ export async function renderSettings(root, focusTab) {
 
   const tabsNav = document.createElement("nav");
   tabsNav.className = "settings-tabs";
+  const heading = document.createElement("div");
+  heading.className = "settings-title";
+  heading.textContent = i18n("Настройки");
+  tabsNav.appendChild(heading);
 
   const content = document.createElement("div");
   content.className = "settings-content data-panel";
 
   async function selectTab(key, build) {
     activeSettingsTab = key;
-    for (const btn of tabsNav.children) btn.classList.toggle("active", btn.dataset.tab === key);
+    for (const btn of tabsNav.querySelectorAll("[data-tab]")) btn.classList.toggle("active", btn.dataset.tab === key);
     content.innerHTML = "";
     const result = await build();
     for (const el of Array.isArray(result) ? result : [result]) content.appendChild(el);
   }
 
-  for (const [key, label, build] of TABS) {
+  let lastGroup = null;
+  for (const [key, label, build, icon, group] of TABS) {
+    if (group !== lastGroup) {
+      const g = document.createElement("div");
+      g.className = "settings-group";
+      g.textContent = GROUP_TITLES[group]();
+      tabsNav.appendChild(g);
+      lastGroup = group;
+    }
     const btn = document.createElement("button");
-    btn.className = "nav-item" + (key === activeSettingsTab ? " active" : "");
+    btn.className = "settings-tab" + (key === activeSettingsTab ? " active" : "");
     btn.dataset.tab = key;
-    btn.textContent = label();
+    btn.innerHTML = `${iconSvg(icon, 15)}<span></span>`;
+    btn.querySelector("span").textContent = label();
     btn.addEventListener("click", () => selectTab(key, build));
     tabsNav.appendChild(btn);
   }
+  const ver = document.createElement("div");
+  ver.className = "settings-version";
+  ver.textContent = `Fictaris ${info.version || ""} · Ctrl+,`;
+  tabsNav.appendChild(ver);
 
   shell.append(tabsNav, content);
   root.appendChild(shell);
@@ -312,26 +331,29 @@ async function buildZoomSection() {
   return section;
 }
 
-// ── Подписи интерфейса ─────────────────────────
-// Разделы («Разделы») и подписи («Подписи интерфейса») были двумя
-// отдельными вкладками с одинаковым списком пунктов — одна прятала,
-// другая переименовывала. Слиты в одну: слева от каждого поля глазик
-// прячет/возвращает раздел (HIDEABLE_TABS, visibility.js), само поле —
-// это и есть подпись, отдельной подписи-каптона рядом больше нет.
-// Название приложения и три служебных пункта (настройки, проверка,
-// корзина) сюда не попадают — их нельзя ни переименовать, ни спрятать
-// (см. LOCKED_NAV_KEYS в labels.js и комментарий в visibility.js).
-// Секции — те же, что в сайдбаре (TAB_SECTIONS); перетаскивать можно
-// только внутри секции.
+// ── Разделы ───────────────────────────────────
+// Раньше — две вкладки с одним и тем же списком: «Подписи интерфейса»
+// (имя, видимость, порядок) и «Горячие клавиши». Теперь одна таблица:
+// на строку раздела — перетаскивание (внутри секции сайдбара), глаз,
+// название и клавиша. Ниже — окна (Проверка, Корзина, Статистика,
+// Настройки): у них нет пункта в списке, но клавишу назначить можно.
+// Название приложения и служебные окна не переименовываются (см.
+// LOCKED_NAV_KEYS в labels.js и комментарий в visibility.js).
+const WINDOW_KEYS = [
+  ["continuity", () => i18n("Проверка мира")],
+  ["trash", () => i18n("Корзина")],
+  ["stats", () => i18n("Статистика")],
+  ["settings", () => i18n("Настройки")],
+];
 
-async function buildLabelsSection() {
+async function buildSectionsSection() {
   const section = document.createElement("div");
   section.className = "data-section";
-  section.innerHTML = `<h3>${i18n("Подписи интерфейса")}</h3>`;
+  section.innerHTML = `<h3>${i18n("Разделы")}</h3><p>${i18n("Название, видимость и клавиша. Строки перетаскиваются внутри своей секции, цифры 1–9 идут по порядку в сайдбаре.")}</p>`;
 
   const body = document.createElement("div");
   section.appendChild(body);
-  await renderLabelsBody(body);
+  await renderSectionsBody(body);
 
   const resetBtn = document.createElement("button");
   resetBtn.className = "btn";
@@ -342,57 +364,121 @@ async function buildLabelsSection() {
     location.reload(); // проще перечитать раздел заново, чем гонять новые значения по всем полям формы
   });
   section.appendChild(resetBtn);
-
   return section;
 }
 
-async function renderLabelsBody(body) {
+async function renderSectionsBody(body) {
   body.innerHTML = "";
   const defaults = defaultLabels();
   const current = window.SITE_LABELS || defaults;
   const hidden = new Set(await getHiddenTabs());
   const order = await getTabOrder();
+  const settings = await apiGet("/api/site-settings").catch(() => ({}));
+  const custom = settings.keyBindings?.nav || {};
+  // Цифры — по тому порядку, что сейчас в сайдбаре (без скрытых).
+  const digits = () => new Map(navOrder().slice(0, 9).map((btn, i) => [btn.dataset.module, String(i + 1)]));
+
+  const keyCells = new Map();
+  const refreshDigits = () => {
+    const d = digits();
+    for (const [key, update] of keyCells) update(d.get(key));
+  };
 
   let drag = null; // { key, sectionId }
+  const collectFullOrder = () => [...body.querySelectorAll("[data-key]")].map((el) => el.dataset.key);
 
-  function collectFullOrder() {
-    return [...body.querySelectorAll("[data-key]")].map((el) => el.dataset.key);
-  }
-
-  for (const section of TAB_SECTIONS) {
+  for (const sec of TAB_SECTIONS) {
     const header = document.createElement("div");
     header.className = "labels-group-header";
-    const nameSpan = document.createElement("span");
-    nameSpan.className = "labels-group-name";
-    nameSpan.textContent = section.label();
-    header.appendChild(nameSpan);
+    header.innerHTML = `<span class="labels-group-name"></span>`;
+    header.firstChild.textContent = sec.label();
     body.appendChild(header);
 
     const container = document.createElement("div");
     container.className = "labels-grid";
-    for (const key of order.filter((k) => section.keys.includes(k))) {
-      const row = buildLabelRow(key, defaults.nav[key], current.nav[key], hidden.has(key), (value) => saveLabels({ nav: { [key]: value } }));
+    for (const key of order.filter((k) => sec.keys.includes(k))) {
+      const row = buildLabelRow(key, defaults.nav[key], current.nav[key], hidden.has(key), (value) => saveLabels({ nav: { [key]: value } }), refreshDigits);
+      row.appendChild(buildKeyCell(key, custom, keyCells));
       row.draggable = true;
       row.dataset.key = key;
-      row.addEventListener("dragstart", () => { drag = { key, sectionId: section.id }; });
+      row.addEventListener("dragstart", () => { drag = { key, sectionId: sec.id }; });
       row.addEventListener("dragover", (e) => {
-        if (drag?.sectionId === section.id) e.preventDefault();
+        if (drag?.sectionId === sec.id) e.preventDefault();
       });
       row.addEventListener("drop", async (e) => {
         e.preventDefault();
-        if (!drag || drag.sectionId !== section.id || drag.key === key) return;
+        if (!drag || drag.sectionId !== sec.id || drag.key === key) return;
         const dragRow = container.querySelector(`[data-key="${drag.key}"]`);
         if (!dragRow) return;
         container.insertBefore(dragRow, row);
         await setTabOrder(collectFullOrder());
+        refreshDigits();
       });
       container.appendChild(row);
     }
     body.appendChild(container);
   }
+
+  const header = document.createElement("div");
+  header.className = "labels-group-header";
+  header.innerHTML = `<span class="labels-group-name"></span>`;
+  header.firstChild.textContent = i18n("Окна");
+  body.appendChild(header);
+  const windows = document.createElement("div");
+  windows.className = "labels-grid";
+  const searchRow = document.createElement("div");
+  searchRow.className = "label-row label-row-static";
+  searchRow.innerHTML = `<span class="label-row-drag"></span><span class="label-row-eye"></span><span class="label-row-text"></span><span class="btn shortcut-key shortcut-key-fixed">/</span><span class="shortcut-clear-gap"></span>`;
+  searchRow.querySelector(".label-row-text").textContent = i18n("Поиск");
+  windows.appendChild(searchRow);
+  for (const [key, label] of WINDOW_KEYS) {
+    const row = document.createElement("div");
+    row.className = "label-row label-row-static";
+    row.innerHTML = `<span class="label-row-drag"></span><span class="label-row-eye"></span><span class="label-row-text"></span>`;
+    row.querySelector(".label-row-text").textContent = label();
+    row.appendChild(buildKeyCell(key, custom, keyCells));
+    windows.appendChild(row);
+  }
+  body.appendChild(windows);
+  refreshDigits();
 }
 
-function buildLabelRow(key, defaultValue, currentValue, isHidden, onSave) {
+// Кнопка клавиши: своя привязка или цифра по порядку; × сбрасывает свою.
+function buildKeyCell(key, custom, keyCells) {
+  const cell = document.createElement("span");
+  cell.className = "shortcut-cell";
+  const keyBtn = document.createElement("button");
+  keyBtn.className = "btn shortcut-key";
+  const clearBtn = document.createElement("button");
+  clearBtn.className = "btn shortcut-clear";
+  clearBtn.textContent = "×";
+  clearBtn.title = i18n("Сбросить на клавишу по умолчанию");
+  let binding = custom[key] || null;
+  let digit = null;
+  const paint = () => {
+    keyBtn.textContent = binding ? bindingLabel(binding) : digit || "–";
+    clearBtn.style.visibility = binding ? "visible" : "hidden";
+  };
+  keyCells.set(key, (d) => { digit = d || null; paint(); });
+  keyBtn.title = i18n("Нажми и затем нужную клавишу");
+  keyBtn.addEventListener("click", () => {
+    captureKey(keyBtn, async (result) => {
+      await saveShortcut(key, result);
+      binding = result;
+      paint();
+    });
+  });
+  clearBtn.addEventListener("click", async () => {
+    await clearShortcut(key);
+    binding = null;
+    paint();
+  });
+  paint();
+  cell.append(keyBtn, clearBtn);
+  return cell;
+}
+
+function buildLabelRow(key, defaultValue, currentValue, isHidden, onSave, onVisibility) {
   const row = document.createElement("div");
   row.className = "label-row" + (isHidden ? " label-row-hidden" : "");
 
@@ -413,6 +499,7 @@ function buildLabelRow(key, defaultValue, currentValue, isHidden, onSave) {
     row.classList.toggle("label-row-hidden", isHidden);
     eyeBtn.innerHTML = iconSvg(isHidden ? "eyeOff" : "eye", 15);
     eyeBtn.title = isHidden ? i18n("Показать раздел") : i18n("Скрыть раздел");
+    onVisibility?.();
   });
 
   const input = document.createElement("input");
@@ -428,57 +515,25 @@ function buildLabelRow(key, defaultValue, currentValue, isHidden, onSave) {
   return row;
 }
 
-async function buildShortcutsSection() {
+// ── Папка проекта ─────────────────────────────
+// Где лежат файлы этого мира — и кнопка открыть её в проводнике
+// (на телефоне своего проводника нет, только путь).
+function buildFolderSection(info) {
   const section = document.createElement("div");
   section.className = "data-section";
-  section.innerHTML = `<h3>${i18n("Горячие клавиши")}</h3>`;
-
-  const settings = await apiGet("/api/site-settings").catch(() => ({}));
-  const custom = settings.keyBindings?.nav || {};
-  const defaults = defaultLabels();
-  const navLabels = window.SITE_LABELS?.nav || defaults.nav;
-
-  const list = document.createElement("div");
-  list.className = "shortcuts-list";
-
-  const digits = new Map(navOrder().slice(0, 9).map((btn, i) => [btn.dataset.module, String(i + 1)]));
-  Object.keys(defaults.nav).forEach((key) => {
-    const row = document.createElement("div");
-    row.className = "shortcut-row";
-
-    const label = document.createElement("span");
-    label.textContent = navLabels[key] || defaults.nav[key];
-
-    const keyBtn = document.createElement("button");
-    keyBtn.className = "btn shortcut-key";
-    const defaultLabel = digits.get(key) || "–";
-    keyBtn.textContent = custom[key] ? bindingLabel(custom[key]) : defaultLabel;
-
-    const clearBtn = document.createElement("button");
-    clearBtn.className = "btn shortcut-clear";
-    clearBtn.textContent = "×";
-    clearBtn.title = i18n("Сбросить на клавишу по умолчанию");
-    clearBtn.style.visibility = custom[key] ? "visible" : "hidden";
-
-    keyBtn.addEventListener("click", () => {
-      captureKey(keyBtn, async (result) => {
-        await saveShortcut(key, result);
-        keyBtn.textContent = bindingLabel(result);
-        clearBtn.style.visibility = "visible";
-      });
-    });
-
-    clearBtn.addEventListener("click", async () => {
-      await clearShortcut(key);
-      keyBtn.textContent = defaultLabel;
-      clearBtn.style.visibility = "hidden";
-    });
-
-    row.append(label, keyBtn, clearBtn);
-    list.appendChild(row);
-  });
-
-  section.appendChild(list);
+  section.innerHTML = `<h3>${i18n("Папка проекта")}</h3><p>${i18n("Все данные мира – обычные файлы в этой папке. Их можно копировать, хранить в облаке и править снаружи.")}</p>`;
+  const path = document.createElement("div");
+  path.className = "settings-path";
+  path.textContent = info.vaultPath || i18n("Папка не выбрана");
+  section.appendChild(path);
+  if (!info.mobile && info.vaultPath) {
+    const btn = document.createElement("button");
+    btn.className = "btn";
+    btn.innerHTML = `${iconSvg("folder", 14)}<span></span>`;
+    btn.querySelector("span").textContent = i18n("Открыть в проводнике");
+    btn.addEventListener("click", () => apiPost("/api/app/open-vault-folder", {}));
+    section.appendChild(btn);
+  }
   return section;
 }
 
@@ -492,7 +547,7 @@ function bindingLabel(binding) {
 // (customTags), тем же принципом, что и TasteID. Сама витрина чипов —
 // в tags.js, buildTagsField; это только экран управления словарём.
 
-async function buildTagsSection() {
+export async function buildTagsSection() {
   const section = document.createElement("div");
   section.className = "data-section";
   section.innerHTML = `<h3>${i18n("Теги")}</h3>`;
@@ -785,7 +840,11 @@ function renderTagsManageList(list, merged, hidden, custom, categoryLabels) {
 let activeTemplateKind = "characters";
 let activeTemplateId = null;
 
-async function buildTemplatesSection() {
+export async function buildTemplatesSection(kind) {
+  if (kind && kind !== activeTemplateKind) {
+    activeTemplateKind = kind;
+    activeTemplateId = null;
+  }
   const section = document.createElement("div");
   section.className = "data-section";
   section.innerHTML = `<h3>${i18n("Шаблоны анкет")}</h3>`;
@@ -1021,7 +1080,7 @@ async function renderTemplatesBody(body, kind) {
 // месяц/день по названиям месяцев отсюда, и точный порядок на шкале
 // вместо эвристики.
 
-async function buildCalendarSection() {
+export async function buildCalendarSection() {
   const section = document.createElement("div");
   section.className = "data-section";
   section.innerHTML = `<h3>${i18n("Календарь")}</h3><p>${i18n("Своё летоисчисление для таймлайна – свои месяцы вместо реальных, произвольная длина года.")}</p>`;
@@ -1445,8 +1504,8 @@ function buildAboutSection(info) {
     <h3>${i18n("О приложении")}</h3>
     <p>Fictaris ${info.version || ""} · ${platform}</p>
     <p>${i18n("Инструмент для писателей и мастеров миров: данные лежат обычной папкой на твоём диске, без своего сервера и без привязки к аккаунту.")}</p>
-    <p><a href="https://github.com/DeQerrti/Fictaris-app" target="_blank" rel="noopener">${i18n("Репозиторий на GitHub")}</a> ·
-       <a href="https://github.com/DeQerrti/Fictaris-app/issues" target="_blank" rel="noopener">${i18n("Сообщить о проблеме")}</a> ·
+    <p class="settings-links"><a href="https://github.com/DeQerrti/Fictaris-app" target="_blank" rel="noopener">${i18n("Репозиторий на GitHub")}</a>
+       <a href="https://github.com/DeQerrti/Fictaris-app/issues" target="_blank" rel="noopener">${i18n("Сообщить о проблеме")}</a>
        <a href="https://github.com/DeQerrti/Fictaris-app/releases" target="_blank" rel="noopener">${i18n("Все версии")}</a></p>
   `;
   return section;

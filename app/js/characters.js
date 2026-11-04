@@ -124,7 +124,7 @@ function addWithTemplate(templateId) {
 }
 
 // "+ Новый шаблон…" в меню выбора (template-choice.js) — заводит
-// шаблон на лету, не уходя в Настройки → Шаблоны анкет, и сразу же
+// шаблон на лету, не открывая «Поля анкеты», и сразу же
 // создаёт карточку по нему. С полей первого имеющегося шаблона (или
 // пустого списка, если шаблонов ещё вовсе нет) — та же отправная
 // точка, что у кнопки "+ Шаблон" в самих Настройках.
@@ -336,6 +336,7 @@ function buildToolbar() {
     chooseTemplate(templates, btn, addWithTemplate, { forceMenu, onCreateNew: addWithNewTemplate });
   const { bar, metaEl: meta } = buildEntityToolbar({
     title: i18n("Персонажи"),
+    fieldsKind: "characters",
     modes: MODES,
     mode,
     onMode: (key) => {
