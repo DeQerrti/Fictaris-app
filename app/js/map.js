@@ -5,7 +5,8 @@ import { locationTypeInfo, iconSvg } from "./icons.js";
 import { prepareMapImage } from "./image-compress.js";
 import { exportElementAsPng } from "./png-export.js";
 import { i18n, i18nPlural } from "./i18n.js";
-import { writePref, sectionHeading, buildNone, buildLinkRow, openEntity, personAvatarHtml } from "./entity-view.js";
+import { readPref, writePref, buildSegmented, buildSelect, sectionHeading, buildNone, buildLinkRow, openEntity, personAvatarHtml } from "./entity-view.js";
+import { DRAW_TOOLS, LABEL_STYLES, blankDrawing, drawingSvg, attachWorkshop, toolIcon } from "./map-draw.js";
 
 // ══════════════════════════════════════════════
 //  КАРТА
@@ -16,6 +17,10 @@ import { writePref, sectionHeading, buildNone, buildLinkRow, openEntity, personA
 //  списка «Не отмечены» (перетащить на карту или щёлкнуть, а потом по
 //  карте). Щелчок по метке — карточка рядом с ней, «Изменить» — окно со
 //  всеми полями метки.
+//
+//  Режим «Мастерская» — рисование самой карты (map-draw.js): суша, вода,
+//  реки, дороги, значки, надписи. Рисунок ложится поверх загруженной
+//  картинки или служит картой сам по себе.
 // ══════════════════════════════════════════════
 
 let map = { rootIds: [], maps: {} };
@@ -33,6 +38,24 @@ let container = null;
 // хранится: { zoom, x, y } в пикселях экрана.
 const views = new Map();
 let stageApi = null;
+
+const MODE_KEY = "fictaris_map_mode";
+const MODES = [
+  ["view", "Просмотр", "Смотреть карту и ставить метки"],
+  ["workshop", "Мастерская", "Рисовать карту: суша, реки, горы, надписи"],
+];
+let mode = readPref(MODE_KEY, MODES.map(([k]) => k), "view");
+// Мастерская: инструмент, выбранная фигура и история отмены — на
+// карту, живут дольше одной перерисовки экрана.
+let drawTool = "select";
+let drawSelectedId = null;
+const drawHistory = new Map();
+let workshop = null;
+
+function historyFor(mapId) {
+  if (!drawHistory.has(mapId)) drawHistory.set(mapId, { undo: [], redo: [] });
+  return drawHistory.get(mapId);
+}
 
 // Какие метки видно — предпочтение устройства.
 const LAYERS_KEY = "fictaris_map_layers";
@@ -114,7 +137,12 @@ function draw() {
   pane.appendChild(buildToolbar());
   const body = document.createElement("div");
   body.className = "map-body";
-  body.append(buildStage(), buildSide());
+  if (mode === "workshop" && (currentMap().imageRelPath || currentMap().drawing)) {
+    body.append(buildToolStrip(), buildStage(), buildWorkshopSide());
+  } else {
+    if (mode === "workshop") mode = "view";
+    body.append(buildStage(), buildSide());
+  }
   pane.appendChild(body);
   view.appendChild(pane);
 
@@ -155,7 +183,7 @@ function buildMapsHome() {
     open.className = "map-home-open";
     open.innerHTML = `
       <div class="map-card-thumb"${m.imageRelPath ? ` style="background-image:url('/${m.imageRelPath}')"` : ""}>
-        ${m.imageRelPath ? "" : iconSvg("map", 30)}
+        ${m.drawing ? `<div class="map-card-drawing">${drawingSvg(m.drawing, { withSea: !m.imageRelPath })}</div>` : m.imageRelPath ? "" : iconSvg("map", 30)}
       </div>
       <div class="map-card-footer">
         <div class="char-name">${escapeHtml(m.name || i18n("Без названия"))}</div>
@@ -192,10 +220,15 @@ function buildMapsHome() {
     grid.appendChild(card);
   }
 
-  const addCard = document.createElement("button");
-  addCard.className = "entity-card add-card";
-  addCard.textContent = i18n("+ Новая карта");
-  addCard.addEventListener("click", createRootMap);
+  const addCard = document.createElement("div");
+  addCard.className = "entity-card add-card map-add-card";
+  const uploadBtn = document.createElement("button");
+  uploadBtn.textContent = i18n("+ Загрузить картинку");
+  uploadBtn.addEventListener("click", createRootMap);
+  const drawBtn = document.createElement("button");
+  drawBtn.textContent = i18n("+ Нарисовать карту");
+  drawBtn.addEventListener("click", createDrawnMap);
+  addCard.append(uploadBtn, drawBtn);
   grid.appendChild(addCard);
 
   view.appendChild(grid);
@@ -219,9 +252,26 @@ function createRootMap() {
   input.click();
 }
 
+function createDrawnMap() {
+  const id = uid();
+  map.maps[id] = { id, name: i18n("Новая карта"), imageRelPath: null, drawing: blankDrawing(), pins: [] };
+  map.rootIds.push(id);
+  persist();
+  setMode("workshop");
+  openMap([id]);
+}
+
+function setMode(next) {
+  mode = next;
+  writePref(MODE_KEY, mode);
+  activePinId = null;
+  placingLocationId = null;
+}
+
 function openMap(path) {
   stack = path;
   activePinId = null;
+  drawSelectedId = null;
   editPinId = null;
   placingLocationId = null;
   draw();
@@ -247,7 +297,7 @@ function pickImage(onPath) {
 function buildUploadPrompt() {
   const wrap = document.createElement("div");
   wrap.className = "empty-state map-upload";
-  wrap.innerHTML = `<div class="empty-state-icon">${iconSvg("map", 28)}</div><p>${escapeHtml(i18n("У этой карты пока нет изображения."))}</p>`;
+  wrap.innerHTML = `<div class="empty-state-icon">${iconSvg("map", 28)}</div><p>${escapeHtml(i18n("У этой карты пока нет изображения – загрузите готовое или нарисуйте сами."))}</p>`;
   const btn = document.createElement("button");
   btn.className = "btn characters-add-btn";
   btn.textContent = i18n("Загрузить изображение");
@@ -256,7 +306,19 @@ function buildUploadPrompt() {
     persist();
     draw();
   }));
-  wrap.appendChild(btn);
+  const drawBtn = document.createElement("button");
+  drawBtn.className = "btn";
+  drawBtn.textContent = i18n("Нарисовать карту");
+  drawBtn.addEventListener("click", () => {
+    currentMap().drawing = blankDrawing();
+    persist();
+    setMode("workshop");
+    draw();
+  });
+  const row = document.createElement("div");
+  row.className = "map-upload-actions";
+  row.append(btn, drawBtn);
+  wrap.appendChild(row);
   return wrap;
 }
 
@@ -303,11 +365,33 @@ function buildToolbar() {
   ].filter(Boolean).join(" · ");
   bar.appendChild(meta);
 
+  if (cm.imageRelPath || cm.drawing) {
+    bar.appendChild(buildSegmented(MODES, mode, (key) => {
+      setMode(key);
+      draw();
+    }));
+  }
+  if (mode === "workshop") {
+    const undoBtn = document.createElement("button");
+    undoBtn.className = "btn map-undo";
+    undoBtn.textContent = "↶";
+    undoBtn.title = i18n("Отменить (Ctrl+Z)");
+    undoBtn.disabled = !historyFor(cm.id).undo.length;
+    undoBtn.addEventListener("click", () => workshop?.undo());
+    const redoBtn = document.createElement("button");
+    redoBtn.className = "btn map-redo";
+    redoBtn.textContent = "↷";
+    redoBtn.title = i18n("Повторить (Ctrl+Shift+Z)");
+    redoBtn.disabled = !historyFor(cm.id).redo.length;
+    redoBtn.addEventListener("click", () => workshop?.redo());
+    bar.append(undoBtn, redoBtn);
+  }
+
   const spacer = document.createElement("div");
   spacer.style.flex = "1";
   bar.appendChild(spacer);
 
-  if (cm.imageRelPath) {
+  if (cm.imageRelPath || cm.drawing) {
     const exportBtn = document.createElement("button");
     exportBtn.className = "btn";
     exportBtn.innerHTML = `${iconSvg("download", 14)}<span>${escapeHtml(i18n("Экспорт в PNG"))}</span>`;
@@ -406,21 +490,32 @@ const MAX_ZOOM = 8;
 
 function buildStage() {
   const cm = currentMap();
+  const editing = mode === "workshop";
   const stage = document.createElement("div");
-  stage.className = "map-stage" + (placingLocationId ? " placing" : "");
+  stage.className = "map-stage" + (placingLocationId ? " placing" : "") + (editing ? ` workshop tool-${drawTool}` : "");
   stageApi = null;
-  if (!cm.imageRelPath) {
+  workshop = null;
+  if (!cm.imageRelPath && !cm.drawing) {
     stage.appendChild(buildUploadPrompt());
     return stage;
   }
 
   const world = document.createElement("div");
   world.className = "map-world" + (layers.labels ? "" : " no-labels");
-  const img = document.createElement("img");
-  img.src = `/${cm.imageRelPath}`;
-  img.draggable = false;
-  img.alt = "";
-  world.appendChild(img);
+  const img = cm.imageRelPath ? document.createElement("img") : null;
+  if (img) {
+    img.src = `/${cm.imageRelPath}`;
+    img.draggable = false;
+    img.alt = "";
+    world.appendChild(img);
+  }
+  // Рисунок — над картинкой, под метками.
+  const drawingHost = document.createElement("div");
+  drawingHost.className = "map-drawing";
+  world.appendChild(drawingHost);
+  const previewSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  previewSvg.classList.add("map-drawing-preview");
+  if (editing) world.appendChild(previewSvg);
 
   const markers = new Map();
   for (const pin of cm.pins) {
@@ -493,11 +588,62 @@ function buildStage() {
     popupHost.appendChild(card);
   }
 
-  img.addEventListener("load", () => {
-    size = { w: img.naturalWidth, h: img.naturalHeight };
+  // Размер холста: у рисунка свой, у картинки — её настоящий. Рисунок
+  // поверх картинки заводим её размера, когда в мастерской что-то
+  // нарисуют (до первой фигуры в данных его нет).
+  const start = (w, h) => {
+    size = { w, h };
+    if (editing && !cm.drawing) cm.drawing = blankDrawing(w, h);
+    const drawing = cm.drawing;
+    if (drawing) {
+      previewSvg.setAttribute("viewBox", `0 0 ${drawing.width} ${drawing.height}`);
+      if (editing) {
+        workshop = attachWorkshop(drawing, {
+          host: drawingHost,
+          preview: previewSvg,
+          withSea: !cm.imageRelPath,
+          tool: drawTool,
+          selectedId: drawSelectedId,
+          history: historyFor(cm.id),
+          zoom: () => view?.zoom || 1,
+          toPoint: (clientX, clientY) => {
+            const r = stage.getBoundingClientRect();
+            return [
+              ((clientX - r.left - view.x) / view.zoom) * (drawing.width / size.w),
+              ((clientY - r.top - view.y) / view.zoom) * (drawing.height / size.h),
+            ];
+          },
+          onChange: () => {
+            persist();
+            // Без выбранной фигуры справа счётчик фигур — обновляем его.
+            if (drawSelectedId) refreshUndo();
+            else refreshWorkshopSide();
+          },
+          onSelect: (shape) => {
+            drawSelectedId = shape?.id || null;
+            refreshWorkshopSide();
+          },
+          onTool: (tool) => {
+            drawTool = tool;
+            hint.textContent = `${i18n(DRAW_TOOLS.find(([key]) => key === tool)?.[1] || "")} · ${i18n("правая кнопка – сдвиг карты")}`;
+            stage.className = stage.className.replace(/tool-\S+/, `tool-${tool}`);
+            container.querySelectorAll(".map-tool").forEach((b) => b.classList.toggle("active", b.dataset.tool === tool));
+          },
+          focusText: () => requestAnimationFrame(() => {
+            const input = container.querySelector(".map-prop-text");
+            input?.focus();
+            input?.select();
+          }),
+        });
+      } else {
+        drawingHost.innerHTML = drawingSvg(drawing, { withSea: !cm.imageRelPath });
+      }
+    }
     if (view) apply();
     else fit();
-  });
+  };
+  if (img) img.addEventListener("load", () => start(img.naturalWidth, img.naturalHeight));
+  else requestAnimationFrame(() => start(cm.drawing.width, cm.drawing.height));
 
   // Колесо — масштаб вокруг курсора.
   stage.addEventListener("wheel", (e) => {
@@ -512,9 +658,16 @@ function buildStage() {
   const pointers = new Map();
   let pan = null;
   let pinch = null;
+  let drawing = false;
   stage.addEventListener("pointerdown", (e) => {
     if (!view || e.target.closest(".map-marker, .map-popup, .map-zoom, .map-upload")) return;
     stage.setPointerCapture(e.pointerId);
+    // Мастерская: левая кнопка — инструменту; средняя или правая, а
+    // также пустое место под «Выбором» — сдвиг карты.
+    if (workshop && e.button === 0 && pointers.size === 0 && workshop.pointerDown(e)) {
+      drawing = true;
+      return;
+    }
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (pointers.size === 1) pan = { x: e.clientX, y: e.clientY, moved: false };
     if (pointers.size === 2) {
@@ -524,6 +677,10 @@ function buildStage() {
     }
   });
   stage.addEventListener("pointermove", (e) => {
+    if (drawing) {
+      workshop.pointerMove(e);
+      return;
+    }
     if (!pointers.has(e.pointerId)) return;
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (pinch && pointers.size === 2) {
@@ -547,10 +704,15 @@ function buildStage() {
     apply();
   });
   const endPointer = (e) => {
+    if (drawing) {
+      drawing = false;
+      workshop.pointerUp(e);
+      return;
+    }
     if (!pointers.has(e.pointerId)) return;
     pointers.delete(e.pointerId);
     if (pointers.size < 2) pinch = null;
-    if (pan && !pan.moved && e.type === "pointerup") {
+    if (pan && !pan.moved && e.type === "pointerup" && !editing) {
       // Простой щелчок по карте: ставим выбранное место или снимаем выбор.
       if (placingLocationId) {
         const p = onImage(e.clientX, e.clientY);
@@ -568,8 +730,11 @@ function buildStage() {
   stage.addEventListener("pointercancel", endPointer);
 
   // Двойной щелчок — новая метка там, где щёлкнули.
+  stage.addEventListener("contextmenu", (e) => {
+    if (editing) e.preventDefault();
+  });
   stage.addEventListener("dblclick", (e) => {
-    if (!view || e.target.closest(".map-marker, .map-popup, .map-zoom")) return;
+    if (!view || editing || e.target.closest(".map-marker, .map-popup, .map-zoom")) return;
     const p = onImage(e.clientX, e.clientY);
     if (p) addPin(p.x, p.y);
   });
@@ -654,7 +819,9 @@ function buildStage() {
 
   const hint = document.createElement("div");
   hint.className = "map-hint";
-  hint.textContent = placingLocationId
+  hint.textContent = editing
+    ? (DRAW_TOOLS.find(([key]) => key === drawTool)?.[1] ? i18n(DRAW_TOOLS.find(([key]) => key === drawTool)[1]) : "") + " · " + i18n("правая кнопка – сдвиг карты")
+    : placingLocationId
     ? i18n("Щёлкните по карте, чтобы отметить «{name}». Esc – отмена.", { name: locById(placingLocationId)?.name || "" })
     : i18n("Колесо – масштаб, перетаскивание – сдвиг, двойной щелчок – новая метка.");
   stage.appendChild(hint);
@@ -670,6 +837,7 @@ function buildStage() {
     // PNG — в натуральную величину, без текущего масштаба и сдвига.
     async exportPng(name) {
       if (!size) return;
+      workshop?.deselect();
       const saved = { ...view };
       view = { zoom: 1, x: 0, y: 0 };
       apply();
@@ -855,15 +1023,154 @@ function buildSideLists(cm) {
   return wrap;
 }
 
+// Мастерская: Delete — удалить выбранное, Ctrl+Z / Ctrl+Shift+Z (Ctrl+Y) —
+// отмена и повтор; в полях ввода клавиши остаются полям.
+document.addEventListener("keydown", (e) => {
+  if (!workshop || !container?.isConnected || mode !== "workshop") return;
+  if (e.target.closest?.("input, textarea, select, [contenteditable]")) return;
+  const mod = e.ctrlKey || e.metaKey;
+  if (mod && e.key.toLowerCase() === "z") {
+    e.preventDefault();
+    if (e.shiftKey) workshop.redo();
+    else workshop.undo();
+  } else if (mod && e.key.toLowerCase() === "y") {
+    e.preventDefault();
+    workshop.redo();
+  } else if (e.key === "Delete" || e.key === "Backspace") {
+    if (workshop.selected()) {
+      e.preventDefault();
+      workshop.removeSelected();
+    }
+  } else if (e.key === "Escape") {
+    workshop.deselect();
+  }
+});
+
 // Esc — отменить постановку места или снять выбор метки.
 document.addEventListener("keydown", (e) => {
-  if (e.key !== "Escape" || !container?.isConnected || !stack.length || editPinId) return;
+  if (e.key !== "Escape" || !container?.isConnected || !stack.length || editPinId || mode === "workshop") return;
   if (placingLocationId || activePinId) {
     placingLocationId = null;
     activePinId = null;
     draw();
   }
 });
+
+
+// ── Мастерская: инструменты и свойства ─────────
+
+function buildToolStrip() {
+  const strip = document.createElement("div");
+  strip.className = "map-tools";
+  for (const [key, label, path] of DRAW_TOOLS) {
+    const btn = document.createElement("button");
+    btn.className = "map-tool" + (key === drawTool ? " active" : "");
+    btn.dataset.tool = key;
+    btn.title = i18n(label);
+    btn.innerHTML = toolIcon(path, 20);
+    btn.addEventListener("click", () => {
+      drawTool = key;
+      if (workshop) workshop.setTool(key);
+      else draw();
+    });
+    strip.appendChild(btn);
+  }
+  return strip;
+}
+
+function refreshUndo() {
+  const h = historyFor(currentMap().id);
+  const undoBtn = container.querySelector(".map-undo");
+  const redoBtn = container.querySelector(".map-redo");
+  if (undoBtn) undoBtn.disabled = !h.undo.length;
+  if (redoBtn) redoBtn.disabled = !h.redo.length;
+}
+
+function refreshWorkshopSide() {
+  const old = container.querySelector(".map-side");
+  if (old) old.replaceWith(buildWorkshopSide());
+  refreshUndo();
+}
+
+const SHAPE_NAMES = {
+  land: "Суша", water: "Вода", river: "Река", road: "Дорога", label: "Надпись",
+  mountain: "Горы", forest: "Лес", city: "Город", castle: "Замок", village: "Деревня",
+};
+
+function buildWorkshopSide() {
+  const side = document.createElement("aside");
+  side.className = "map-side";
+  const shape = workshop?.selected() || null;
+
+  if (!shape) {
+    side.appendChild(sectionHeading(i18n("Как рисовать")));
+    const tips = document.createElement("ul");
+    tips.className = "map-tips";
+    for (const tip of [
+      "Суша и вода – ведите контур, он замкнётся сам. Вода поверх суши – озеро или залив.",
+      "Реки и дороги – ведите линию.",
+      "Горы и лес – щёлкните или ведите: значки лягут грядой.",
+      "Город, замок, деревня, надпись – щелчок ставит, потом их можно двигать «Выбором».",
+      "Delete – удалить выбранное, Ctrl+Z – отменить.",
+      "Метки мест ставятся в «Просмотре» – на рисунке их тоже видно.",
+    ]) {
+      const li = document.createElement("li");
+      li.textContent = i18n(tip);
+      tips.appendChild(li);
+    }
+    side.appendChild(tips);
+    const count = currentMap().drawing?.shapes.length || 0;
+    side.appendChild(buildNone(count ? i18n("Фигур на карте: {n}", { n: count }) : i18n("Карта пока пуста")));
+    return side;
+  }
+
+  side.appendChild(sectionHeading(i18n(SHAPE_NAMES[shape.kind === "stamp" ? shape.icon : shape.kind] || "Фигура")));
+  const prop = (label, control) => {
+    const row = document.createElement("label");
+    row.className = "map-prop";
+    const span = document.createElement("span");
+    span.textContent = label;
+    row.append(span, control);
+    side.appendChild(row);
+  };
+  const range = (value, min, max, onInput) => {
+    const input = document.createElement("input");
+    input.type = "range";
+    input.min = min;
+    input.max = max;
+    input.value = value;
+    // Значение — по ходу, в историю отмены — один шаг на всё движение.
+    input.addEventListener("change", () => onInput(Number(input.value)));
+    return input;
+  };
+
+  if (shape.kind === "label") {
+    const text = document.createElement("input");
+    text.className = "characters-search map-prop-text";
+    text.value = shape.text || "";
+    text.addEventListener("change", () => workshop.update({ text: text.value }));
+    text.addEventListener("keydown", (e) => { if (e.key === "Enter") text.blur(); });
+    prop(i18n("Текст"), text);
+    prop(i18n("Вид"), buildSelect(LABEL_STYLES, shape.style || "place", (value) => {
+      workshop.update({ style: value, size: undefined });
+      refreshWorkshopSide();
+    }));
+    const base = { title: 40, region: 16, place: 17, sea: 30 }[shape.style || "place"];
+    prop(i18n("Размер"), range(shape.size || base, 8, 96, (value) => workshop.update({ size: value })));
+  } else if (shape.kind === "stamp") {
+    const base = { mountain: 44, forest: 22, city: 34, castle: 30, village: 28 }[shape.icon] || 30;
+    prop(i18n("Размер"), range(shape.size || base, 10, 120, (value) => workshop.update({ size: value })));
+  } else if (shape.kind === "river" || shape.kind === "road") {
+    prop(i18n("Толщина"), range(shape.width || (shape.kind === "river" ? 3 : 2), 1, 14, (value) => workshop.update({ width: value })));
+  }
+
+  const del = document.createElement("button");
+  del.className = "btn danger map-side-replace";
+  del.innerHTML = `${iconSvg("trash", 14)}<span>${escapeHtml(i18n("Удалить"))}</span>`;
+  del.addEventListener("click", () => workshop.removeSelected());
+  side.appendChild(del);
+  return side;
+}
 
 function buildDrawer(pin) {
   const cm = currentMap();

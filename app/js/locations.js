@@ -11,6 +11,7 @@ import { chooseTemplate } from "./template-choice.js";
 import { openTemplateEditorModal } from "./template-editor-modal.js";
 import { closeEntityModal } from "./entity-modal.js";
 import { chapterLabel } from "./books.js";
+import { drawingSvg } from "./map-draw.js";
 import { i18n, i18nPlural } from "./i18n.js";
 import {
   readPref, writePref, buildSegmented, buildEntityToolbar, buildOverviewSection, buildDossierList, buildDossierSplit,
@@ -385,13 +386,29 @@ function buildOverview() {
 // Кусок карты над карточкой: вся карта вдвое крупнее рамки, сдвинута
 // так, чтобы метка места стояла по центру; соседние метки — точками с
 // подписью.
+// Основа карты: загруженная картинка, нарисованная (map-draw.js) или
+// рисунок поверх картинки. У одного рисунка размер задаёт aspect-ratio.
+function mapBaseHtml(map) {
+  const img = map.imageRelPath ? `<img src="/${map.imageRelPath}" alt="">` : "";
+  const drawing = map.drawing ? `<div class="loc-drawing">${drawingSvg(map.drawing, { withSea: !map.imageRelPath })}</div>` : "";
+  return img + drawing;
+}
+
+function mapAspect(map) {
+  return !map.imageRelPath && map.drawing ? `aspect-ratio:${map.drawing.width}/${map.drawing.height};` : "";
+}
+
+function hasMapBase(map) {
+  return Boolean(map.imageRelPath || map.drawing);
+}
+
 function miniMapHtml({ map, pin }) {
   const dots = (map.pins || []).map((p) => `
     <i class="${p === pin ? "on" : ""}" style="left:${p.x}%;top:${p.y}%">${p === pin ? "" : `<b>${escapeHtml(p.label || "")}</b>`}</i>
   `).join("");
   return `
     <div class="loc-minimap">
-      <div class="loc-minimap-inner" style="transform:translate(-${pin.x}%,-${pin.y}%)"><img src="/${map.imageRelPath}" alt="">${dots}</div>
+      <div class="loc-minimap-inner" style="${mapAspect(map)}transform:translate(-${pin.x}%,-${pin.y}%)">${mapBaseHtml(map)}${dots}</div>
       <span>${escapeHtml(map.name || "")}</span>
     </div>
   `;
@@ -408,7 +425,7 @@ function buildCard(loc) {
   const card = document.createElement("button");
   card.className = "cast-card loc-card";
   card.innerHTML = `
-    ${info.pins[0] && info.pins[0].map.imageRelPath
+    ${info.pins[0] && hasMapBase(info.pins[0].map)
       ? miniMapHtml(info.pins[0])
       : `<div class="loc-minimap loc-minimap-none" style="--type-color:${color}">${iconSvg(iconName, 32)}<span>${escapeHtml(i18n("не отмечено на карте"))}</span></div>`}
     <div class="loc-card-body">
@@ -612,7 +629,7 @@ function buildPage(loc) {
 // подписаны. Мест на нескольких картах — первая из них.
 function buildMapBlock(info) {
   const wrap = document.createElement("div");
-  const first = info.pins.find((x) => x.map.imageRelPath);
+  const first = info.pins.find((x) => hasMapBase(x.map));
   if (!first) {
     wrap.className = "loc-map loc-map-none";
     wrap.innerHTML = `${iconSvg("map", 22)}<span>${escapeHtml(i18n("Место пока не отмечено ни на одной карте – метку ставят во вкладке «Карта»"))}</span>`;
@@ -623,7 +640,7 @@ function buildMapBlock(info) {
     <i class="${p === first.pin ? "on" : ""}" style="left:${p.x}%;top:${p.y}%"><b>${escapeHtml(p.label || "")}</b></i>
   `).join("");
   wrap.innerHTML = `
-    <div class="loc-map-inner"><img src="/${first.map.imageRelPath}" alt="">${dots}</div>
+    <div class="loc-map-inner" style="${mapAspect(first.map)}">${mapBaseHtml(first.map)}${dots}</div>
     <span class="loc-map-caption">${iconSvg("map", 13)}${escapeHtml(first.map.name || "")}</span>
   `;
   return wrap;
