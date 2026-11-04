@@ -32,3 +32,10 @@ export function flattenBoards(raw) {
   }
   return flat;
 }
+
+// Участники карточки. Раньше у карточки был один персонаж (characterId) —
+// старые данные читаются так же, как новые (characterIds).
+export function cardCharacterIds(card) {
+  if (Array.isArray(card?.characterIds)) return card.characterIds;
+  return card?.characterId ? [card.characterId] : [];
+}

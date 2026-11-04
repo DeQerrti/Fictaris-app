@@ -2666,37 +2666,30 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
 }
 
 /* ── Доска ─────────────────────────────────── */
+/* Канбан (app/js/board.js): колонки на всю ширину, карточки — плашки,
+   правка — в окне карточки (.drawer). */
 
 .board-outer {
   display: flex;
   flex-direction: column;
   width: 100%;
+  min-width: 0;
   overflow: hidden;
 }
 
 .board-view {
+  flex: 1;
+  min-height: 0;
   display: flex;
-  gap: 14px;
-  padding: 20px;
-  overflow-x: auto;
-  width: 100%;
+  gap: 16px;
+  padding: 20px 28px;
+  overflow: auto;
   align-items: flex-start;
 }
 
-
-.board-switcher-bar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 16px 20px 0;
-}
-
-.board-switcher-current {
-  max-width: 200px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+.board-switcher-current { display: inline-flex; align-items: center; gap: 6px; max-width: 260px; }
+.board-switcher-current span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-book); font-weight: 600; }
+.board-switcher-current svg { transform: rotate(90deg); flex-shrink: 0; }
 
 /* Список досок в попапе переключателя (board.js, buildBoardSwitchList) —
    тем же приёмом, что и переключатель проектов (.project-row и
@@ -2753,31 +2746,22 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
 
 .board-switch-divider { height: 1px; background: var(--border); margin: 4px 0; }
 
-.board-card-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin-top: 6px;
-}
-
 .board-column {
-  width: 240px;
-  flex-shrink: 0;
+  flex: 1 1 300px;
+  min-width: 280px;
+  max-width: 420px;
+  max-height: 100%;
   background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 12px;
   padding: 10px;
   display: flex;
   flex-direction: column;
+  gap: 8px;
+  box-sizing: border-box;
 }
 
-.board-column-header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 8px;
-}
-
+.board-column-header { display: flex; align-items: center; gap: 6px; padding: 2px 2px 0 4px; }
 .board-column-title {
   flex: 1;
   min-width: 0;
@@ -2788,10 +2772,10 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
   font-weight: 600;
   font-size: 0.95rem;
 }
-
 .board-column-title:focus { outline: none; }
+.board-column-count { font-size: 0.75rem; color: var(--text-faint); background: var(--panel-alt); border-radius: 10px; padding: 0 8px; font-variant-numeric: tabular-nums; }
 
-.board-column-del, .board-card-del {
+.board-column-del {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -2805,95 +2789,106 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
   font-size: 0.72rem;
   padding: 0 6px;
 }
+.board-column-del:hover { color: var(--color-3); background: var(--panel-alt); }
 
-.board-column-del:hover, .board-card-del:hover { color: var(--color-3); background: var(--panel-alt); }
-
-.board-card-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  min-height: 20px;
-}
-
-.board-card {
-  position: relative;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 8px 10px;
-  cursor: grab;
-}
-
-/* Удаление карточки — в углу и только по наведению: в потоке под
-   чипами крестик читался как «убрать чип», а не «удалить карточку». */
-.board-card .board-card-del {
-  position: absolute;
-  top: 2px;
-  right: 2px;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  border-radius: 6px;
-  opacity: 0;
-  transition: opacity 0.12s;
-}
-.board-card:hover .board-card-del,
-.board-card .board-card-del:focus-visible { opacity: 1; }
-.board-card .board-card-del:hover { background: var(--panel-alt); }
-.board-card-title { padding-right: 22px; }
-
-.board-card:hover { border-color: var(--accent); }
-
-.board-card-title {
-  display: block;
+.board-quick-add {
   width: 100%;
+  box-sizing: border-box;
+  padding: 7px 10px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
   background: none;
-  border: none;
   color: var(--text);
   font-family: inherit;
-  font-size: 0.88rem;
-  line-height: 1.3;
-  resize: none;
-  overflow: hidden;
+  font-size: 0.85rem;
 }
+.board-quick-add::placeholder { color: var(--text-faint); }
+.board-quick-add:focus { outline: none; border-style: solid; border-color: var(--accent); background: var(--card); }
 
-.board-card-title:focus { outline: none; }
+.board-card-list { flex: 1; min-height: 24px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
 
+.board-card {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 10px 12px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+}
+.board-card:hover { border-color: var(--accent); }
+.board-card-head { display: flex; align-items: center; gap: 6px; }
+.board-card-stripe { width: 36px; height: 6px; border-radius: 3px; }
+.board-card-type { font-size: 0.7rem; color: var(--text-faint); }
+.board-card-title { font-size: 0.92rem; font-weight: 600; line-height: 1.35; color: var(--text); overflow-wrap: anywhere; }
 .board-card-notes {
-  width: 100%;
-  margin-top: 4px;
-  background: none;
-  border: none;
-  color: var(--text-dim);
-  font-family: inherit;
   font-size: 0.8rem;
-  line-height: 1.4;
-  resize: none;
+  line-height: 1.45;
+  color: var(--text-dim);
+  white-space: pre-wrap;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  min-height: 2.6em;
 }
-
-.board-card-notes::placeholder { color: var(--placeholder); }
-/* Подсказка про правый клик — одна и та же в каждой пустой карточке;
-   видна, только когда к карточке тянутся мышью или пишут в ней. */
-.board-card:not(:hover) .board-card-notes:not(:focus)::placeholder { color: transparent; }
-.board-card-notes:focus { outline: none; background: var(--panel-alt); border-radius: 4px; }
+.board-card-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.board-link-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 7px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.board-link-chip svg { flex-shrink: 0; }
+.board-card-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.board-card-who { display: flex; }
+.board-card-who .ms-avatar + .ms-avatar { margin-left: -6px; }
+.board-card-check { display: inline-flex; align-items: center; gap: 4px; font-size: 0.74rem; color: var(--text-faint); font-variant-numeric: tabular-nums; }
+.board-card-check.done { color: #5a8a5f; }
 
 .add-column {
-  width: 200px;
-  flex-shrink: 0;
+  flex: 0 0 220px;
   align-self: flex-start;
-  padding: 10px;
+  padding: 12px;
   background: none;
   border: 1px dashed var(--border);
-  border-radius: 10px;
+  border-radius: 12px;
   color: var(--text-faint);
   cursor: pointer;
   font-family: inherit;
   font-size: 0.88rem;
 }
-
 .add-column:hover { color: var(--accent-hover); border-color: var(--accent); }
+
+/* Окно карточки */
+.board-outer:has(.drawer)::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 15050;
+  background: rgba(0, 0, 0, 0.55);
+}
+.board-editor-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+.board-card-editor .color-row { flex-wrap: wrap; }
+.swatch-none { position: relative; }
+.swatch-none::after { content: ""; position: absolute; inset: 45% 10%; background: var(--text-faint); transform: rotate(-45deg); }
+.board-checklist { display: flex; flex-direction: column; gap: 4px; }
+.board-check-row { display: flex; align-items: center; gap: 8px; }
+.board-check-row:hover .ms-remove { opacity: 1; }
+.board-check-text { flex: 1; min-width: 0; background: none; border: none; color: var(--text); font-family: inherit; font-size: 0.88rem; padding: 4px 0; }
+.board-check-text:focus { outline: none; border-bottom: 1px solid var(--accent); }
+.board-check-text.done { color: var(--text-faint); text-decoration: line-through; }
 
 /* ── Карта ─────────────────────────────────── */
 

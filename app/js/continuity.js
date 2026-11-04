@@ -1,5 +1,5 @@
 import { apiGet } from "./api.js";
-import { flattenBoards } from "./board-data.js";
+import { flattenBoards, cardCharacterIds } from "./board-data.js";
 import { escapeHtml, buildEmptyState } from "./chips.js";
 import { knowledgeIssues } from "./knowledge.js";
 import { i18n } from "./i18n.js";
@@ -42,7 +42,7 @@ export function brokenRefs({ characters, locations, factions, relationships, tim
   }
 
   for (const card of Object.values(board.cards || {})) {
-    if (card.characterId && !chars.has(card.characterId)) {
+    if (cardCharacterIds(card).some((id) => !chars.has(id))) {
       issues.push(i18n("Карточка доски «{title}» ссылается на несуществующего персонажа", { title: card.title }));
     }
   }
@@ -71,7 +71,7 @@ export function orphans({ characters, locations, relationships, factions, timeli
     for (const l of ev.locationIds || []) referenced.add(l);
   }
   for (const card of Object.values(board.cards || {})) {
-    if (card.characterId) referenced.add(card.characterId);
+    for (const id of cardCharacterIds(card)) referenced.add(id);
   }
   for (const m of Object.values(map.maps || {})) {
     for (const pin of m.pins || []) {

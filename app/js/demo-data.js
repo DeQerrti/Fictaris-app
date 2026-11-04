@@ -238,14 +238,38 @@ export async function buildDemoBundle() {
       { id: colProgress, title: L("В работе", "In progress") },
       { id: colDone, title: L("Готово", "Done") },
     ],
+    // Каждый тип карточки, несколько участников, место, глава и чек-лист —
+    // чтобы канбан показал на примере всё, что умеет карточка.
     cards: {
-      "demo-card-1": { id: "demo-card-1", title: L("Сцена предательства Нессы?", "Nessa's betrayal scene?"), characterId: nessa.id },
-      "demo-card-2": { id: "demo-card-2", title: L("Прописать бегство из столицы", "Write out the escape from the capital"), characterId: kael.id },
-      "demo-card-3": { id: "demo-card-3", title: L("Переворот – глава 1", "The coup — chapter 1"), characterId: varn.id },
+      "demo-card-1": { id: "demo-card-1", type: "idea", title: L("Сцена предательства Нессы?", "Nessa's betrayal scene?"),
+        notes: L("Несса сдаёт отряд страже в обмен на долю – или всё-таки нет?", "Nessa sells the party out to the guard for a cut – or does she?"),
+        characterIds: [nessa.id] },
+      "demo-card-4": { id: "demo-card-4", type: "mystery", title: L("Кто на самом деле отец Нессы?", "Who is Nessa's real father?"),
+        notes: L("Связать с родословной – тайна Эдвина и Ады.", "Tie it to the family tree – Edwin and Ada's secret."),
+        characterIds: [nessa.id, "demo-c-father"] },
+      "demo-card-5": { id: "demo-card-5", type: "research", title: L("Как устроены портовые пошлины", "How harbour tolls work"),
+        notes: "", locationId: "demo-l-harbor" },
+      "demo-card-2": { id: "demo-card-2", type: "scene", title: L("Прописать бегство из столицы", "Write out the escape from the capital"),
+        notes: L("Каэль выводит Астру через катакомбы.", "Kael leads Astra out through the catacombs."),
+        characterIds: [kael.id, aster.id], locationId: "demo-l-capital", chapterId: "demo-ch-2",
+        checklist: [
+          { id: "demo-chk-1", text: L("Маршрут через катакомбы", "Route through the catacombs"), done: true },
+          { id: "demo-chk-2", text: L("Погоня стражи", "The guard's pursuit"), done: true },
+          { id: "demo-chk-3", text: L("Прощание с городом", "Farewell to the city"), done: false },
+        ] },
+      "demo-card-6": { id: "demo-card-6", type: "edit", title: L("Проверить сроки: десять лет между главами", "Check the timeline: ten years between chapters"),
+        notes: "", chapterId: "demo-ch-2" },
+      "demo-card-3": { id: "demo-card-3", type: "scene", title: L("Переворот – глава 1", "The coup — chapter 1"),
+        notes: L("Глазами Варна.", "Through Varn's eyes."),
+        characterIds: [varn.id], locationId: "demo-l-capital", chapterId: "demo-ch-1",
+        checklist: [
+          { id: "demo-chk-4", text: L("Черновик", "Draft"), done: true },
+          { id: "demo-chk-5", text: L("Вычитка", "Proofread"), done: true },
+        ] },
     },
     cardOrder: {
-      [colIdeas]: ["demo-card-1"],
-      [colProgress]: ["demo-card-2"],
+      [colIdeas]: ["demo-card-1", "demo-card-4", "demo-card-5"],
+      [colProgress]: ["demo-card-2", "demo-card-6"],
       [colDone]: ["demo-card-3"],
     },
   };

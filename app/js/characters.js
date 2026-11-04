@@ -1,5 +1,5 @@
 import { apiGet, apiPost, uid } from "./api.js";
-import { flattenBoards } from "./board-data.js";
+import { flattenBoards, cardCharacterIds } from "./board-data.js";
 import { debounceSave } from "./save-badge.js";
 import { escapeHtml, characterSelect, buildEmptyState, buildCardFieldsHtml, reorderById, attachCardDrag } from "./chips.js";
 import { pushTrash } from "./trash.js";
@@ -119,7 +119,7 @@ function reverseLinksFor(c) {
     .map((f) => `${f.name}${f.leaderId === c.id ? ` (${i18n("глава")})` : ""}`);
 
   const cardRows = Object.values(board.cards || {})
-    .filter((card) => card.characterId === c.id)
+    .filter((card) => cardCharacterIds(card).includes(c.id))
     .map((card) => card.title);
 
   const pinRows = [];

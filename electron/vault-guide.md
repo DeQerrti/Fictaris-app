@@ -1,4 +1,4 @@
-<!-- fictaris-guide v3 – файл создан приложением Fictaris и обновляется им. Чтобы оставить свою версию, удалите эту строку. -->
+<!-- fictaris-guide v4 – файл создан приложением Fictaris и обновляется им. Чтобы оставить свою версию, удалите эту строку. -->
 # Проект Fictaris – как править файлы
 
 Эта папка – проект писательского приложения Fictaris: персонажи, локации, главы рукописи и т.д., по одному JSON-файлу на раздел. Файлы можно править напрямую – открытое приложение заметит изменение и перечитает данные. Если в приложении в этот момент есть несохранённые правки, оно спросит, чью версию оставить.
@@ -61,7 +61,7 @@
 ```
 { "boards": [ { "id", "name", "columns": [{id, title}], "cards": { "<id>": card }, "cardOrder": { "<columnId>": ["<cardId>", ...] } } ], "activeBoardId": "..." }
 ```
-Карточка: `id`, `title`, `notes`, `characterId`, `factionId`, `locationId`, `chapterId` (каждое – id или `null`), `labelColor` (`#rrggbb` или `null`). Каждая карточка должна быть и в `cards`, и ровно в одном списке `cardOrder`. Старый формат одной доски (`{columns, cards, cardOrder}` без обёртки) тоже читается.
+Карточка: `id`, `title`, `notes`, `type` (`scene` | `idea` | `edit` | `research` | `mystery` или `null`), `characterIds: string[]` – участники, `factionId`, `locationId`, `chapterId` (каждое – id или `null`), `labelColor` (`#rrggbb` или `null` – тогда цвет типа), `checklist: [{id, text, done}]`. В старых карточках вместо `characterIds` бывает один `characterId` – приложение переведёт его само. Каждая карточка должна быть и в `cards`, и ровно в одном списке `cardOrder`. Старый формат одной доски (`{columns, cards, cardOrder}` без обёртки) тоже читается.
 
 ### canvas.json – холсты
 ```
@@ -84,7 +84,7 @@
 ## Что ссылается на что
 
 Удаляя или объединяя запись, почистите ссылки:
-- **персонаж** – `characters[].parentIds/adoptiveParentIds/uncertainParentIds/partnerIds`, ключи `partnerKinds`, `manuscript.chapters[].characterIds`, `relationships[].charA/charB` (связь удалить целиком), `factions[].leaderId/memberIds`, `timeline[].characterIds`, `board` → `cards[].characterId`, `map` → `pins[].characterId`, ключи `knowledge.facts[].entries`, упоминания `@Имя` в тексте глав. **Переименование персонажа ломает упоминания** – замените `@Старое имя` в `content` глав.
+- **персонаж** – `characters[].parentIds/adoptiveParentIds/uncertainParentIds/partnerIds`, ключи `partnerKinds`, `manuscript.chapters[].characterIds`, `relationships[].charA/charB` (связь удалить целиком), `factions[].leaderId/memberIds`, `timeline[].characterIds`, `board` → `cards[].characterIds`, `map` → `pins[].characterId`, ключи `knowledge.facts[].entries`, упоминания `@Имя` в тексте глав. **Переименование персонажа ломает упоминания** – замените `@Старое имя` в `content` глав.
 - **локация** – `locations[].parentId`, `manuscript.chapters[].locationIds`, `factions[].headquartersId`, `timeline[].locationIds`, карточки досок, метки карт.
 - **фракция** – карточки досок (`factionId`).
 - **глава** – `canvas` → `cards[].chapterId`, карточки досок (`chapterId`), значения `knowledge.facts[].entries`, `manuscript.activeChapterId`.
