@@ -3,7 +3,8 @@ import { escapeHtml } from "./chips.js";
 import { iconSvg } from "./icons.js";
 import { i18n, i18nPlural } from "./i18n.js";
 import { chapterLabel } from "./books.js";
-import { sectionHeading, buildNone, buildSelect, autoGrow, openEntity } from "./entity-view.js";
+import { sectionHeading, buildNone, buildSelect, buildSegmented, autoGrow, openEntity } from "./entity-view.js";
+import { roughRect, roughDiamond, roughEllipse, roughPolyline, arrowHead, penPath, fillPattern } from "./sketch.js";
 
 // ══════════════════════════════════════════════
 //  ХОЛСТ — САМА ДОСКА
@@ -18,7 +19,9 @@ import { sectionHeading, buildNone, buildSelect, autoGrow, openEntity } from "./
 //  и повтор, Delete — удалить, пробел или правая кнопка — двигать поле.
 //
 //  Данные — те же canvas.json → canvases[id]: cards, edges и groups
-//  (рамки { id, x, y, w, h, title, color }).
+//  (рамки { id, x, y, w, h, title, color }), shapes — фигуры, линии,
+//  карандаш и надписи (см. vault-guide.md), style — "hand" («От руки»:
+//  всё будто нарисовано пером, рукописный шрифт) или нет поля (аккуратно).
 // ══════════════════════════════════════════════
 
 export const CARD_COLORS = [null, "#c9944a", "#4f7d74", "#a4483c", "#7d6a9e", "#6a8fae", "#5a8a5f"];
@@ -27,6 +30,35 @@ const MIN_H = 70;
 const MIN_SCALE = 0.2;
 const MAX_SCALE = 2.5;
 const SVG_NS = "http://www.w3.org/2000/svg";
+
+// Инструменты рисования: [ключ, подпись, значок, клавиши].
+const SHAPE_TOOLS = [
+  ["rect", "Прямоугольник", '<rect x="4" y="6" width="16" height="12" rx="1"/>', "r к"],
+  ["diamond", "Ромб", '<path d="M12 3l9 9-9 9-9-9z"/>', "d в"],
+  ["ellipse", "Эллипс", '<ellipse cx="12" cy="12" rx="9" ry="7"/>', "o щ"],
+  ["arrow", "Стрелка", '<path d="M4 20 20 4M20 4h-7M20 4v7"/>', "a ф"],
+  ["line", "Линия", '<path d="M4 20 20 4"/>', "l д"],
+  ["pen", "Карандаш", '<path d="M4 20c4-1 5-6 8-6s3 4 8 2"/>', "p з"],
+  ["text", "Надпись", '<path d="M5 6V4h14v2M12 4v16M9 20h6"/>', "t е"],
+];
+// Цвета фигур; null — цвет текста темы.
+const INK_COLORS = [null, "#c76a5c", "#6fa35a", "#5a8fd0", "#d6a75c", "#9a86c4"];
+const FONTS = { hand: "Caveat, 'Segoe Print', cursive", ui: "var(--font-ui)", book: "var(--font-book)" };
+
+function shapeBox(s) {
+  if (s.points) {
+    const xs = s.points.map((p) => p[0]);
+    const ys = s.points.map((p) => p[1]);
+    return { x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) };
+  }
+  if (s.kind === "text") {
+    const lines = (s.text || " ").split("\n");
+    const size = s.fontSize || 24;
+    return { x: s.x, y: s.y, w: Math.max(...lines.map((l) => l.length)) * size * 0.5 + 8, h: lines.length * size * 1.25 };
+  }
+  // Прямоугольник рисуют в любую сторону — w/h могут быть отрицательными.
+  return { x: Math.min(s.x, s.x + s.w), y: Math.min(s.y, s.y + s.h), w: Math.abs(s.w), h: Math.abs(s.h) };
+}
 
 // История отмены — на холст, переживает перерисовку экрана.
 const histories = new Map();
@@ -72,6 +104,8 @@ export function edgeGeometry(a, b) {
 export function buildBoard(ctx) {
   const { cv } = ctx;
   if (!Array.isArray(cv.groups)) cv.groups = [];
+  if (!Array.isArray(cv.shapes)) cv.shapes = [];
+  const hand = () => cv.style === "hand";
   if (!histories.has(cv.id)) histories.set(cv.id, { undo: [], redo: [] });
   const history = histories.get(cv.id);
 
@@ -79,6 +113,7 @@ export function buildBoard(ctx) {
   let selCards = new Set();
   let selGroups = new Set();
   let selEdge = null;
+  let selShapes = new Set();
   let editingId = null;
   let tool = "select";
   let spaceDown = false;
@@ -103,7 +138,14 @@ export function buildBoard(ctx) {
   });
   const meta = document.createElement("div");
   meta.className = "timeline-meta";
-  bar.append(back, nameInput, meta);
+  const styleSwitch = buildSegmented([["clean", "Аккуратно"], ["hand", "От руки"]], hand() ? "hand" : "clean", (key) => {
+    remember();
+    if (key === "hand") cv.style = "hand";
+    else delete cv.style;
+    styleSwitch.querySelectorAll(".segmented-btn").forEach((b, i) => b.classList.toggle("active", (i === 1) === hand()));
+    changed();
+  });
+  bar.append(back, nameInput, meta, styleSwitch);
   pane.appendChild(bar);
 
   // ── Поле
@@ -115,7 +157,9 @@ export function buildBoard(ctx) {
   svg.classList.add("cboard-svg");
   const layer = document.createElement("div");
   layer.className = "cboard-layer";
-  world.append(svg, layer);
+  const shapesSvg = document.createElementNS(SVG_NS, "svg");
+  shapesSvg.classList.add("cboard-svg", "cboard-shapes");
+  world.append(svg, layer, shapesSvg);
   const marquee = document.createElement("div");
   marquee.className = "cboard-marquee";
   marquee.hidden = true;
@@ -144,7 +188,7 @@ export function buildBoard(ctx) {
     applyView();
   };
   const bounds = () => {
-    const boxes = [...cv.cards.map(cardBox), ...cv.groups];
+    const boxes = [...cv.cards.map(cardBox), ...cv.groups, ...cv.shapes.map(shapeBox)];
     if (!boxes.length) return null;
     const x1 = Math.min(...boxes.map((b) => b.x));
     const y1 = Math.min(...boxes.map((b) => b.y));
@@ -173,7 +217,7 @@ export function buildBoard(ctx) {
   };
 
   // ── История
-  const snapshot = () => JSON.stringify({ cards: cv.cards, edges: cv.edges, groups: cv.groups });
+  const snapshot = () => JSON.stringify({ cards: cv.cards, edges: cv.edges, groups: cv.groups, shapes: cv.shapes, style: cv.style });
   const remember = () => {
     history.undo.push(snapshot());
     if (history.undo.length > 80) history.undo.shift();
@@ -184,6 +228,10 @@ export function buildBoard(ctx) {
     cv.cards = s.cards;
     cv.edges = s.edges;
     cv.groups = s.groups || [];
+    cv.shapes = s.shapes || [];
+    if (s.style) cv.style = s.style;
+    else delete cv.style;
+    styleSwitch.querySelectorAll(".segmented-btn").forEach((b, i) => b.classList.toggle("active", (i === 1) === hand()));
   };
   const undo = () => {
     if (!history.undo.length) return;
@@ -220,6 +268,7 @@ export function buildBoard(ctx) {
   const clearSelection = () => {
     selCards = new Set();
     selGroups = new Set();
+    selShapes = new Set();
     selEdge = null;
     editingId = null;
   };
@@ -234,6 +283,7 @@ export function buildBoard(ctx) {
     undoBtn.disabled = !history.undo.length;
     redoBtn.disabled = !history.redo.length;
 
+    stage.classList.toggle("hand-style", hand());
     svg.innerHTML = `<defs><marker id="cboard-arrow-${cv.id}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--accent)"/></marker></defs>`;
     layer.innerHTML = "";
     const byId = new Map(cv.cards.map((c) => [c.id, c]));
@@ -271,10 +321,24 @@ export function buildBoard(ctx) {
       if (!a || !b) continue;
       const geo = edgeGeometry(a, b);
       const path = document.createElementNS(SVG_NS, "path");
-      path.setAttribute("d", geo.d);
       path.classList.add("cboard-edge");
       path.dataset.edgeId = e.id;
-      path.setAttribute("marker-end", `url(#cboard-arrow-${cv.id})`);
+      if (hand()) {
+        // Кривая — по точкам, а точки — пером.
+        const pts = [];
+        for (let i = 0; i <= 8; i++) {
+          const t = i / 8;
+          const u = 1 - t;
+          pts.push([
+            u * u * u * geo.p.x + 3 * u * u * t * geo.c1.x + 3 * u * t * t * geo.c2.x + t * t * t * geo.q.x,
+            u * u * u * geo.p.y + 3 * u * u * t * geo.c1.y + 3 * u * t * t * geo.c2.y + t * t * t * geo.q.y,
+          ]);
+        }
+        path.setAttribute("d", roughPolyline(pts, e.id, 1) + arrowHead(pts, e.id, 1));
+      } else {
+        path.setAttribute("d", geo.d);
+        path.setAttribute("marker-end", `url(#cboard-arrow-${cv.id})`);
+      }
       svg.appendChild(path);
       const hit = document.createElementNS(SVG_NS, "path");
       hit.setAttribute("d", geo.d);
@@ -293,9 +357,84 @@ export function buildBoard(ctx) {
       }
     }
 
+    if (hand()) {
+      // Карточка от руки — контур пером под прозрачной карточкой; цветная
+      // — со штриховкой своего цвета.
+      const defs = svg.querySelector("defs");
+      for (const c of cv.cards) {
+        const b = cardBox(c);
+        if (c.color) {
+          defs.insertAdjacentHTML("beforeend", fillPattern(`cbh-${c.id}`, c.color, "hachure"));
+          const fill = document.createElementNS(SVG_NS, "rect");
+          for (const [k, v] of Object.entries({ x: b.x + 3, y: b.y + 3, width: b.w - 6, height: b.h - 6, fill: `url(#cbh-${c.id})` })) fill.setAttribute(k, v);
+          svg.appendChild(fill);
+        }
+        const outline = document.createElementNS(SVG_NS, "path");
+        outline.setAttribute("d", roughRect(b.x, b.y, b.w, b.h, c.id, 1));
+        outline.classList.add("cboard-card-sketch");
+        if (c.color) outline.style.stroke = c.color;
+        svg.appendChild(outline);
+      }
+    }
     for (const c of cv.cards) layer.appendChild(buildCard(c));
     layer.append(...labels);
+    renderShapes();
     markSelection();
+  }
+
+  // Фигуры, линии, карандаш, надписи — над карточками.
+  function renderShapes() {
+    const defs = [];
+    let html = "";
+    for (const s of cv.shapes) {
+      const rough = hand() ? (s.roughness ?? 1) : 0;
+      const stroke = s.stroke || "var(--text)";
+      const width = s.strokeWidth || 2;
+      const b = shapeBox(s);
+      let outline = "";
+      let fillD = "";
+      if (s.kind === "rect" || s.kind === "diamond" || s.kind === "ellipse") {
+        const make = { rect: roughRect, diamond: roughDiamond, ellipse: roughEllipse }[s.kind];
+        outline = make(b.x, b.y, b.w, b.h, s.id, rough);
+        fillD = make(b.x, b.y, b.w, b.h, `${s.id}f`, 0);
+      } else if (s.kind === "line" || s.kind === "arrow") {
+        outline = roughPolyline(s.points, s.id, rough) + (s.kind === "arrow" ? arrowHead(s.points, s.id, rough, 10 + width * 3) : "");
+      } else if (s.kind === "pen") {
+        outline = penPath(s.points);
+      }
+      let fill = "";
+      if (s.fill && fillD) {
+        if (s.fillStyle === "solid") fill = `<path d="${fillD}" fill="${s.fill}" fill-opacity=".45" stroke="none"/>`;
+        else {
+          const id = `cbf-${s.id}`;
+          defs.push(fillPattern(id, s.fill, s.fillStyle === "cross" ? "cross" : "hachure"));
+          fill = `<path d="${fillD}" fill="url(#${id})" stroke="none"/>`;
+        }
+      }
+      let body = "";
+      if (s.kind === "text") {
+        const size = s.fontSize || 24;
+        const font = FONTS[s.font || (hand() ? "hand" : "ui")] || FONTS.ui;
+        const lines = (s.text || "").split("\n");
+        body = `<text x="${s.x}" y="${s.y}" fill="${stroke}" style="font-family:${font};font-size:${size}px">${lines
+          .map((line, i) => `<tspan x="${s.x}" dy="${i ? size * 1.25 : size}">${escapeHtml(line) || " "}</tspan>`).join("")}</text>`;
+      } else {
+        body = `${fill}<path d="${outline}" fill="none" stroke="${stroke}" stroke-width="${width}" stroke-linecap="round" stroke-linejoin="round"/>`;
+      }
+      // Невидимая широкая обводка — по ней легко попасть мышью.
+      const hitD = s.kind === "text" ? "" : (fillD || (s.kind === "pen" ? outline : roughPolyline(s.points || [], s.id, 0)));
+      const hit = s.kind === "text"
+        ? `<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" class="cboard-shape-hit filled"/>`
+        : `<path d="${hitD}" class="cboard-shape-hit${s.fill ? " filled" : ""}"/>`;
+      html += `<g data-shape="${escapeHtml(s.id)}">${body}${hit}</g>`;
+      if (selShapes.has(s.id)) {
+        html += `<rect x="${b.x - 6}" y="${b.y - 6}" width="${b.w + 12}" height="${b.h + 12}" class="cboard-shape-sel"/>`;
+        if (selShapes.size === 1 && !s.points) {
+          html += `<rect x="${b.x + b.w}" y="${b.y + b.h}" width="12" height="12" class="cboard-shape-handle" data-resize-shape="${escapeHtml(s.id)}"/>`;
+        }
+      }
+    }
+    shapesSvg.innerHTML = `<defs>${defs.join("")}</defs>${html}`;
   }
 
   // Выбор меняет только классы — без перерисовки, иначе узел под
@@ -307,14 +446,14 @@ export function buildBoard(ctx) {
     svg.querySelectorAll(".cboard-group").forEach((el, i) => el.classList.toggle("selected", selGroups.has(cv.groups[i]?.id)));
     svg.querySelectorAll(".cboard-edge:not(.cboard-edge-ghost)").forEach((el) => el.classList.toggle("selected", el.dataset.edgeId === selEdge));
     layer.querySelectorAll(".cboard-edge-label").forEach((el) => el.classList.toggle("selected", el.dataset.edge === selEdge));
-    stage.classList.toggle("single", selCards.size === 1 && !selGroups.size);
+    stage.classList.toggle("single", selCards.size === 1 && !selGroups.size && !selShapes.size);
     stage.classList.toggle("single-group", selGroups.size === 1 && !selCards.size);
   }
 
   function buildCard(c) {
     const b = cardBox(c);
     const el = document.createElement("div");
-    el.className = "cboard-card" + (c.color ? " colored" : "");
+    el.className = "cboard-card" + (c.color ? " colored" : "") + (hand() ? " hand" : "");
     el.dataset.card = c.id;
     el.style.left = `${b.x}px`;
     el.style.top = `${b.y}px`;
@@ -436,9 +575,15 @@ export function buildBoard(ctx) {
     side.innerHTML = "";
     const cards = cv.cards.filter((c) => selCards.has(c.id));
     const groups = cv.groups.filter((g) => selGroups.has(g.id));
+    const shapes = cv.shapes.filter((x) => selShapes.has(x.id));
     const edge = cv.edges.find((e) => e.id === selEdge);
-    side.hidden = !cards.length && !groups.length && !edge;
+    side.hidden = !cards.length && !groups.length && !edge && !shapes.length;
     if (side.hidden) return;
+
+    if (shapes.length && !cards.length && !groups.length) {
+      buildShapeSide(shapes);
+      return;
+    }
 
     if (cards.length === 1 && !groups.length) {
       const c = cards[0];
@@ -553,6 +698,77 @@ export function buildBoard(ctx) {
     deleteButton(i18n("Удалить выбранное"));
   }
 
+  // Свойства фигур — сразу для всех выбранных.
+  function buildShapeSide(shapes) {
+    const one = shapes.length === 1 ? shapes[0] : null;
+    const names = { rect: "Прямоугольник", diamond: "Ромб", ellipse: "Эллипс", arrow: "Стрелка", line: "Линия", pen: "Карандаш", text: "Надпись" };
+    side.appendChild(sectionHeading(one ? i18n(names[one.kind]) : i18n("Выбрано: {n}", { n: shapes.length })));
+    const apply = (patch) => {
+      remember();
+      for (const sh of shapes) {
+        for (const [k, v] of Object.entries(patch)) {
+          if (v === undefined || v === null) delete sh[k];
+          else sh[k] = v;
+        }
+      }
+      changed();
+    };
+    const swatches = (current, onPick, withNone) => {
+      const row = document.createElement("div");
+      row.className = "color-row cboard-colors";
+      for (const color of withNone ? [undefined, ...INK_COLORS.slice(1)] : INK_COLORS) {
+        const sw = document.createElement("div");
+        sw.className = "swatch" + (color ? "" : " swatch-none") + ((current || undefined) === (color || undefined) ? " selected" : "");
+        if (color) sw.style.background = color;
+        else if (!withNone) sw.style.background = "var(--text)";
+        sw.title = color ? "" : i18n(withNone ? "Без заливки" : "Цвет текста");
+        sw.addEventListener("click", () => onPick(color));
+        row.appendChild(sw);
+      }
+      return row;
+    };
+    const first = shapes[0];
+    if (one?.kind === "text") {
+      const text = document.createElement("textarea");
+      text.className = "cboard-textarea cboard-shape-text";
+      text.rows = 2;
+      text.value = one.text || "";
+      autoGrow(text);
+      const once = rememberOnce(text);
+      text.addEventListener("input", () => { once(); one.text = text.value; ctx.persist(); renderShapes(); });
+      field(i18n("Текст"), text);
+    }
+    field(i18n("Обводка"), swatches(first.stroke, (color) => apply({ stroke: color })));
+    const closed = shapes.every((x) => ["rect", "diamond", "ellipse"].includes(x.kind));
+    if (closed) {
+      field(i18n("Фон"), swatches(first.fill, (color) => apply({ fill: color }), true));
+      if (shapes.some((x) => x.fill)) {
+        field(i18n("Заливка"), buildSegmented([["hachure", "Штрих"], ["cross", "Сетка"], ["solid", "Сплошная"]], first.fillStyle || "hachure",
+          (key) => apply({ fillStyle: key === "hachure" ? undefined : key })));
+      }
+    }
+    if (!shapes.some((x) => x.kind === "text")) {
+      field(i18n("Толщина"), buildSegmented([["1", "Тонко"], ["2", "Обычно"], ["4", "Жирно"]], String(first.strokeWidth || 2),
+        (key) => apply({ strokeWidth: key === "2" ? undefined : Number(key) })));
+      if (hand() && !shapes.some((x) => x.kind === "pen")) {
+        field(i18n("Небрежность"), buildSegmented([["0", "Ровно"], ["1", "От руки"], ["2", "Набросок"]], String(first.roughness ?? 1),
+          (key) => apply({ roughness: key === "1" ? undefined : Number(key) })));
+      }
+    }
+    if (shapes.every((x) => x.kind === "text")) {
+      field(i18n("Шрифт"), buildSegmented([["hand", "Рука"], ["ui", "Обычный"], ["book", "Книжный"]], first.font || (hand() ? "hand" : "ui"),
+        (key) => apply({ font: key })));
+      const size = document.createElement("input");
+      size.type = "range";
+      size.min = 12;
+      size.max = 72;
+      size.value = first.fontSize || 24;
+      size.addEventListener("change", () => apply({ fontSize: Number(size.value) }));
+      field(i18n("Размер"), size);
+    }
+    deleteButton(shapes.length > 1 ? i18n("Удалить выбранное") : i18n("Удалить"));
+  }
+
   // ── Действия
   function addCardAt(x, y, edit = true) {
     remember();
@@ -588,13 +804,31 @@ export function buildBoard(ctx) {
   }
 
   function removeSelection() {
-    if (!selCards.size && !selGroups.size && !selEdge) return;
+    if (!selCards.size && !selGroups.size && !selEdge && !selShapes.size) return;
     remember();
+    cv.shapes = cv.shapes.filter((x) => !selShapes.has(x.id));
     cv.cards = cv.cards.filter((c) => !selCards.has(c.id));
     cv.edges = cv.edges.filter((e) => e.id !== selEdge && !selCards.has(e.fromId) && !selCards.has(e.toId));
     cv.groups = cv.groups.filter((g) => !selGroups.has(g.id));
     clearSelection();
     changed();
+  }
+
+  // Что поедет: выбранные карточки, фигуры и рамки, а с рамкой — то,
+  // что внутри. Для линий и карандаша запоминаем все точки.
+  function movingSet() {
+    const moving = new Map();
+    const remember = (item) => {
+      if (!moving.has(item)) moving.set(item, item.points ? { points: item.points.map((p) => [...p]) } : { x: item.x, y: item.y });
+    };
+    for (const c of cv.cards) if (selCards.has(c.id)) remember(c);
+    for (const x of cv.shapes) if (selShapes.has(x.id)) remember(x);
+    for (const g of cv.groups) {
+      if (!selGroups.has(g.id)) continue;
+      remember(g);
+      for (const c of cardsInside(g)) remember(c);
+    }
+    return moving;
   }
 
   // Карточки, чей центр внутри рамки, — едут вместе с ней.
@@ -632,6 +866,57 @@ export function buildBoard(ctx) {
       stage.classList.add("panning");
       return;
     }
+    // Инструмент рисования — новая фигура там, где нажали.
+    const drawTool = SHAPE_TOOLS.find(([key]) => key === tool);
+    if (drawTool && e.button === 0) {
+      remember();
+      let shape;
+      const base = { id: uid(), kind: tool };
+      if (tool === "text") {
+        shape = { ...base, x: Math.round(pt.x), y: Math.round(pt.y), text: i18n("Надпись"), fontSize: 24 };
+        cv.shapes.push(shape);
+        clearSelection();
+        selShapes.add(shape.id);
+        setTool("select");
+        changed();
+        // Без этого браузер по умолчанию отдаст фокус полю под курсором —
+        // и первые буквы пропадут мимо надписи.
+        e.preventDefault();
+        const input = side.querySelector(".cboard-shape-text");
+        input?.focus();
+        input?.select();
+        return;
+      }
+      if (tool === "rect" || tool === "diamond" || tool === "ellipse") shape = { ...base, x: pt.x, y: pt.y, w: 0, h: 0 };
+      else shape = { ...base, points: tool === "pen" ? [[pt.x, pt.y]] : [[pt.x, pt.y], [pt.x, pt.y]] };
+      cv.shapes.push(shape);
+      gesture = { kind: "draw", shape, start: pt };
+      return;
+    }
+    const resizeShape = e.target.closest("[data-resize-shape]");
+    if (resizeShape) {
+      const item = cv.shapes.find((x) => x.id === resizeShape.dataset.resizeShape);
+      const b = shapeBox(item);
+      Object.assign(item, item.kind === "text" ? {} : { x: b.x, y: b.y, w: b.w, h: b.h });
+      gesture = { kind: "resize", item, start: pt, w: b.w, h: b.h, moved: false, isShape: true };
+      return;
+    }
+    const shapeEl = e.target.closest("[data-shape]");
+    if (shapeEl) {
+      const id = shapeEl.dataset.shape;
+      if (e.shiftKey) {
+        if (selShapes.has(id)) selShapes.delete(id);
+        else selShapes.add(id);
+      } else if (!selShapes.has(id)) {
+        clearSelection();
+        selShapes.add(id);
+      }
+      gesture = { kind: "move", start: pt, moving: movingSet(), moved: false };
+      renderShapes();
+      markSelection();
+      renderSide();
+      return;
+    }
     const port = e.target.closest("[data-port]");
     if (port) {
       gesture = { kind: "connect", fromId: port.dataset.port, start: pt };
@@ -661,15 +946,8 @@ export function buildBoard(ctx) {
       }
       selEdge = null;
       if (editingId && editingId !== id) editingId = null;
-      // Что поедет: выбранные карточки и рамки, а с рамкой — то, что внутри.
-      const moving = new Map();
-      for (const c of cv.cards) if (selCards.has(c.id)) moving.set(c, { x: c.x, y: c.y });
-      for (const g of cv.groups) {
-        if (!selGroups.has(g.id)) continue;
-        moving.set(g, { x: g.x, y: g.y });
-        for (const c of cardsInside(g)) if (!moving.has(c)) moving.set(c, { x: c.x, y: c.y });
-      }
-      gesture = { kind: "move", start: pt, moving, moved: false };
+      gesture = { kind: "move", start: pt, moving: movingSet(), moved: false };
+      renderShapes();
       markSelection();
       renderSide();
       return;
@@ -678,6 +956,7 @@ export function buildBoard(ctx) {
       clearSelection();
       selEdge = edgeEl.dataset.edge;
       gesture = null;
+      renderShapes();
       markSelection();
       renderSide();
       return;
@@ -712,19 +991,51 @@ export function buildBoard(ctx) {
         if (editingId) editingId = null;
       }
       for (const [item, from] of gesture.moving) {
-        item.x = Math.round(from.x + dx);
-        item.y = Math.round(from.y + dy);
+        if (from.points) item.points = from.points.map(([x, y]) => [Math.round(x + dx), Math.round(y + dy)]);
+        else {
+          item.x = Math.round(from.x + dx);
+          item.y = Math.round(from.y + dy);
+        }
       }
-      renderScene();
+      if ([...gesture.moving.keys()].every((item) => cv.shapes.includes(item))) renderShapes();
+      else renderScene();
     } else if (gesture.kind === "resize") {
       if (!gesture.moved) {
         remember();
         gesture.moved = true;
       }
       const item = gesture.item;
+      if (gesture.isShape) {
+        if (item.kind === "text") item.fontSize = Math.max(10, Math.min(120, Math.round((gesture.h + pt.y - gesture.start.y) / 1.25)));
+        else {
+          item.w = Math.max(8, Math.round(gesture.w + pt.x - gesture.start.x));
+          item.h = Math.max(8, Math.round(gesture.h + pt.y - gesture.start.y));
+        }
+        renderShapes();
+        return;
+      }
       item.w = Math.max(gesture.isCard ? MIN_W : 200, Math.round(gesture.w + pt.x - gesture.start.x));
       item.h = Math.max(gesture.isCard ? MIN_H : 120, Math.round(gesture.h + pt.y - gesture.start.y));
       renderScene();
+    } else if (gesture.kind === "draw") {
+      const sh = gesture.shape;
+      if (sh.kind === "pen") {
+        const [lx, ly] = sh.points[sh.points.length - 1];
+        if (Math.hypot(pt.x - lx, pt.y - ly) * view.scale < 3) return;
+        sh.points.push([Math.round(pt.x * 10) / 10, Math.round(pt.y * 10) / 10]);
+      } else if (sh.points) {
+        sh.points[1] = [Math.round(pt.x), Math.round(pt.y)];
+      } else {
+        sh.w = Math.round(pt.x - gesture.start.x);
+        sh.h = Math.round(pt.y - gesture.start.y);
+        // Shift — ровный квадрат или круг.
+        if (e.shiftKey) {
+          const side = Math.max(Math.abs(sh.w), Math.abs(sh.h));
+          sh.w = Math.sign(sh.w || 1) * side;
+          sh.h = Math.sign(sh.h || 1) * side;
+        }
+      }
+      renderShapes();
     } else if (gesture.kind === "connect") {
       const from = cv.cards.find((c) => c.id === gesture.fromId);
       const b = cardBox(from);
@@ -757,8 +1068,11 @@ export function buildBoard(ctx) {
       const inside = (b) => b.x >= x1 && b.y >= y1 && b.x + b.w <= x2 && b.y + b.h <= y2;
       if (!gesture.add) clearSelection();
       gesture.base ||= { cards: new Set(selCards), groups: new Set(selGroups) };
+      gesture.base.shapes ||= new Set(selShapes);
       selCards = new Set([...gesture.base.cards, ...cv.cards.filter((c) => inside(cardBox(c))).map((c) => c.id)]);
       selGroups = new Set([...gesture.base.groups, ...cv.groups.filter(inside).map((g) => g.id)]);
+      selShapes = new Set([...gesture.base.shapes, ...cv.shapes.filter((x) => inside(shapeBox(x))).map((x) => x.id)]);
+      renderShapes();
       markSelection();
     }
   });
@@ -769,7 +1083,24 @@ export function buildBoard(ctx) {
     if (pointers.size === 0) gesture = null;
     stage.classList.remove("panning");
     if (!g) return;
-    if (g.kind === "move" || g.kind === "resize") {
+    if (g.kind === "draw") {
+      const sh = g.shape;
+      const b = shapeBox(sh);
+      const tiny = sh.kind === "pen" ? sh.points.length < 2 : b.w + b.h < 6;
+      if (tiny) {
+        // Щелчок без протяжки — фигуры нет, и в истории её нет.
+        cv.shapes = cv.shapes.filter((x) => x !== sh);
+        history.undo.pop();
+        renderShapes();
+        return;
+      }
+      if (sh.w !== undefined) Object.assign(sh, b);
+      clearSelection();
+      selShapes.add(sh.id);
+      // Карандаш остаётся в руке, остальное — снова «Выбор».
+      if (sh.kind !== "pen") setTool("select");
+      changed();
+    } else if (g.kind === "move" || g.kind === "resize") {
       if (g.moved) ctx.persist();
       renderSide();
     } else if (g.kind === "connect") {
@@ -806,6 +1137,7 @@ export function buildBoard(ctx) {
         const wasEditing = editingId;
         clearSelection();
         if (wasEditing) renderScene();
+        else renderShapes();
       }
       markSelection();
       renderSide();
@@ -823,7 +1155,11 @@ export function buildBoard(ctx) {
   }, { passive: false });
 
   stage.addEventListener("dblclick", (e) => {
-    if (e.target.closest(".cboard-side, .cboard-bar, input, textarea")) return;
+    if (tool !== "select" || e.target.closest(".cboard-side, .cboard-bar, input, textarea")) return;
+    if (e.target.closest("[data-shape]")) {
+      side.querySelector(".cboard-shape-text")?.focus();
+      return;
+    }
     const cardEl = e.target.closest("[data-card]");
     if (cardEl) {
       editingId = cardEl.dataset.card;
@@ -856,13 +1192,16 @@ export function buildBoard(ctx) {
     b.className = "cboard-tool" + (tool === key ? " active" : "");
     b.title = label;
     b.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${svgPath}</svg>`;
-    b.addEventListener("click", () => {
-      tool = key;
-      tools.querySelectorAll(".cboard-tool").forEach((x) => x.classList.toggle("active", x === b));
-      stage.classList.toggle("hand", tool === "hand");
-    });
+    b.dataset.tool = key;
+    b.addEventListener("click", () => setTool(key));
     return b;
   };
+  function setTool(key) {
+    tool = key;
+    tools.querySelectorAll(".cboard-tool").forEach((x) => x.classList.toggle("active", x.dataset.tool === key));
+    stage.classList.toggle("hand", tool === "hand");
+    stage.classList.toggle("drawing", SHAPE_TOOLS.some(([k]) => k === tool));
+  }
   const action = (label, onClick, title) => {
     const b = document.createElement("button");
     b.className = "cboard-action";
@@ -884,6 +1223,8 @@ export function buildBoard(ctx) {
     toolBtn("select", i18n("Выбор (V)"), '<path d="M5 3l14 8-6 2-2 6z"/>'),
     toolBtn("hand", i18n("Рука – двигать поле (H, пробел)"), '<path d="M7 11V5a1.5 1.5 0 0 1 3 0v5m0-6a1.5 1.5 0 0 1 3 0v6m0-5a1.5 1.5 0 0 1 3 0v6m0-3a1.5 1.5 0 0 1 3 0v5a7 7 0 0 1-7 7h-1a6 6 0 0 1-5-3l-3-5a1.5 1.5 0 0 1 2.5-1.6L7 13"/>'),
     sep(),
+    ...SHAPE_TOOLS.map(([key, label, path, keys]) => toolBtn(key, `${i18n(label)} (${keys.split(" ")[0].toUpperCase()})`, path)),
+    sep(),
     action(escapeHtml(i18n("+ Карточка")), () => {
       const r = stage.getBoundingClientRect();
       const c = toWorld(r.left + r.width / 2, r.top + r.height / 2);
@@ -903,7 +1244,7 @@ export function buildBoard(ctx) {
 
   const hint = document.createElement("div");
   hint.className = "map-hint cboard-hint";
-  hint.textContent = i18n("Двойной щелчок – новая карточка · тяните фон – выделить · пробел или правая кнопка – двигать поле");
+  hint.textContent = i18n("Двойной щелчок – новая карточка · тяните фон – выделить · пробел или правая кнопка – двигать поле · Shift – ровная фигура");
   stage.appendChild(hint);
 
   // ── Клавиши
@@ -927,6 +1268,7 @@ export function buildBoard(ctx) {
       e.preventDefault();
       selCards = new Set(cv.cards.map((c) => c.id));
       selGroups = new Set(cv.groups.map((g) => g.id));
+      selShapes = new Set(cv.shapes.map((x) => x.id));
       selEdge = null;
       renderScene();
       renderSide();
@@ -935,6 +1277,7 @@ export function buildBoard(ctx) {
       removeSelection();
     } else if (e.key === "Escape") {
       clearSelection();
+      setTool("select");
       renderScene();
       renderSide();
     } else if (e.key === " ") {
@@ -942,9 +1285,12 @@ export function buildBoard(ctx) {
       spaceDown = true;
       stage.classList.add("hand");
     } else if (!mod && (key === "v" || key === "м")) {
-      tools.querySelector(".cboard-tool")?.click();
+      setTool("select");
     } else if (!mod && (key === "h" || key === "р")) {
-      tools.querySelectorAll(".cboard-tool")[1]?.click();
+      setTool("hand");
+    } else if (!mod) {
+      const found = SHAPE_TOOLS.find(([, , , keys]) => keys.split(" ").includes(key));
+      if (found) setTool(found[0]);
     }
   };
   const onKeyUp = (e) => {

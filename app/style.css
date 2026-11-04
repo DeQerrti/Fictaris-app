@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=Inter:wght@400;500;600&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=Inter:wght@400;500;600&family=Caveat:wght@500;700&display=swap");
 
 :root {
   /* Два семейства на всё приложение: Inter — интерфейс (цифры дат и
@@ -3913,6 +3913,22 @@ button.cboard-chip:hover { color: var(--accent-hover); }
 .cboard-card .cboard-resize { right: -7px; bottom: -7px; }
 .cboard-stage.single .cboard-card.selected .cboard-resize { display: block; }
 .cboard-stage.single-group .cboard-group-resize.selected { display: block; }
+
+.cboard-stage.drawing, .cboard-stage.drawing * { cursor: crosshair !important; }
+.cboard-shapes { z-index: 1; }
+.cboard-shape-hit { fill: none; stroke: transparent; stroke-width: 14; pointer-events: stroke; cursor: move; }
+.cboard-shape-hit.filled { fill: transparent; pointer-events: all; }
+.cboard-shape-sel { fill: none; stroke: #8fb4ff; stroke-width: 1.2; stroke-dasharray: 4 3; pointer-events: none; }
+.cboard-shape-handle { fill: var(--bg); stroke: #8fb4ff; stroke-width: 1.5; pointer-events: all; cursor: nwse-resize; }
+
+/* «От руки»: карточка — прозрачная, контур пером под ней (svg), почерк. */
+.cboard-card.hand { background: none; border: none; box-shadow: none; }
+.cboard-card.hand .cboard-card-title, .cboard-card.hand .cboard-card-title-input { font-family: Caveat, "Segoe Print", cursive; font-size: 1.5rem; font-weight: 700; }
+.cboard-card.hand .cboard-card-text, .cboard-card.hand .cboard-card-text-input { font-family: Caveat, "Segoe Print", cursive; font-size: 1.2rem; line-height: 1.2; color: var(--text); }
+.cboard-card.hand.selected { outline-style: dashed; }
+.cboard-card-sketch { fill: none; stroke: var(--text-dim); stroke-width: 1.7; stroke-linecap: round; }
+.hand-style .cboard-edge { stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.hand-style .cboard-edge-label { border: none; background: none; font-family: Caveat, "Segoe Print", cursive; font-size: 1.1rem; color: var(--text-dim); }
 
 .cboard-bar { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); display: flex; align-items: center; gap: 2px; padding: 4px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4); }
 .cboard-tool, .cboard-action { display: flex; align-items: center; justify-content: center; min-width: 34px; height: 34px; padding: 0 10px; border: none; border-radius: 7px; background: none; color: var(--text-dim); font-family: var(--font-ui); font-size: 0.84rem; cursor: pointer; white-space: nowrap; }
