@@ -22,15 +22,18 @@ export function closeSidePanel() {
 }
 
 function onKey(e) {
-  if (e.key === "Escape" && !document.querySelector(".context-menu, .entity-modal-backdrop")) {
+  // Сначала закрывается всплывающее окошко внутри панели, потом сама
+  // панель; модалку карточки под ней Escape при этом не трогает.
+  if (e.key === "Escape" && !document.querySelector(".context-menu")) {
     e.stopPropagation();
     closeSidePanel();
   }
 }
 
 // build(body) — содержимое (может быть async); reload — перерисовать
-// раздел под панелью после закрытия.
-export async function openSidePanel({ title, subtitle, build, reload = true }) {
+// раздел под панелью после закрытия; wide — шире (словарь тегов, поля
+// анкеты: им тесно в 480px).
+export async function openSidePanel({ title, subtitle, build, reload = true, wide = false }) {
   closeSidePanel();
   const backdrop = document.createElement("div");
   backdrop.className = "side-panel-backdrop";
@@ -39,7 +42,7 @@ export async function openSidePanel({ title, subtitle, build, reload = true }) {
   });
 
   const panel = document.createElement("aside");
-  panel.className = "side-panel";
+  panel.className = "side-panel" + (wide ? " wide" : "");
   panel.innerHTML = `<div class="side-panel-head"><div class="side-panel-titles"><div class="side-panel-title"></div><div class="side-panel-sub"></div></div><button class="side-panel-close">×</button></div><div class="side-panel-body"></div>`;
   panel.querySelector(".side-panel-title").textContent = title;
   panel.querySelector(".side-panel-sub").textContent = subtitle || "";
