@@ -6,6 +6,7 @@ import { openContextMenu, openPopover, closeMenu } from "./context-menu.js";
 import { escapeHtml } from "./chips.js";
 import { iconSvg, locationTypeInfo } from "./icons.js";
 import { i18n } from "./i18n.js";
+import { chapterLabel } from "./books.js";
 import { migrateBoards } from "./board-data.js";
 
 const LABEL_COLORS = [
@@ -25,6 +26,7 @@ let characters = [];
 let factions = [];
 let locations = [];
 let chapters = [];
+let books = []; // manuscript.books — ради подписи книги у главы (chapterLabel)
 let container = null;
 const save = debounceSave((d) => apiPost("/api/board", d));
 
@@ -209,6 +211,7 @@ export async function renderBoard(root) {
   factions = facs;
   locations = locs;
   chapters = manuscriptData.chapters || [];
+  books = manuscriptData.books || [];
   data = migrateBoards(rawBoard);
   board = data.boards.find((b) => b.id === data.activeBoardId) || data.boards[0];
   if (!board.columns.length) {
@@ -417,7 +420,7 @@ function cardContextItems(card, colId) {
   const chapterItems = [
     { label: i18n("Без главы"), checked: !card.chapterId, action: () => { card.chapterId = null; persist(); draw(); } },
     ...chapters.map((c) => ({
-      label: escapeHtml(c.title || i18n("Без названия")), checked: card.chapterId === c.id,
+      label: escapeHtml(chapterLabel(c, books)), checked: card.chapterId === c.id,
       action: () => { card.chapterId = c.id; persist(); draw(); },
     })),
   ];
@@ -543,7 +546,7 @@ function buildCard(card, colId) {
     chip.style.background = "var(--panel-alt)";
     chip.style.color = "var(--text-dim)";
     chip.style.border = "1px solid var(--border)";
-    chip.textContent = linkedChapter.title || i18n("Без названия");
+    chip.textContent = chapterLabel(linkedChapter, books);
     chipsRow.appendChild(chip);
   }
   if (chipsRow.children.length) el.appendChild(chipsRow);

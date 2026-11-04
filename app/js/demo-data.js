@@ -250,27 +250,56 @@ export async function buildDemoBundle() {
     },
   };
 
+  // Две книги одного мира (manuscript.books) — у первой часть-папка, цель
+  // по словам и главы с синопсисом, местами и @упоминаниями, по которым
+  // панель главы и «Обзор» сами видят, кто в главе; вторая — только
+  // начатый пролог, чтобы переключатель книг было на чём показать.
   const manuscript = {
+    books: [
+      { id: "demo-book-1", title: L("Раскольный клинок", "The Sundered Blade"), goal: 80000 },
+      { id: "demo-book-2", title: L("Наследие Вирен", "The Viren Legacy") },
+    ],
+    activeBookId: "demo-book-1",
+    folders: [
+      { id: "demo-fold-1", name: L("Часть первая. Изгнание", "Part One. Exile"), status: null, parentId: null, collapsed: false, bookId: "demo-book-1" },
+    ],
     chapters: [
       {
         id: "demo-ch-1", title: L("Глава 1. Переворот", "Chapter 1. The Coup"), status: "done",
+        bookId: "demo-book-1", folderId: "demo-fold-1",
         content: L(
           "Сольвейн горел не так, как горят обычные пожары – размеренно, будто по расписанию.\n\n" +
-          "Варн стоял на ступенях дворца и смотрел, как гвардейцы Дома Вирен складывают оружие один за другим.",
+          "@[Лорд Варн|Варн] стоял на ступенях дворца и смотрел, как гвардейцы Дома Вирен складывают оружие один за другим.",
           "Solveign burned unlike ordinary fires — steady, almost on schedule.\n\n" +
-          "Varn stood on the palace steps, watching House Viren's guards lay down their weapons, one after another."
+          "@[Lord Varn|Varn] stood on the palace steps, watching House Viren's guards lay down their weapons, one after another."
         ),
+        synopsis: L("Варн захватывает столицу. Дом Вирен сдаётся – глазами победителя.", "Varn seizes the capital. House Viren surrenders – seen through the victor's eyes."),
+        locationIds: ["demo-l-capital"],
         authorNotes: L("Показать переворот глазами Варна, не Астры – контраст с главой 3.", "Show the coup through Varn's eyes, not Astra's — contrast with chapter 3."),
       },
       {
         id: "demo-ch-2", title: L("Глава 2. Портовый квартал", "Chapter 2. The Docks"), status: "editing",
+        bookId: "demo-book-1", folderId: "demo-fold-1",
         content: L(
-          "Десять лет спустя запах рыбы и смолы всё ещё казался Астре запахом свободы.\n\n" +
-          "– Ты платишь вперёд, – сказала Несса, не оборачиваясь. – Так делают все, кому есть что терять.",
-          "Ten years later, the smell of fish and tar still felt like freedom to Astra.\n\n" +
-          "\"You pay up front,\" Nessa said without turning around. \"That's how it's done by anyone with something to lose.\""
+          "Десять лет спустя запах рыбы и смолы всё ещё казался @[Астра Вирен|Астре] запахом свободы.\n\n" +
+          "– Ты платишь вперёд, – сказала @Несса, не оборачиваясь. – Так делают все, кому есть что терять.",
+          "Ten years later, the smell of fish and tar still felt like freedom to @[Astra Viren|Astra].\n\n" +
+          "\"You pay up front,\" @Nessa said without turning around. \"That's how it's done by anyone with something to lose.\""
         ),
+        synopsis: L("Астра и Каэль ищут проводника к крепости и выходят на Нессу.", "Astra and Kael look for a guide to the fortress and find Nessa."),
+        characterIds: ["demo-c-kael"],
+        locationIds: ["demo-l-harbor"],
         authorNotes: L("Нужно больше показать недоверие Каэля к Нессе.", "Need to show more of Kael's distrust of Nessa."),
+      },
+      {
+        id: "demo-ch-3", title: L("Пролог", "Prologue"), status: "draft",
+        bookId: "demo-book-2", folderId: null,
+        content: L(
+          "Лия никогда не видела Сольвейна – только слышала, как мать говорит о нём шёпотом.",
+          "Lia had never seen Solveign – she had only heard her mother speak of it in a whisper."
+        ),
+        synopsis: L("Двадцать лет спустя: дочь Ирис узнаёт, чья она наследница.", "Twenty years later: Iris's daughter learns whose heir she is."),
+        characterIds: ["demo-c-lia", "demo-c-iris"],
       },
     ],
     activeChapterId: "demo-ch-1",

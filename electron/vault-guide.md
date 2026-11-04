@@ -1,4 +1,4 @@
-<!-- fictaris-guide v2 – файл создан приложением Fictaris и обновляется им. Чтобы оставить свою версию, удалите эту строку. -->
+<!-- fictaris-guide v3 – файл создан приложением Fictaris и обновляется им. Чтобы оставить свою версию, удалите эту строку. -->
 # Проект Fictaris – как править файлы
 
 Эта папка – проект писательского приложения Fictaris: персонажи, локации, главы рукописи и т.д., по одному JSON-файлу на раздел. Файлы можно править напрямую – открытое приложение заметит изменение и перечитает данные. Если в приложении в этот момент есть несохранённые правки, оно спросит, чью версию оставить.
@@ -38,11 +38,12 @@
 ### relationships.json – связи между персонажами
 Массив. `id`, `charA`, `charB` (id персонажей), `label` – как назвать связь («наставник»), `score` – число от −100 (вражда) до 100 (близость), `note`.
 
-### manuscript.json – рукопись
+### manuscript.json – рукопись (книги мира)
 ```
-{ "chapters": [...], "folders": [...], "activeChapterId": "id главы" | null }
+{ "books": [...], "activeBookId": "id книги", "chapters": [...], "folders": [...], "activeChapterId": "id главы" | null }
 ```
-Глава: `id`, `title`, `content`, `status` (`draft` | `editing` | `done` или ключ из `site-settings.json` → `chapterStatuses`), `folderId` (папка или `null`), `notes: [{id, text}]` – заметки автора, `stickies: [{id, text}]`, `snapshots: [{id, content, savedAt}]` – сохранённые версии текста (не трогайте).
+Проект – это один мир, книг в нём может быть несколько. Книга: `id`, `title`, `goal` (цель по словам, необязательно), `lastChapterId` (служебное). Главы и папки всех книг лежат в общих массивах, у каждой – `bookId`. Порядок глав книги – их порядок в `chapters`. Новой книге нужен хотя бы `id` и `title`; глава или папка без `bookId` попадёт в первую книгу.
+Глава: `id`, `title`, `content`, `status` (`draft` | `editing` | `done` или ключ из `site-settings.json` → `chapterStatuses`), `bookId`, `folderId` (папка той же книги или `null`), `synopsis` – о чём глава в одну-две фразы (видно в «Обзоре»), `characterIds: string[]` – кто в главе помимо упомянутых через `@` в тексте, `locationIds: string[]` – где она идёт, `notes: [{id, text}]` – заметки автора, `stickies: [{id, text}]`, `snapshots: [{id, content, savedAt}]` – сохранённые версии текста (не трогайте).
 
 В старых проектах вместо `notes` бывает строка `authorNotes`, а `folders` нет вовсе – приложение переведёт их само при открытии рукописи; новые главы пишите сразу в новом виде.
 
@@ -51,7 +52,7 @@
 - упоминания персонажей: `@Имя` или `@[Имя|как в тексте]` (для падежей: `@[Надя|Наде]`). Слева от `|` – **точное** `name` персонажа;
 - стикеры: `[[note:n1]]` – ссылка на `stickies[].id` той же главы.
 
-Папка: `id`, `name`, `parentId` (папка или `null`), `status`, `collapsed`.
+Папка: `id`, `name`, `bookId`, `parentId` (папка той же книги или `null`), `status`, `collapsed`. Папки верхнего уровня – части книги в «Обзоре».
 
 ### timeline.json – таймлайн
 Массив событий. `id`, `order` – число, по нему события стоят на шкале, `date` – свободный текст («год 214, весна»), `title`, `description`, `characterIds: string[]`, `locationIds: string[]`.
@@ -83,7 +84,7 @@
 ## Что ссылается на что
 
 Удаляя или объединяя запись, почистите ссылки:
-- **персонаж** – `characters[].parentIds/adoptiveParentIds/uncertainParentIds/partnerIds`, ключи `partnerKinds`, `relationships[].charA/charB` (связь удалить целиком), `factions[].leaderId/memberIds`, `timeline[].characterIds`, `board` → `cards[].characterId`, `map` → `pins[].characterId`, ключи `knowledge.facts[].entries`, упоминания `@Имя` в тексте глав. **Переименование персонажа ломает упоминания** – замените `@Старое имя` в `content` глав.
-- **локация** – `locations[].parentId`, `factions[].headquartersId`, `timeline[].locationIds`, карточки досок, метки карт.
+- **персонаж** – `characters[].parentIds/adoptiveParentIds/uncertainParentIds/partnerIds`, ключи `partnerKinds`, `manuscript.chapters[].characterIds`, `relationships[].charA/charB` (связь удалить целиком), `factions[].leaderId/memberIds`, `timeline[].characterIds`, `board` → `cards[].characterId`, `map` → `pins[].characterId`, ключи `knowledge.facts[].entries`, упоминания `@Имя` в тексте глав. **Переименование персонажа ломает упоминания** – замените `@Старое имя` в `content` глав.
+- **локация** – `locations[].parentId`, `manuscript.chapters[].locationIds`, `factions[].headquartersId`, `timeline[].locationIds`, карточки досок, метки карт.
 - **фракция** – карточки досок (`factionId`).
 - **глава** – `canvas` → `cards[].chapterId`, карточки досок (`chapterId`), значения `knowledge.facts[].entries`, `manuscript.activeChapterId`.

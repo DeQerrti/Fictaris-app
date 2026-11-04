@@ -4,6 +4,7 @@ import { openContextMenu } from "./context-menu.js";
 import { buildEmptyState } from "./chips.js";
 import { iconSvg } from "./icons.js";
 import { i18n } from "./i18n.js";
+import { chapterLabel } from "./books.js";
 
 // ══════════════════════════════════════════════
 //  ЗНАНИЯ — кто из персонажей что знает и с какой главы
@@ -31,6 +32,7 @@ export const KNOWS_FROM_START = "__start__";
 let facts = [];
 let characters = [];
 let chapters = [];
+let books = []; // manuscript.books — ради подписи книги у главы (chapterLabel)
 let container = null;
 const save = debounceSave(() => apiPost("/api/knowledge", { facts }));
 function persist() {
@@ -51,6 +53,7 @@ export async function renderKnowledge(root) {
   facts = Array.isArray(data.facts) ? data.facts : [];
   characters = charactersData;
   chapters = manuscript.chapters || [];
+  books = manuscript.books || [];
   draw();
 }
 
@@ -189,7 +192,7 @@ function buildEntryRow(fact, charId, character) {
   for (const ch of chapters) {
     const opt = document.createElement("option");
     opt.value = ch.id;
-    opt.textContent = ch.title || i18n("Без названия");
+    opt.textContent = chapterLabel(ch, books);
     select.appendChild(opt);
   }
   select.value = fact.entries[charId] || "";

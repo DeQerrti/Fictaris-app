@@ -1924,10 +1924,10 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
 
 /* ── Рукопись ──────────────────────────────── */
 
-.manuscript-view { display: flex; width: 100%; }
+.manuscript-view { display: flex; width: 100%; container-type: inline-size; }
 
 .chapter-list {
-  width: 220px;
+  width: 260px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -1967,6 +1967,227 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
 .chapter-item.active { background: var(--card); color: var(--text); }
 
 .status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+/* Книга — переключатель и прогресс над списком глав и в шапке «Обзора». */
+.chapter-list-head { flex-shrink: 0; display: flex; flex-direction: column; gap: 10px; padding: 12px 12px 4px; }
+.ms-book-switcher { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.ms-book-select {
+  flex: 1;
+  min-width: 0;
+  min-height: 32px;
+  padding: 0 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--panel-alt);
+  color: var(--text);
+  font-family: var(--font-book);
+  font-size: 0.98rem;
+  font-weight: 600;
+}
+.timeline-toolbar .ms-book-switcher { flex: 0 1 260px; }
+.ms-book-progress { display: flex; flex-direction: column; gap: 5px; }
+.ms-book-progress-line { display: flex; justify-content: space-between; gap: 8px; font-size: 0.75rem; color: var(--text-faint); font-variant-numeric: tabular-nums; }
+.ms-bar { display: block; height: 4px; border-radius: 2px; background: var(--panel-alt); overflow: hidden; }
+.ms-bar > span { display: block; height: 100%; border-radius: 2px; background: var(--accent); }
+.ms-link { background: none; border: none; padding: 0; color: var(--text-faint); font-family: inherit; font-size: 0.75rem; cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
+.ms-link:hover { color: var(--accent); }
+.ms-ask-menu { padding: 12px; }
+.ms-ask { display: flex; flex-direction: column; gap: 8px; min-width: 240px; }
+
+.chapter-item { align-items: flex-start; }
+.chapter-item .status-dot, .chapter-item .status-emoji { margin-top: 5px; }
+.chapter-item-text { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.chapter-item-title { overflow-wrap: anywhere; }
+.chapter-item-meta { font-size: 0.72rem; color: var(--text-faint); font-variant-numeric: tabular-nums; }
+.chapter-item.active .chapter-item-title { font-weight: 600; }
+
+/* Текст: панель инструментов, страница по центру, строка состояния. */
+.editor-pane { min-width: 0; container-type: inline-size; }
+/* Узкая колонка текста (открыта панель главы, небольшое окно) — у
+   кнопок остаются значки, подписи уходят в подсказки. */
+@container (max-width: 900px) {
+  .editor-toolbar .tb-label { display: none; }
+}
+.editor-toolbar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.editor-toolbar .btn { display: inline-flex; align-items: center; gap: 6px; }
+.editor-toolbar .segmented-btn { display: inline-flex; align-items: center; gap: 5px; }
+.editor-toolbar .btn.icon-btn.active { color: var(--accent); }
+.ms-fmt-btn { min-width: 30px; justify-content: center; }
+.segmented-btn:disabled { opacity: 0.4; cursor: default; }
+.ms-fmt-mark { background: color-mix(in srgb, var(--accent) 40%, transparent); padding: 0 3px; border-radius: 2px; }
+
+.editor-scroll { flex: 1; min-height: 0; overflow-y: auto; }
+.editor-page { max-width: 720px; margin: 0 auto; padding: 44px 32px 96px; }
+.editor-page-meta { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; font-size: 0.8rem; color: var(--text-faint); }
+.ms-status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: none;
+  color: var(--text-dim);
+  font-family: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+.ms-status-chip:hover { border-color: var(--accent); }
+.ms-status-chip.static { cursor: default; }
+.ms-status-chip.static:hover { border-color: var(--border); }
+
+.chapter-title-input {
+  width: 100%;
+  background: none;
+  border: none;
+  color: var(--text);
+  font-family: var(--font-book);
+  font-size: 2.1rem;
+  font-weight: 600;
+  margin: 0 0 24px;
+  padding: 0;
+}
+.chapter-title-input:focus { outline: none; }
+
+.editor-textarea-wrap { position: relative; }
+.chapter-content {
+  display: block;
+  width: 100%;
+  min-height: 50vh;
+  background: none;
+  border: none;
+  color: var(--text);
+  font-family: var(--font-book);
+  font-size: var(--editor-font-size, 17px);
+  line-height: 1.75;
+  padding: 0;
+  resize: none;
+  overflow: hidden;
+}
+.chapter-content:focus { outline: none; }
+.chapter-content::placeholder { color: var(--placeholder); }
+
+.editor-status {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 7px 20px;
+  border-top: 1px solid var(--border);
+  font-size: 0.76rem;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+.editor-status .word-count { font-size: inherit; }
+.editor-status-today { display: inline-flex; align-items: center; gap: 8px; }
+.editor-status-today .ms-bar { width: 110px; }
+
+/* Панель главы справа. */
+.ms-inspector {
+  width: 300px;
+  flex-shrink: 0;
+  overflow-y: auto;
+  padding: 16px 16px 24px;
+  border-left: 1px solid var(--border);
+  background: var(--panel);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.ms-section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.ms-section-head > span { font-size: 0.7rem; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.04em; }
+.ms-synopsis {
+  width: 100%;
+  min-height: 72px;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--text-dim);
+  font-family: inherit;
+  font-size: 0.86rem;
+  line-height: 1.5;
+  resize: vertical;
+}
+.ms-cast { display: flex; flex-direction: column; gap: 4px; }
+.ms-cast-row { position: relative; display: flex; align-items: center; gap: 9px; padding: 4px 6px; margin: 0 -6px; border-radius: 6px; cursor: pointer; }
+.ms-cast-row:hover { background: var(--card); }
+.ms-cast-text { min-width: 0; display: flex; flex-direction: column; }
+.ms-cast-name { font-size: 0.86rem; color: var(--text); }
+.ms-cast-role { font-size: 0.72rem; color: var(--text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ms-remove { margin-left: auto; width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; border: none; border-radius: 6px; background: none; color: var(--text-faint); cursor: pointer; opacity: 0; }
+.ms-cast-row:hover .ms-remove { opacity: 1; }
+.ms-remove:hover { color: var(--color-3); background: var(--panel-alt); }
+.ms-avatar {
+  flex-shrink: 0;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  color: #14110d;
+  font-size: 0.72rem;
+  font-weight: 600;
+  border: 2px solid var(--card);
+  box-sizing: border-box;
+}
+.ms-avatar .char-avatar-img { width: 100%; height: 100%; object-fit: cover; }
+.ms-inspector .author-notes { border-top: none; padding: 0; background: none; }
+
+/* Обзор — книга карточками глав. */
+.ms-overview { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
+.ms-readiness { flex-shrink: 0; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 14px 28px 0; font-size: 0.8rem; color: var(--text-faint); }
+.ms-readiness-track { flex: 1; min-width: 160px; max-width: 560px; height: 8px; border-radius: 4px; background: var(--panel-alt); display: flex; overflow: hidden; }
+.ms-readiness-legend { display: flex; gap: 12px; flex-wrap: wrap; }
+.ms-readiness-legend > span { display: inline-flex; align-items: center; gap: 5px; }
+.ms-overview-body { flex: 1; overflow-y: auto; padding: 18px 28px 32px; }
+.ms-part-head { display: flex; align-items: baseline; gap: 10px; margin: 6px 0 12px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+.ms-part-head span { font-family: var(--font-book); font-size: 1.1rem; font-weight: 600; color: var(--text); }
+.ms-part-head small { font-size: 0.78rem; color: var(--text-faint); }
+.ms-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; margin-bottom: 26px; }
+.ms-card {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  min-height: 220px;
+  padding: 14px 16px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--status-color);
+  border-radius: 10px;
+  cursor: pointer;
+  box-sizing: border-box;
+  text-align: left;
+  font-family: inherit;
+}
+.ms-card:hover { border-color: var(--accent); border-top-color: var(--status-color); }
+.ms-card-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.ms-card-num { font-size: 0.75rem; color: var(--text-faint); }
+.ms-card-title { font-family: var(--font-book); font-size: 1.15rem; font-weight: 600; color: var(--text); }
+.ms-card-about { flex: 1; font-size: 0.86rem; line-height: 1.5; color: var(--text-dim); display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+.ms-card-about.empty { color: var(--text-faint); font-style: italic; }
+.ms-card-line { font-family: var(--font-book); font-size: 0.84rem; font-style: italic; line-height: 1.5; color: var(--text-faint); border-left: 2px solid var(--border); padding-left: 10px; }
+.ms-card-bottom { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ms-card-cast { display: flex; }
+.ms-card-cast .ms-avatar + .ms-avatar { margin-left: -6px; }
+.ms-card-more { margin-left: 4px; font-size: 0.75rem; color: var(--text-faint); align-self: center; }
+.ms-card-words { font-size: 0.78rem; color: var(--text-faint); font-variant-numeric: tabular-nums; }
+.ms-card-add { align-items: center; justify-content: center; border: 1px dashed var(--border); background: none; color: var(--text-faint); font-size: 0.9rem; }
+.ms-card-add:hover { color: var(--accent); border-color: var(--accent); }
+
+@container (max-width: 980px) {
+  .ms-inspector { display: none; }
+}
+
 .status-emoji { font-size: 0.85rem; line-height: 1; flex-shrink: 0; }
 
 /* Папка — как в Obsidian: строка с шевроном (открыть/закрыть),
@@ -2048,46 +2269,11 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
   overflow: hidden;
 }
 
-.editor-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 14px 24px;
-  border-bottom: 1px solid var(--border);
-}
-
-.chapter-title-input {
-  flex: 1;
-  background: none;
-  border: none;
-  color: var(--text);
-  font-family: var(--font-book);
-  font-size: 1.3rem;
-  font-weight: 600;
-}
-
-.chapter-title-input:focus { outline: none; }
-
 .word-count {
   font-family: var(--font-ui); font-variant-numeric: tabular-nums;
   font-size: 0.75rem;
   color: var(--text-faint);
 }
-
-.chapter-content {
-  flex: 1;
-  background: none;
-  border: none;
-  color: var(--text);
-  font-family: var(--font-book);
-  font-size: var(--editor-font-size, 17px);
-  line-height: 1.7;
-  padding: 24px 48px;
-  resize: none;
-  overflow-y: auto;
-}
-
-.chapter-content:focus { outline: none; }
 
 .chapter-content-view { font-size: var(--editor-font-size, 17px); }
 
@@ -2130,8 +2316,6 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
   overflow-y: auto;
   white-space: pre-wrap;
 }
-
-.editor-textarea-wrap { position: relative; flex: 1; display: flex; overflow: hidden; }
 
 .sticky-editor-row { display: flex; gap: 6px; align-items: flex-start; margin-top: 8px; }
 .sticky-editor-textarea {
@@ -2811,7 +2995,7 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
 
 .chapter-content-view {
   white-space: pre-wrap;
-  overflow-y: auto;
+  min-height: 50vh;
   cursor: text;
 }
 

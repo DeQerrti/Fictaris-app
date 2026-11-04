@@ -4,6 +4,7 @@ import { escapeHtml, buildEmptyState } from "./chips.js";
 import { openContextMenu, openPopover, closeMenu } from "./context-menu.js";
 import { iconSvg } from "./icons.js";
 import { i18n, i18nPlural } from "./i18n.js";
+import { chapterLabel } from "./books.js";
 
 // ══════════════════════════════════════════════
 //  ХОЛСТ
@@ -32,6 +33,7 @@ import { i18n, i18nPlural } from "./i18n.js";
 
 let data = { order: [], canvases: {} };
 let chapters = [];
+let books = []; // manuscript.books — ради подписи книги у главы (chapterLabel)
 let activeId = null;
 let focusCardId = null;
 let container = null;
@@ -124,7 +126,10 @@ export async function renderCanvas(root, focus) {
   focusCardId = focus || null;
   [data, chapters] = await Promise.all([
     apiGet("/api/canvas"),
-    apiGet("/api/manuscript").then((m) => m.chapters || []),
+    apiGet("/api/manuscript").then((m) => {
+      books = m.books || [];
+      return m.chapters || [];
+    }),
   ]);
   if (!Array.isArray(data.order)) data.order = [];
   if (!data.canvases || typeof data.canvases !== "object") data.canvases = {};
@@ -506,7 +511,7 @@ function buildCanvasView() {
     for (const ch of chapters) {
       const opt = document.createElement("option");
       opt.value = ch.id;
-      opt.textContent = ch.title || i18n("Без названия");
+      opt.textContent = chapterLabel(ch, books);
       if (card.chapterId === ch.id) opt.selected = true;
       select.appendChild(opt);
     }
@@ -549,7 +554,8 @@ function buildCanvasView() {
       titleEl.textContent = card.title;
       el.appendChild(titleEl);
     }
-    const chapterText = card.chapterId ? chapters.find((c) => c.id === card.chapterId)?.title : card.chapterLabel;
+    const linked = card.chapterId ? chapters.find((c) => c.id === card.chapterId) : null;
+    const chapterText = card.chapterId ? linked && chapterLabel(linked, books) : card.chapterLabel;
     if (chapterText) {
       const chip = document.createElement(card.chapterId ? "button" : "div");
       chip.className = "canvas-card-chapter" + (card.chapterId ? " canvas-card-chapter-link" : "");

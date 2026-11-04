@@ -5,6 +5,7 @@ import { locationTypeInfo, factionTypeInfo, iconSvg } from "./icons.js";
 import { exportWorldPdf } from "./export-pdf.js";
 import { exportSiteZip } from "./export-site.js";
 import { i18n } from "./i18n.js";
+import { chapterLabel } from "./books.js";
 import { readRecent } from "./recent-nav.js";
 
 // ══════════════════════════════════════════════
@@ -140,7 +141,7 @@ async function buildIndex() {
     entries.push({
       module: "manuscript",
       id: c.id,
-      title: c.title || i18n("Без названия"),
+      title: chapterLabel(c, manuscript.books),
       subtitle: snippet(c.content),
       color: "#c9944a",
     });
