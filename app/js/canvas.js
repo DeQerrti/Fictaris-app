@@ -32,6 +32,7 @@ import { buildBoard, edgeGeometry } from "./canvas-board.js";
 let data = { order: [], canvases: {} };
 let chapters = [];
 let books = []; // manuscript.books — ради подписи книги у главы (chapterLabel)
+let world = { characters: [], locations: [], factions: [] }; // карточки «Из мира»
 let activeId = null;
 let focusCardId = null;
 let container = null;
@@ -114,13 +115,18 @@ async function importLegacyPlotOnce() {
 export async function renderCanvas(root, focus) {
   container = root;
   focusCardId = focus || null;
-  [data, chapters] = await Promise.all([
+  let characters, locations, factions;
+  [data, chapters, characters, locations, factions] = await Promise.all([
     apiGet("/api/canvas"),
     apiGet("/api/manuscript").then((m) => {
       books = m.books || [];
       return m.chapters || [];
     }),
+    apiGet("/api/characters"),
+    apiGet("/api/locations"),
+    apiGet("/api/factions"),
   ]);
+  world = { characters, locations, factions };
   if (!Array.isArray(data.order)) data.order = [];
   if (!data.canvases || typeof data.canvases !== "object") data.canvases = {};
   if (activeId && !data.canvases[activeId]) activeId = null;
@@ -253,6 +259,7 @@ function buildCanvasView() {
     cv: currentCanvas(),
     chapters,
     books,
+    ...world,
     persist,
     focusCardId,
     onBack: () => {

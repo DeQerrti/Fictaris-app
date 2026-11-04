@@ -1,9 +1,12 @@
-import { uid } from "./api.js";
+import { uid, apiPost } from "./api.js";
 import { escapeHtml } from "./chips.js";
-import { iconSvg } from "./icons.js";
+import { iconSvg, locationTypeInfo, factionTypeInfo } from "./icons.js";
+import { openPopover, closeMenu } from "./context-menu.js";
+import { prepareMapImage } from "./image-compress.js";
+import { exportElementAsPng } from "./png-export.js";
 import { i18n, i18nPlural } from "./i18n.js";
 import { chapterLabel } from "./books.js";
-import { sectionHeading, buildNone, buildSelect, buildSegmented, autoGrow, openEntity } from "./entity-view.js";
+import { sectionHeading, buildNone, buildSelect, buildSegmented, autoGrow, openEntity, personAvatarHtml } from "./entity-view.js";
 import { roughRect, roughDiamond, roughEllipse, roughPolyline, arrowHead, penPath, fillPattern } from "./sketch.js";
 
 // ══════════════════════════════════════════════
@@ -20,7 +23,9 @@ import { roughRect, roughDiamond, roughEllipse, roughPolyline, arrowHead, penPat
 //
 //  Данные — те же canvas.json → canvases[id]: cards, edges и groups
 //  (рамки { id, x, y, w, h, title, color }), shapes — фигуры, линии,
-//  карандаш и надписи (см. vault-guide.md), style — "hand" («От руки»:
+//  карандаш, надписи и картинки (см. vault-guide.md); карточка с entity
+//  { type, id } — персонаж, место, фракция или глава из мира: имя и
+//  подпись берутся из мира, своё у неё только заметка. style — "hand" («От руки»:
 //  всё будто нарисовано пером, рукописный шрифт) или нет поля (аккуратно).
 // ══════════════════════════════════════════════
 
@@ -44,6 +49,14 @@ const SHAPE_TOOLS = [
 // Цвета фигур; null — цвет текста темы.
 const INK_COLORS = [null, "#c76a5c", "#6fa35a", "#5a8fd0", "#d6a75c", "#9a86c4"];
 const FONTS = { hand: "Caveat, 'Segoe Print', cursive", ui: "var(--font-ui)", book: "var(--font-book)" };
+
+// Что за сущность мира на карточке: для шапки карточки и списка «Из мира».
+const ENTITY_KINDS = [
+  ["character", "Персонаж"],
+  ["location", "Место"],
+  ["faction", "Фракция"],
+  ["chapter", "Глава"],
+];
 
 function shapeBox(s) {
   if (s.points) {
@@ -99,13 +112,40 @@ export function edgeGeometry(a, b) {
   return { p, q, c1, c2, mid, d: `M${p.x},${p.y} C${c1.x},${c1.y} ${c2.x},${c2.y} ${q.x},${q.y}` };
 }
 
-// ctx — что даёт canvas.js: cv (холст), chapters, books, persist(),
-// onBack(), focusCardId, onRename().
+// ctx — что даёт canvas.js: cv (холст), chapters, books, characters,
+// locations, factions, persist(), onBack(), focusCardId.
 export function buildBoard(ctx) {
   const { cv } = ctx;
   if (!Array.isArray(cv.groups)) cv.groups = [];
   if (!Array.isArray(cv.shapes)) cv.shapes = [];
   const hand = () => cv.style === "hand";
+
+  // Сущность мира карточки: { kind, name, sub, lead } или null — удалена.
+  function entityOf(c) {
+    const ref = c.entity;
+    if (!ref) return null;
+    if (ref.type === "character") {
+      const x = (ctx.characters || []).find((p) => p.id === ref.id);
+      return x && { name: x.name, sub: x.role || "", lead: personAvatarHtml(x, "cast-avatar cast-avatar-md") };
+    }
+    if (ref.type === "location") {
+      const x = (ctx.locations || []).find((p) => p.id === ref.id);
+      if (!x) return null;
+      const [, label, icon, color] = locationTypeInfo(x.type);
+      return { name: x.name, sub: i18n(label), lead: `<span class="cast-avatar cast-avatar-md" style="background:${color}">${iconSvg(icon, 18)}</span>` };
+    }
+    if (ref.type === "faction") {
+      const x = (ctx.factions || []).find((p) => p.id === ref.id);
+      if (!x) return null;
+      const [, label, icon, color] = factionTypeInfo(x.type);
+      return { name: x.name, sub: i18n(label), lead: `<span class="cast-avatar cast-avatar-md" style="background:${color}">${iconSvg(icon, 18)}</span>` };
+    }
+    if (ref.type === "chapter") {
+      const x = ctx.chapters.find((p) => p.id === ref.id);
+      return x && { name: x.title, sub: chapterLabel(x, ctx.books) === x.title ? "" : chapterLabel(x, ctx.books).split(" · ")[0], lead: `<span class="cast-avatar cast-avatar-md cboard-chapter-lead">${iconSvg("manuscript", 18)}</span>` };
+    }
+    return null;
+  }
   if (!histories.has(cv.id)) histories.set(cv.id, { undo: [], redo: [] });
   const history = histories.get(cv.id);
 
@@ -157,9 +197,13 @@ export function buildBoard(ctx) {
   svg.classList.add("cboard-svg");
   const layer = document.createElement("div");
   layer.className = "cboard-layer";
+  // Картинки — обычными <img> над карточками: экспорт в PNG (html2canvas)
+  // не рисует <image> внутри SVG.
+  const imagesLayer = document.createElement("div");
+  imagesLayer.className = "cboard-layer cboard-images";
   const shapesSvg = document.createElementNS(SVG_NS, "svg");
   shapesSvg.classList.add("cboard-svg", "cboard-shapes");
-  world.append(svg, layer, shapesSvg);
+  world.append(svg, layer, imagesLayer, shapesSvg);
   const marquee = document.createElement("div");
   marquee.className = "cboard-marquee";
   marquee.hidden = true;
@@ -175,6 +219,7 @@ export function buildBoard(ctx) {
   const applyView = () => {
     world.style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.scale})`;
     zoomLabel.textContent = `${Math.round(view.scale * 100)}%`;
+    renderMinimap();
   };
   const toWorld = (clientX, clientY) => {
     const r = stage.getBoundingClientRect();
@@ -380,12 +425,14 @@ export function buildBoard(ctx) {
     layer.append(...labels);
     renderShapes();
     markSelection();
+    if (view) renderMinimap();
   }
 
   // Фигуры, линии, карандаш, надписи — над карточками.
   function renderShapes() {
     const defs = [];
     let html = "";
+    imagesLayer.innerHTML = "";
     for (const s of cv.shapes) {
       const rough = hand() ? (s.roughness ?? 1) : 0;
       const stroke = s.stroke || "var(--text)";
@@ -412,7 +459,14 @@ export function buildBoard(ctx) {
         }
       }
       let body = "";
-      if (s.kind === "text") {
+      if (s.kind === "image") {
+        const box = document.createElement("div");
+        box.className = "cboard-image";
+        box.dataset.shape = s.id;
+        Object.assign(box.style, { left: `${b.x}px`, top: `${b.y}px`, width: `${b.w}px`, height: `${b.h}px` });
+        box.innerHTML = `<img src="/${escapeHtml(s.src)}" alt="" draggable="false">`;
+        imagesLayer.appendChild(box);
+      } else if (s.kind === "text") {
         const size = s.fontSize || 24;
         const font = FONTS[s.font || (hand() ? "hand" : "ui")] || FONTS.ui;
         const lines = (s.text || "").split("\n");
@@ -422,11 +476,11 @@ export function buildBoard(ctx) {
         body = `${fill}<path d="${outline}" fill="none" stroke="${stroke}" stroke-width="${width}" stroke-linecap="round" stroke-linejoin="round"/>`;
       }
       // Невидимая широкая обводка — по ней легко попасть мышью.
-      const hitD = s.kind === "text" ? "" : (fillD || (s.kind === "pen" ? outline : roughPolyline(s.points || [], s.id, 0)));
-      const hit = s.kind === "text"
+      const hitD = s.kind === "text" || s.kind === "image" ? "" : (fillD || (s.kind === "pen" ? outline : roughPolyline(s.points || [], s.id, 0)));
+      const hit = s.kind === "image" ? "" : s.kind === "text"
         ? `<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" class="cboard-shape-hit filled"/>`
         : `<path d="${hitD}" class="cboard-shape-hit${s.fill ? " filled" : ""}"/>`;
-      html += `<g data-shape="${escapeHtml(s.id)}">${body}${hit}</g>`;
+      if (s.kind !== "image") html += `<g data-shape="${escapeHtml(s.id)}">${body}${hit}</g>`;
       if (selShapes.has(s.id)) {
         html += `<rect x="${b.x - 6}" y="${b.y - 6}" width="${b.w + 12}" height="${b.h + 12}" class="cboard-shape-sel"/>`;
         if (selShapes.size === 1 && !s.points) {
@@ -461,7 +515,49 @@ export function buildBoard(ctx) {
     el.style.height = `${b.h}px`;
     if (c.color) el.style.setProperty("--card-color", c.color);
 
-    if (editingId === c.id) {
+    if (c.entity) {
+      el.classList.add("entity");
+      const info = entityOf(c);
+      const kindLabel = i18n(ENTITY_KINDS.find(([k]) => k === c.entity.type)?.[1] || "");
+      const head = document.createElement("div");
+      head.className = "cboard-entity-head";
+      head.innerHTML = info
+        ? `${info.lead}<div><small>${escapeHtml(kindLabel)}</small><b>${escapeHtml(info.name || i18n("Без имени"))}</b>${info.sub ? `<span>${escapeHtml(info.sub)}</span>` : ""}</div>`
+        : `<span class="cast-avatar cast-avatar-md cboard-chapter-lead">?</span><div><small>${escapeHtml(kindLabel)}</small><b>${escapeHtml(i18n("Удалено из мира"))}</b></div>`;
+      if (info) {
+        const open = document.createElement("button");
+        open.className = "cboard-entity-open";
+        open.title = i18n("Открыть");
+        open.dataset.openEntity = c.entity.type;
+        open.dataset.openId = c.entity.id;
+        open.innerHTML = iconSvg("link", 14);
+        head.appendChild(open);
+      }
+      el.appendChild(head);
+      if (editingId === c.id) {
+        const text = document.createElement("textarea");
+        text.className = "cboard-card-text-input";
+        text.placeholder = i18n("Заметка на холсте");
+        text.value = c.text || "";
+        const once = rememberOnce(text);
+        text.addEventListener("input", () => { once(); c.text = text.value; ctx.persist(); });
+        text.addEventListener("blur", () => setTimeout(() => {
+          if (editingId === c.id) {
+            editingId = null;
+            renderScene();
+            renderSide();
+          }
+        }, 0));
+        text.addEventListener("keydown", (e) => { if (e.key === "Escape") text.blur(); });
+        el.appendChild(text);
+        setTimeout(() => text.focus(), 0);
+      } else if (c.text) {
+        const note = document.createElement("div");
+        note.className = "cboard-card-text";
+        note.textContent = c.text;
+        el.appendChild(note);
+      }
+    } else if (editingId === c.id) {
       const title = document.createElement("input");
       title.className = "cboard-card-title-input";
       title.placeholder = i18n("Заголовок");
@@ -585,6 +681,39 @@ export function buildBoard(ctx) {
       return;
     }
 
+    if (cards.length === 1 && !groups.length && cards[0].entity) {
+      const c = cards[0];
+      const info = entityOf(c);
+      side.appendChild(sectionHeading(i18n(ENTITY_KINDS.find(([k]) => k === c.entity.type)?.[1] || "Карточка")));
+      const name = document.createElement("div");
+      name.className = "cboard-entity-name";
+      name.textContent = info ? info.name : i18n("Удалено из мира");
+      side.appendChild(name);
+      if (info) {
+        const open = document.createElement("button");
+        open.className = "btn cboard-wide";
+        open.textContent = i18n("Открыть");
+        open.addEventListener("click", () => openEntity(c.entity.type, c.entity.id));
+        side.appendChild(open);
+      }
+      const text = document.createElement("textarea");
+      text.className = "cboard-textarea";
+      text.rows = 2;
+      text.value = c.text || "";
+      text.placeholder = i18n("Заметка на холсте");
+      autoGrow(text);
+      const once = rememberOnce(text);
+      text.addEventListener("input", () => { once(); c.text = text.value; ctx.persist(); renderScene(); });
+      field(i18n("Заметка"), text);
+      field(i18n("Цвет"), colorRow(c.color, (color) => {
+        remember();
+        c.color = color;
+        changed();
+      }));
+      deleteButton(i18n("Убрать с холста"));
+      return;
+    }
+
     if (cards.length === 1 && !groups.length) {
       const c = cards[0];
       side.appendChild(sectionHeading(i18n("Карточка")));
@@ -624,7 +753,8 @@ export function buildBoard(ctx) {
         if (!other) continue;
         const row = document.createElement("button");
         row.className = "dossier-link-row";
-        row.innerHTML = `<span class="dossier-row-icon">${e.fromId === c.id ? "→" : "←"}</span><span class="dossier-link-text">${escapeHtml(other.title || (other.text || "").slice(0, 30) || i18n("Без заголовка"))}</span>${e.label ? `<small>${escapeHtml(e.label)}</small>` : ""}`;
+        const otherName = other.entity ? entityOf(other)?.name : other.title || (other.text || "").slice(0, 30);
+        row.innerHTML = `<span class="dossier-row-icon">${e.fromId === c.id ? "→" : "←"}</span><span class="dossier-link-text">${escapeHtml(otherName || i18n("Без заголовка"))}</span>${e.label ? `<small>${escapeHtml(e.label)}</small>` : ""}`;
         row.addEventListener("click", () => {
           clearSelection();
           selCards.add(other.id);
@@ -701,7 +831,7 @@ export function buildBoard(ctx) {
   // Свойства фигур — сразу для всех выбранных.
   function buildShapeSide(shapes) {
     const one = shapes.length === 1 ? shapes[0] : null;
-    const names = { rect: "Прямоугольник", diamond: "Ромб", ellipse: "Эллипс", arrow: "Стрелка", line: "Линия", pen: "Карандаш", text: "Надпись" };
+    const names = { rect: "Прямоугольник", diamond: "Ромб", ellipse: "Эллипс", arrow: "Стрелка", line: "Линия", pen: "Карандаш", text: "Надпись", image: "Картинка" };
     side.appendChild(sectionHeading(one ? i18n(names[one.kind]) : i18n("Выбрано: {n}", { n: shapes.length })));
     const apply = (patch) => {
       remember();
@@ -728,6 +858,11 @@ export function buildBoard(ctx) {
       return row;
     };
     const first = shapes[0];
+    if (shapes.every((x) => x.kind === "image")) {
+      side.appendChild(buildNone(i18n("Тяните за уголок – размер меняется без искажения")));
+      deleteButton(shapes.length > 1 ? i18n("Удалить выбранное") : i18n("Удалить"));
+      return;
+    }
     if (one?.kind === "text") {
       const text = document.createElement("textarea");
       text.className = "cboard-textarea cboard-shape-text";
@@ -779,6 +914,104 @@ export function buildBoard(ctx) {
     if (edit) editingId = card.id;
     changed();
     return card;
+  }
+
+  const viewCenter = () => {
+    const r = stage.getBoundingClientRect();
+    return toWorld(r.left + r.width / 2, r.top + r.height / 2);
+  };
+
+  // «+ Из мира»: список персонажей, мест, фракций и глав с поиском.
+  function openWorldPicker(anchorEl) {
+    const wrap = document.createElement("div");
+    wrap.className = "cboard-picker";
+    const search = document.createElement("input");
+    search.type = "search";
+    search.className = "characters-search";
+    search.placeholder = i18n("Кого или что положить на холст…");
+    const list = document.createElement("div");
+    list.className = "cboard-picker-list";
+    wrap.append(search, list);
+    const all = [
+      ...(ctx.characters || []).map((x) => ({ type: "character", id: x.id, name: x.name, sub: x.role })),
+      ...(ctx.locations || []).map((x) => ({ type: "location", id: x.id, name: x.name, sub: i18n(locationTypeInfo(x.type)[1]) })),
+      ...(ctx.factions || []).map((x) => ({ type: "faction", id: x.id, name: x.name, sub: i18n(factionTypeInfo(x.type)[1]) })),
+      ...ctx.chapters.map((x) => ({ type: "chapter", id: x.id, name: x.title, sub: chapterLabel(x, ctx.books) })),
+    ];
+    const render = () => {
+      const q = search.value.trim().toLowerCase();
+      list.innerHTML = "";
+      for (const [type, label] of ENTITY_KINDS) {
+        const items = all.filter((x) => x.type === type && (!q || (x.name || "").toLowerCase().includes(q)));
+        if (!items.length) continue;
+        const head = document.createElement("div");
+        head.className = "dossier-list-group";
+        head.textContent = i18n(label);
+        list.appendChild(head);
+        for (const item of items) {
+          const onBoard = cv.cards.some((c) => c.entity?.type === item.type && c.entity?.id === item.id);
+          const row = document.createElement("button");
+          row.className = "dossier-link-row";
+          row.innerHTML = `<span class="dossier-link-text">${escapeHtml(item.name || i18n("Без имени"))}</span><small>${escapeHtml(onBoard ? i18n("уже на холсте") : item.sub || "")}</small>`;
+          row.addEventListener("click", () => {
+            closeMenu();
+            addEntityCard(item.type, item.id);
+          });
+          list.appendChild(row);
+        }
+      }
+      if (!list.children.length) list.appendChild(buildNone(i18n("Ничего не нашлось.")));
+    };
+    search.addEventListener("input", render);
+    render();
+    const r = anchorEl.getBoundingClientRect();
+    openPopover(r.left, r.top - 8, wrap, "cboard-picker-menu");
+    setTimeout(() => search.focus(), 0);
+  }
+
+  function addEntityCard(type, id) {
+    remember();
+    const c = viewCenter();
+    // Несколько подряд — лесенкой, а не стопкой в одной точке.
+    let x = Math.round(c.x - 120);
+    let y = Math.round(c.y - 40);
+    while (cv.cards.some((k) => Math.abs(k.x - x) < 12 && Math.abs(k.y - y) < 12)) {
+      x += 28;
+      y += 28;
+    }
+    const card = { ...blankCard(x, y), w: 240, h: 84, entity: { type, id } };
+    cv.cards.push(card);
+    clearSelection();
+    selCards.add(card.id);
+    changed();
+  }
+
+  // Картинка — в папку проекта (maps/, как у карт), на холст — фигурой.
+  async function addImage(file, at) {
+    if (!file || !/^image\//.test(file.type)) return;
+    const { base64, ext } = await prepareMapImage(file);
+    const { path } = await apiPost("/api/map/image", { data: base64, ext });
+    const img = new Image();
+    img.onload = () => {
+      const w = Math.min(420, img.naturalWidth || 420);
+      const h = Math.round(w * ((img.naturalHeight || 1) / (img.naturalWidth || 1)));
+      const c = at || viewCenter();
+      remember();
+      const shape = { id: uid(), kind: "image", src: path, x: Math.round(c.x - w / 2), y: Math.round(c.y - h / 2), w, h };
+      cv.shapes.push(shape);
+      clearSelection();
+      selShapes.add(shape.id);
+      changed();
+    };
+    img.src = `/${path}`;
+  }
+
+  function pickImage() {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.addEventListener("change", () => addImage(input.files[0]));
+    input.click();
   }
 
   function groupSelection() {
@@ -847,7 +1080,7 @@ export function buildBoard(ctx) {
 
   stage.addEventListener("pointerdown", (e) => {
     if (!view || e.target.closest(".cboard-side, .cboard-bar, input, textarea, select")) return;
-    if (e.target.closest(".cboard-chip[data-open-chapter]")) return;
+    if (e.target.closest(".cboard-chip[data-open-chapter], [data-open-entity], .cboard-minimap")) return;
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     try {
       stage.setPointerCapture(e.pointerId);
@@ -1007,7 +1240,10 @@ export function buildBoard(ctx) {
       const item = gesture.item;
       if (gesture.isShape) {
         if (item.kind === "text") item.fontSize = Math.max(10, Math.min(120, Math.round((gesture.h + pt.y - gesture.start.y) / 1.25)));
-        else {
+        else if (item.kind === "image") {
+          item.w = Math.max(24, Math.round(gesture.w + pt.x - gesture.start.x));
+          item.h = Math.round(item.w * (gesture.h / gesture.w));
+        } else {
           item.w = Math.max(8, Math.round(gesture.w + pt.x - gesture.start.x));
           item.h = Math.max(8, Math.round(gesture.h + pt.y - gesture.start.y));
         }
@@ -1182,6 +1418,8 @@ export function buildBoard(ctx) {
   layer.addEventListener("click", (e) => {
     const chip = e.target.closest("[data-open-chapter]");
     if (chip) openEntity("chapter", chip.dataset.openChapter);
+    const ent = e.target.closest("[data-open-entity]");
+    if (ent) openEntity(ent.dataset.openEntity, ent.dataset.openId);
   });
 
   // ── Нижняя панель
@@ -1230,6 +1468,8 @@ export function buildBoard(ctx) {
       const c = toWorld(r.left + r.width / 2, r.top + r.height / 2);
       addCardAt(c.x, c.y);
     }),
+    action(escapeHtml(i18n("+ Из мира")), (e) => openWorldPicker(e.currentTarget), i18n("Персонаж, место, фракция или глава")),
+    action(iconSvg("camera", 16), () => pickImage(), i18n("Картинка – или вставьте из буфера, Ctrl+V")),
     action(escapeHtml(i18n("Группа")), () => groupSelection(), i18n("Рамка вокруг выбранного или пустая")),
     sep(),
     undoBtn,
@@ -1242,6 +1482,91 @@ export function buildBoard(ctx) {
   );
   stage.appendChild(tools);
 
+  // ── Мини-карта: всё поле и рамка того, что сейчас видно; щелчок или
+  // перетаскивание по ней — перейти туда.
+  const mini = document.createElement("div");
+  mini.className = "cboard-minimap";
+  stage.appendChild(mini);
+  const MINI_W = 180;
+  const MINI_H = 120;
+  let miniMap = null;
+  function renderMinimap() {
+    const b = bounds();
+    const r = stage.getBoundingClientRect();
+    if (!b || !view || !r.width) {
+      mini.hidden = true;
+      return;
+    }
+    mini.hidden = false;
+    // Поле с запасом и с тем, что видно сейчас, — рамка вида не уходит за край.
+    const vx = -view.x / view.scale;
+    const vy = -view.y / view.scale;
+    const vw = r.width / view.scale;
+    const vh = r.height / view.scale;
+    const x1 = Math.min(b.x, vx) - 40;
+    const y1 = Math.min(b.y, vy) - 40;
+    const x2 = Math.max(b.x + b.w, vx + vw) + 40;
+    const y2 = Math.max(b.y + b.h, vy + vh) + 40;
+    const k = Math.min(MINI_W / (x2 - x1), MINI_H / (y2 - y1));
+    miniMap = { x1, y1, k };
+    const rect = (x, y, w, h, cls, color) => `<rect x="${((x - x1) * k).toFixed(1)}" y="${((y - y1) * k).toFixed(1)}" width="${Math.max(1, w * k).toFixed(1)}" height="${Math.max(1, h * k).toFixed(1)}" class="${cls}"${color ? ` style="fill:${color}"` : ""}/>`;
+    mini.innerHTML = `<svg width="${MINI_W}" height="${MINI_H}">
+      ${cv.groups.map((g) => rect(g.x, g.y, g.w, g.h, "g")).join("")}
+      ${cv.shapes.map((x) => { const sb = shapeBox(x); return rect(sb.x, sb.y, sb.w, sb.h, "s"); }).join("")}
+      ${cv.cards.map((c) => { const cb = cardBox(c); return rect(cb.x, cb.y, cb.w, cb.h, "c", c.color); }).join("")}
+      ${rect(vx, vy, vw, vh, "v")}
+    </svg>`;
+  }
+  const miniJump = (e) => {
+    if (!miniMap) return;
+    const r = mini.getBoundingClientRect();
+    const wx = (e.clientX - r.left) / miniMap.k + miniMap.x1;
+    const wy = (e.clientY - r.top) / miniMap.k + miniMap.y1;
+    const sr = stage.getBoundingClientRect();
+    view.x = sr.width / 2 - wx * view.scale;
+    view.y = sr.height / 2 - wy * view.scale;
+    applyView();
+  };
+  let miniDrag = false;
+  mini.addEventListener("pointerdown", (e) => {
+    e.stopPropagation();
+    miniDrag = true;
+    try { mini.setPointerCapture(e.pointerId); } catch { /* уже отпущен */ }
+    miniJump(e);
+  });
+  mini.addEventListener("pointermove", (e) => { if (miniDrag) miniJump(e); });
+  mini.addEventListener("pointerup", () => { miniDrag = false; });
+
+  // PNG — всё поле, вписанное в окно, без панелей поверх.
+  async function exportPng(btn) {
+    const saved = { ...view };
+    btn.disabled = true;
+    clearSelection();
+    renderScene();
+    renderSide();
+    stage.classList.add("exporting");
+    fit();
+    try {
+      const safe = (cv.name || "").replace(/[^a-zA-Zа-яА-Я0-9_\- ]/g, "").trim() || "fictaris";
+      await exportElementAsPng(stage, `${safe}.png`);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      stage.classList.remove("exporting");
+      view = saved;
+      views.set(cv.id, view);
+      applyView();
+      btn.disabled = false;
+    }
+  }
+  const exportBtn = document.createElement("button");
+  exportBtn.className = "btn";
+  exportBtn.innerHTML = `${iconSvg("download", 14)}<span>${escapeHtml(i18n("Экспорт в PNG"))}</span>`;
+  exportBtn.addEventListener("click", () => exportPng(exportBtn));
+  const spacer = document.createElement("div");
+  spacer.style.flex = "1";
+  bar.append(spacer, exportBtn);
+
   const hint = document.createElement("div");
   hint.className = "map-hint cboard-hint";
   hint.textContent = i18n("Двойной щелчок – новая карточка · тяните фон – выделить · пробел или правая кнопка – двигать поле · Shift – ровная фигура");
@@ -1252,6 +1577,7 @@ export function buildBoard(ctx) {
     if (!pane.isConnected) {
       document.removeEventListener("keydown", onKey);
       document.removeEventListener("keyup", onKeyUp);
+      document.removeEventListener("paste", onPaste);
       return;
     }
     if (e.target.closest?.("input, textarea, select, [contenteditable]")) return;
@@ -1299,8 +1625,21 @@ export function buildBoard(ctx) {
       stage.classList.toggle("hand", tool === "hand");
     }
   };
+  const onPaste = (e) => {
+    if (!pane.isConnected) {
+      document.removeEventListener("paste", onPaste);
+      return;
+    }
+    if (e.target.closest?.("input, textarea, [contenteditable]")) return;
+    const file = [...(e.clipboardData?.files || [])].find((f) => f.type.startsWith("image/"));
+    if (file) {
+      e.preventDefault();
+      addImage(file);
+    }
+  };
   document.addEventListener("keydown", onKey);
   document.addEventListener("keyup", onKeyUp);
+  document.addEventListener("paste", onPaste);
 
   // Размер поля известен только в документе — вид считаем после вставки.
   setTimeout(() => {

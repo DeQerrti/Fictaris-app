@@ -1,4 +1,4 @@
-<!-- fictaris-guide v9 – файл создан приложением Fictaris и обновляется им. Чтобы оставить свою версию, удалите эту строку. -->
+<!-- fictaris-guide v10 – файл создан приложением Fictaris и обновляется им. Чтобы оставить свою версию, удалите эту строку. -->
 # Проект Fictaris – как править файлы
 
 Эта папка – проект писательского приложения Fictaris: персонажи, локации, главы рукописи и т.д., по одному JSON-файлу на раздел. Файлы можно править напрямую – открытое приложение заметит изменение и перечитает данные. Если в приложении в этот момент есть несохранённые правки, оно спросит, чью версию оставить.
@@ -68,13 +68,14 @@
 ```
 { "order": ["<canvasId>", ...], "canvases": { "<id>": { "id", "name", "style"?, "cards": [...], "edges": [...], "groups": [...], "shapes": [...] } } }
 ```
-Карточка: `id`, `x`, `y`, `w`, `h` (пиксели), `title`, `text`, `chapterId` (глава или `null`), `color` (`#rrggbb` или `null`). Стрелка: `id`, `fromId`, `toId` (id карточек того же холста), `label`; приложение само ведёт её от ближайших краёв карточек. Группа – рамка на холсте: `id`, `x`, `y`, `w`, `h`, `title`, `color` (`#rrggbb` или `null`); карточки, чей центр внутри рамки, двигаются вместе с ней (сама рамка ссылок на карточки не хранит).
+Карточка: `id`, `x`, `y`, `w`, `h` (пиксели), `title`, `text`, `chapterId` (глава или `null`), `color` (`#rrggbb` или `null`). Карточка из мира – с `entity: { type: "character" | "location" | "faction" | "chapter", id }`: имя и подпись берутся у этой записи, `text` – заметка к ней на холсте. Стрелка: `id`, `fromId`, `toId` (id карточек того же холста), `label`; приложение само ведёт её от ближайших краёв карточек. Группа – рамка на холсте: `id`, `x`, `y`, `w`, `h`, `title`, `color` (`#rrggbb` или `null`); карточки, чей центр внутри рамки, двигаются вместе с ней (сама рамка ссылок на карточки не хранит).
 
 `style: "hand"` – холст «от руки» (контуры пером, рукописный шрифт); нет поля – аккуратный. Фигура (`shapes[]`) – рисунок поверх карточек, в пикселях холста:
 - `{ id, kind: "rect" | "diamond" | "ellipse", x, y, w, h }` – фигура; `fill` (`#rrggbb`) и `fillStyle` (`"cross"`, `"solid"` или нет поля – штрих) – заливка;
 - `{ id, kind: "line" | "arrow", points: [[x, y], [x, y]] }` – линия или стрелка;
 - `{ id, kind: "pen", points: [[x, y], ...] }` – карандаш;
 - `{ id, kind: "text", x, y, text, fontSize?, font?: "hand" | "ui" | "book" }` – надпись (`x`, `y` – левый верхний угол).
+- `{ id, kind: "image", src: "maps/...", x, y, w, h }` – картинка (файл в `maps/`, как у карт).
 У всех, кроме надписи, необязательные `stroke` (`#rrggbb`, нет поля – цвет текста), `strokeWidth` (1, 2, 4) и `roughness` (0 ровно, 1 от руки, 2 набросок – только для холста «от руки»).
 
 ### map.json – карты
@@ -101,7 +102,7 @@
 ## Что ссылается на что
 
 Удаляя или объединяя запись, почистите ссылки:
-- **персонаж** – `characters[].parentIds/adoptiveParentIds/uncertainParentIds/partnerIds`, ключи `partnerKinds`, `manuscript.chapters[].characterIds`, `relationships[].charA/charB` (связь удалить целиком), `factions[].leaderId/memberIds`, `timeline[].characterIds`, `board` → `cards[].characterIds`, `map` → `pins[].characterId`, ключи `knowledge.facts[].entries`, упоминания `@Имя` в тексте глав. **Переименование персонажа ломает упоминания** – замените `@Старое имя` в `content` глав.
-- **локация** – `locations[].parentId`, `manuscript.chapters[].locationIds`, `factions[].headquartersId`, `timeline[].locationIds`, карточки досок, метки карт.
-- **фракция** – ключи `factions[].relations` других фракций, карточки досок (`factionId`), границы на картах `map` → `drawing.shapes[].factionId`.
-- **глава** – `canvas` → `cards[].chapterId`, карточки досок (`chapterId`), значения `knowledge.facts[].entries`, `manuscript.activeChapterId`.
+- **персонаж** – карточки холстов `canvas` → `cards[].entity` (карточку удалить или оставить – приложение покажет её как «Удалено из мира»), `characters[].parentIds/adoptiveParentIds/uncertainParentIds/partnerIds`, ключи `partnerKinds`, `manuscript.chapters[].characterIds`, `relationships[].charA/charB` (связь удалить целиком), `factions[].leaderId/memberIds`, `timeline[].characterIds`, `board` → `cards[].characterIds`, `map` → `pins[].characterId`, ключи `knowledge.facts[].entries`, упоминания `@Имя` в тексте глав. **Переименование персонажа ломает упоминания** – замените `@Старое имя` в `content` глав.
+- **локация** – карточки холстов `canvas` → `cards[].entity` (карточку удалить или оставить – приложение покажет её как «Удалено из мира»), `locations[].parentId`, `manuscript.chapters[].locationIds`, `factions[].headquartersId`, `timeline[].locationIds`, карточки досок, метки карт.
+- **фракция** – карточки холстов `canvas` → `cards[].entity` (карточку удалить или оставить – приложение покажет её как «Удалено из мира»), ключи `factions[].relations` других фракций, карточки досок (`factionId`), границы на картах `map` → `drawing.shapes[].factionId`.
+- **глава** – `canvas` → `cards[].chapterId` и `cards[].entity`, карточки досок (`chapterId`), значения `knowledge.facts[].entries`, `manuscript.activeChapterId`.

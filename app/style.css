@@ -3916,6 +3916,8 @@ button.cboard-chip:hover { color: var(--accent-hover); }
 
 .cboard-stage.drawing, .cboard-stage.drawing * { cursor: crosshair !important; }
 .cboard-shapes { z-index: 1; }
+.cboard-image { position: absolute; cursor: move; }
+.cboard-image img { display: block; width: 100%; height: 100%; border-radius: 4px; pointer-events: none; }
 .cboard-shape-hit { fill: none; stroke: transparent; stroke-width: 14; pointer-events: stroke; cursor: move; }
 .cboard-shape-hit.filled { fill: transparent; pointer-events: all; }
 .cboard-shape-sel { fill: none; stroke: #8fb4ff; stroke-width: 1.2; stroke-dasharray: 4 3; pointer-events: none; }
@@ -3929,6 +3931,33 @@ button.cboard-chip:hover { color: var(--accent-hover); }
 .cboard-card-sketch { fill: none; stroke: var(--text-dim); stroke-width: 1.7; stroke-linecap: round; }
 .hand-style .cboard-edge { stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .hand-style .cboard-edge-label { border: none; background: none; font-family: Caveat, "Segoe Print", cursive; font-size: 1.1rem; color: var(--text-dim); }
+
+.cboard-card.entity { border-top-width: 1px; border-left: 3px solid var(--card-color, var(--accent)); gap: 8px; }
+.cboard-entity-head { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.cboard-entity-head > div { flex: 1; min-width: 0; }
+.cboard-entity-head small { display: block; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-faint); }
+.cboard-entity-head b { display: block; font-family: var(--font-book); font-size: 1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cboard-entity-head span:not(.cast-avatar) { display: block; font-size: 0.76rem; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cboard-chapter-lead { background: var(--panel-alt); color: var(--accent); border: 1px solid var(--border); }
+.cboard-entity-open { flex-shrink: 0; display: flex; padding: 6px; border: none; border-radius: 6px; background: none; color: var(--text-faint); cursor: pointer; }
+.cboard-entity-open:hover { background: var(--panel-alt); color: var(--accent); }
+.cboard-card.entity.hand .cboard-entity-head b { font-family: Caveat, "Segoe Print", cursive; font-size: 1.35rem; }
+.cboard-entity-name { margin-bottom: 4px; font-family: var(--font-book); font-size: 1.1rem; font-weight: 600; }
+
+.context-menu.cboard-picker-menu { padding: 10px; width: 300px; }
+.cboard-picker { display: flex; flex-direction: column; gap: 8px; }
+.cboard-picker .characters-search { width: 100%; }
+.cboard-picker-list { max-height: 320px; overflow-y: auto; }
+.cboard-picker-list .dossier-link-row { margin: 0; }
+.cboard-picker-list .dossier-link-row small { max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.cboard-minimap { position: absolute; right: 16px; bottom: 16px; width: 180px; height: 120px; border: 1px solid var(--border); border-radius: 8px; background: color-mix(in srgb, var(--panel) 92%, transparent); overflow: hidden; cursor: pointer; }
+.cboard-minimap svg { display: block; }
+.cboard-minimap .c { fill: var(--text-faint); opacity: 0.7; }
+.cboard-minimap .s { fill: none; stroke: var(--text-faint); stroke-width: 1; }
+.cboard-minimap .g { fill: none; stroke: var(--accent); stroke-dasharray: 2 2; opacity: 0.6; }
+.cboard-minimap .v { fill: rgba(201, 148, 74, 0.1); stroke: var(--accent); stroke-width: 1.5; }
+.cboard-stage.exporting .cboard-bar, .cboard-stage.exporting .cboard-side, .cboard-stage.exporting .cboard-minimap, .cboard-stage.exporting .cboard-hint { display: none !important; }
 
 .cboard-bar { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); display: flex; align-items: center; gap: 2px; padding: 4px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4); }
 .cboard-tool, .cboard-action { display: flex; align-items: center; justify-content: center; min-width: 34px; height: 34px; padding: 0 10px; border: none; border-radius: 7px; background: none; color: var(--text-dim); font-family: var(--font-ui); font-size: 0.84rem; cursor: pointer; white-space: nowrap; }
@@ -3952,6 +3981,7 @@ button.cboard-chip:hover { color: var(--accent-hover); }
 .cboard-delete { display: inline-flex; align-items: center; gap: 6px; margin-top: 16px; }
 
 @container (max-width: 700px) {
+  .cboard-minimap { display: none; }
   .cboard-side { left: 8px; right: 8px; top: auto; bottom: 64px; width: auto; max-height: 45%; }
   .cboard-hint { display: none; }
 }
