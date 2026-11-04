@@ -558,15 +558,6 @@ body.focus-mode .sidebar { display: none; }
   min-width: 260px;
 }
 
-/* Попап «Привязать к главе…» (canvas.js, openChapterPopover) — просто
-   подпись и выпадающий список глав, той же плавающей карточкой. */
-.context-menu.canvas-chapter-popover-menu {
-  padding: 12px;
-  min-width: 220px;
-}
-.canvas-chapter-popover { display: flex; flex-direction: column; gap: 8px; }
-.canvas-chapter-popover-title { font-weight: 600; color: var(--text); font-size: 0.85rem; }
-
 /* Попап «Отметить как известный факт…» (ПКМ по тексту главы,
    manuscript.js) — короткий путь к тому же, что и вкладка «Знания»,
    теперь модалка. */
@@ -1240,7 +1231,8 @@ button.btn.icon-btn.gallery-nav:hover { background: rgba(0, 0, 0, 0.6); }
   padding: 12px;
   box-sizing: border-box;
 }
-.canvas-thumb-edges line { stroke: var(--text-dim); stroke-width: 12; }
+.canvas-thumb-edges path { fill: none; stroke: var(--text-dim); stroke-width: 12; }
+.canvas-thumb-groups rect { fill: none; stroke: var(--accent); stroke-width: 6; stroke-dasharray: 24 18; opacity: 0.6; }
 .canvas-thumb-cards rect { stroke: var(--border); stroke-width: 4; }
 
 .map-home-card .board-column-del {
@@ -3848,190 +3840,105 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
 
 .kin-kind-select { min-height: 26px; padding: 0 6px; border-radius: 6px; border: 1px solid var(--border); background: var(--panel-alt); color: var(--text); font-family: inherit; font-size: 0.76rem; }
 
-/* ── Холст (app/js/canvas.js) ──────────────────
-   Свободные текстовые карточки на панорамируемом/масштабируемом поле —
-   по духу Obsidian Canvas. viewport — обычный div с CSS transform
-   (translate+scale), а не SVG-группа, как у графов: карточкам нужен
-   живой <textarea>. */
-.canvas-view-wrap {
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-  padding: 16px 20px 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.canvas-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-
-.canvas-name-input {
-  background: none;
-  border: none;
-  border-bottom: 1px solid var(--border);
-  color: var(--text);
-  font-family: var(--font-ui);
-  font-size: 1rem;
-  padding: 4px 2px;
-  min-width: 160px;
-}
-
-.canvas-holder {
-  flex: 1;
-  min-height: 0;
+/* ── Холст (canvas-board.js) ──────────────────
+   Поле с точками; карточки — HTML (живой текст), стрелки и рамки групп —
+   SVG под ними. Мир сдвигается и масштабируется transform'ом. */
+.cboard-name { min-width: 120px; max-width: 360px; padding: 2px 6px; border: 1px solid transparent; border-radius: 6px; background: none; color: var(--text); font-family: var(--font-book); font-size: 1.35rem; font-weight: 600; }
+.cboard-name:hover { border-color: var(--border); }
+.cboard-name:focus { outline: none; border-color: var(--accent); background: var(--panel-alt); }
+.cboard-stage {
   position: relative;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
-  cursor: grab;
+  background-color: var(--bg);
+  background-image: radial-gradient(circle, color-mix(in srgb, var(--text) 9%, transparent) 1px, transparent 1px);
+  background-size: 22px 22px;
   touch-action: none;
+  user-select: none;
 }
+.cboard-stage.hand, .cboard-stage.hand * { cursor: grab !important; }
+.cboard-stage.panning, .cboard-stage.panning * { cursor: grabbing !important; }
+.cboard-world { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+.cboard-svg { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; pointer-events: none; }
+.cboard-layer { position: absolute; left: 0; top: 0; }
+.cboard-marquee { position: absolute; border: 1px solid var(--accent); background: rgba(201, 148, 74, 0.08); pointer-events: none; }
 
-.canvas-holder.panning { cursor: grabbing; }
+.cboard-group { fill: color-mix(in srgb, var(--group-color) 6%, transparent); stroke: color-mix(in srgb, var(--group-color) 55%, transparent); stroke-width: 1.5; stroke-dasharray: 6 5; }
+.cboard-group.selected { stroke: var(--group-color); stroke-dasharray: none; stroke-width: 2; }
+.cboard-group-title { position: absolute; padding: 2px 10px; border-radius: 6px; background: var(--bg); color: var(--group-color); font-family: var(--font-ui); font-size: 0.82rem; font-weight: 600; white-space: nowrap; cursor: move; }
+.cboard-group-title.selected { box-shadow: 0 0 0 1.5px var(--group-color); }
 
-.canvas-viewport {
-  position: absolute;
-  left: 0;
-  top: 0;
-  transform-origin: 0 0;
-}
+.cboard-edge { fill: none; stroke: var(--accent); stroke-width: 2; }
+.cboard-edge.selected { stroke-width: 3.5; }
+.cboard-edge-ghost { stroke-dasharray: 6 5; opacity: 0.8; }
+.cboard-edge-hit { fill: none; stroke: transparent; stroke-width: 16; pointer-events: stroke; cursor: pointer; }
+.cboard-edge-label { position: absolute; transform: translate(-50%, -50%); max-width: 180px; padding: 2px 9px; border: 1px solid var(--border); border-radius: 11px; background: var(--panel); color: var(--text-dim); font-family: var(--font-ui); font-size: 0.76rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+.cboard-edge-label.selected { border-color: var(--accent); color: var(--text); }
 
-.canvas-edges-svg {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 1px;
-  height: 1px;
-  overflow: visible;
-  pointer-events: none;
-}
-
-/* ПКМ по связи (canvas.js, renderEdges) — подпись/удаление. Сама svg
-   держит pointer-events:none (не мешать панораме фона), здесь включаем
-   обратно только на самом ребре — .canvas-edge-hit шире видимой линии,
-   иначе попасть кликом в 2px линию мышью почти нереально. */
-.canvas-edge { pointer-events: none; }
-.canvas-edge-hit { pointer-events: stroke; cursor: context-menu; }
-.canvas-edge text { pointer-events: none; }
-
-.canvas-card-layer { position: absolute; left: 0; top: 0; }
-
-.canvas-card {
+.cboard-card {
   position: absolute;
   display: flex;
   flex-direction: column;
-  background: var(--panel-alt);
+  gap: 4px;
+  padding: 12px 14px;
   border: 1px solid var(--border);
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  overflow: hidden;
-  transition: box-shadow 0.3s, border-color 0.3s;
-}
-
-/* Переход из поиска на конкретную карточку (canvas.js, renderCanvas
-   focusCardId) — секундная подсветка вместо того, чтобы просто открыть
-   доску и оставить искать нужную карточку глазами. */
-.canvas-card-highlight {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(201, 148, 74, 0.35);
-}
-
-.canvas-card-head {
-  flex-shrink: 0;
-  padding: 4px 8px;
-  font-size: 0.7rem;
-  letter-spacing: 0.1em;
-  color: var(--text-faint);
-  cursor: grab;
-  user-select: none;
-  background: var(--panel);
-  border-bottom: 1px solid var(--border);
-}
-
-.canvas-card-head:active { cursor: grabbing; }
-
-/* Заголовок и привязка к главе — необязательные поля карточки (ПКМ →
-   «Заголовок…»/«Привязать к главе…», canvas.js), показываются только
-   когда заданы. То, что раньше отличало «Карту сюжета» от голого
-   «Холста» (см. шапку canvas.js) — теперь просто необязательная часть
-   одной и той же карточки. */
-.canvas-card-title {
-  flex-shrink: 0;
-  padding: 6px 8px 0;
-  font-weight: 600;
-  font-size: 0.85rem;
-  color: var(--text);
-}
-
-.canvas-card-chapter {
-  flex-shrink: 0;
-  align-self: flex-start;
-  margin: 4px 8px 0;
-  padding: 2px 8px;
+  border-top: 3px solid var(--card-color, var(--border));
   border-radius: 10px;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  color: var(--text-faint);
-  font-size: 0.72rem;
-  font-family: inherit;
+  background: var(--card);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+  font-family: var(--font-ui);
+  cursor: move;
 }
+.cboard-card.selected { outline: 2px solid var(--accent); outline-offset: 2px; }
+.cboard-card.drop-target { outline: 2px dashed var(--accent); outline-offset: 4px; }
+.cboard-card-title { font-family: var(--font-book); font-size: 1.02rem; font-weight: 600; line-height: 1.25; }
+.cboard-card-text { flex: 1; min-height: 0; overflow: hidden; font-size: 0.84rem; line-height: 1.45; color: var(--text-dim); white-space: pre-wrap; overflow-wrap: anywhere; }
+.cboard-card-text.empty { color: var(--placeholder); font-style: italic; }
+.cboard-card-title-input, .cboard-card-text-input { width: 100%; padding: 0; border: none; background: none; color: var(--text); font-family: inherit; cursor: text; user-select: text; }
+.cboard-card-title-input { font-family: var(--font-book); font-size: 1.02rem; font-weight: 600; }
+.cboard-card-text-input { flex: 1; min-height: 0; resize: none; font-size: 0.84rem; line-height: 1.45; color: var(--text-dim); }
+.cboard-card-title-input:focus, .cboard-card-text-input:focus { outline: none; }
+.cboard-chip { align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; max-width: 100%; padding: 2px 8px; border: none; border-radius: 10px; background: var(--panel-alt); color: var(--accent); font-family: var(--font-ui); font-size: 0.74rem; white-space: nowrap; overflow: hidden; }
+button.cboard-chip { cursor: pointer; }
+button.cboard-chip:hover { color: var(--accent-hover); }
 
-.canvas-card-chapter-link {
-  cursor: pointer;
-  color: var(--accent);
-  border-color: var(--accent);
+.cboard-port { position: absolute; width: 12px; height: 12px; border: 2px solid var(--bg); border-radius: 50%; background: var(--accent); opacity: 0; cursor: crosshair; transition: opacity 0.12s; }
+.cboard-card:hover .cboard-port, .cboard-card.selected .cboard-port { opacity: 1; }
+.cboard-port.top { top: -7px; left: calc(50% - 6px); }
+.cboard-port.bottom { bottom: -7px; left: calc(50% - 6px); }
+.cboard-port.left { left: -7px; top: calc(50% - 6px); }
+.cboard-port.right { right: -7px; top: calc(50% - 6px); }
+.cboard-resize { position: absolute; width: 14px; height: 14px; border: 2px solid var(--accent); border-radius: 3px; background: var(--bg); cursor: nwse-resize; display: none; }
+.cboard-card .cboard-resize { right: -7px; bottom: -7px; }
+.cboard-stage.single .cboard-card.selected .cboard-resize { display: block; }
+.cboard-stage.single-group .cboard-group-resize.selected { display: block; }
+
+.cboard-bar { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); display: flex; align-items: center; gap: 2px; padding: 4px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4); }
+.cboard-tool, .cboard-action { display: flex; align-items: center; justify-content: center; min-width: 34px; height: 34px; padding: 0 10px; border: none; border-radius: 7px; background: none; color: var(--text-dim); font-family: var(--font-ui); font-size: 0.84rem; cursor: pointer; white-space: nowrap; }
+.cboard-tool { padding: 0; }
+.cboard-tool:hover, .cboard-action:hover { background: var(--card); color: var(--text); }
+.cboard-tool.active { background: var(--accent); color: #14110d; }
+.cboard-action:disabled { opacity: 0.35; cursor: default; background: none; }
+.cboard-sep { width: 1px; height: 20px; margin: 0 4px; background: var(--border); }
+.cboard-zoom { min-width: 46px; text-align: center; font-size: 0.75rem; color: var(--text-faint); font-variant-numeric: tabular-nums; }
+.cboard-hint { top: 12px; bottom: auto; }
+
+.cboard-side { position: absolute; top: 14px; right: 14px; width: 280px; max-height: calc(100% - 100px); overflow-y: auto; padding: 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4); }
+.cboard-side .dossier-heading:not(:first-child) { margin-top: 18px; }
+.cboard-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+.cboard-field > span { font-size: 0.75rem; color: var(--text-faint); }
+.cboard-field .characters-search, .cboard-select { width: 100%; }
+.cboard-textarea { width: 100%; min-height: 60px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel-alt); color: var(--text); font-family: inherit; font-size: 0.85rem; line-height: 1.45; resize: none; overflow: hidden; }
+.cboard-textarea:focus { outline: none; border-color: var(--accent); }
+.cboard-colors { flex-wrap: wrap; margin: 0; }
+.cboard-wide, .cboard-delete { width: 100%; margin-top: 8px; justify-content: center; }
+.cboard-delete { display: inline-flex; align-items: center; gap: 6px; margin-top: 16px; }
+
+@container (max-width: 700px) {
+  .cboard-side { left: 8px; right: 8px; top: auto; bottom: 64px; width: auto; max-height: 45%; }
+  .cboard-hint { display: none; }
 }
-.canvas-card-chapter-link:hover { background: var(--panel-alt); }
-
-.canvas-card-text {
-  flex: 1;
-  resize: none;
-  background: none;
-  border: none;
-  color: var(--text-dim);
-  font-family: inherit;
-  font-size: 0.85rem;
-  padding: 8px;
-}
-
-.canvas-card-resize {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  width: 14px;
-  height: 14px;
-  cursor: nwse-resize;
-}
-
-.canvas-card-resize::after {
-  content: "";
-  position: absolute;
-  right: 3px;
-  bottom: 3px;
-  width: 6px;
-  height: 6px;
-  border-right: 2px solid var(--text-faint);
-  border-bottom: 2px solid var(--text-faint);
-}
-
-.canvas-connector {
-  position: absolute;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--accent);
-  opacity: 0;
-  transition: opacity 0.12s;
-  cursor: crosshair;
-}
-
-.canvas-card:hover .canvas-connector { opacity: 0.85; }
-
-.canvas-connector-n { top: -5px; left: calc(50% - 5px); }
-.canvas-connector-s { bottom: -5px; left: calc(50% - 5px); }
-.canvas-connector-e { right: -5px; top: calc(50% - 5px); }
-.canvas-connector-w { left: -5px; top: calc(50% - 5px); }
 
 /* ── Проверка согласованности ─────────────────── */
 
