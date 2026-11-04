@@ -1002,13 +1002,17 @@ button.fac-member { cursor: pointer; }
 button.fac-member:hover { border-color: var(--accent); }
 .fac-member em { font-style: normal; font-size: 0.72rem; color: var(--accent); }
 .fac-outside { margin-top: 28px; }
-.fac-tie { display: grid; grid-template-columns: 10px auto 1fr; column-gap: 8px; align-items: center; padding: 4px 0; font-size: 0.86rem; text-align: left; }
+.fac-tie { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: 0.86rem; }
 .fac-tie i { width: 8px; height: 8px; border-radius: 50%; background: var(--tie-color); }
 .fac-tie span { font-size: 0.8rem; color: var(--tie-color); }
-.fac-tie small { grid-column: 2 / -1; font-size: 0.75rem; color: var(--text-faint); }
-.fac-tie-link { width: 100%; padding: 6px; margin: 0 -6px; border: none; border-radius: 6px; background: none; color: var(--text); font-family: var(--font-ui); cursor: pointer; }
-.fac-tie-link:hover { background: var(--panel); }
-.fac-member-remove { display: flex; padding: 4px; border-radius: 4px; color: var(--text-faint); }
+.fac-relation-row { display: flex; align-items: center; gap: 6px; min-height: 34px; }
+.fac-relation-name { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; padding: 4px 6px; margin-left: -6px; border: none; border-radius: 6px; background: none; color: var(--text); font-family: var(--font-ui); font-size: 0.86rem; text-align: left; cursor: pointer; }
+.fac-relation-name:hover { background: var(--panel); }
+.fac-relation-name i { flex-shrink: 0; width: 8px; height: 8px; border-radius: 50%; background: var(--tie-color); }
+.fac-status-select { max-width: 140px; color: var(--tie-color); }
+.fac-status-input { width: 140px; min-height: 26px; padding: 0 8px; border: 1px solid var(--accent); border-radius: 6px; background: var(--panel-alt); color: var(--text); font-family: inherit; font-size: 0.8rem; }
+.fac-status-input:focus { outline: none; }
+.fac-member-remove { display: flex; padding: 4px; border: none; background: none; cursor: pointer; border-radius: 4px; color: var(--text-faint); }
 .fac-member-remove:hover { color: var(--color-3); background: var(--panel-alt); }
 .fac-member-add { width: 100%; margin-top: 8px; }
 

@@ -202,11 +202,11 @@ export async function buildDemoBundle() {
     { id: "demo-f-vieren", name: L("Дом Вирен", "House Viren"), type: "monarchy",
       description: L("Свергнутый правящий род, единственная законная наследница – Астра", "The deposed ruling house — its only legitimate heir is Astra"),
       notes: "", tags: L("изгнанники", "exiles"), leaderId: aster.id, headquartersId: fortress.id,
-      memberIds: [aster.id, kael.id] },
+      memberIds: [aster.id, kael.id], relations: { "demo-f-legion": "enemies" } },
     { id: "demo-f-legion", name: L("Легион Варна", "Varn's Legion"), type: "military",
       description: L("Военная сила, которой держится узурпация", "The military force propping up the usurpation"),
       notes: "", tags: L("антагонисты", "antagonists"), leaderId: varn.id, headquartersId: capital.id,
-      memberIds: [varn.id] },
+      memberIds: [varn.id], relations: { "demo-f-vieren": "enemies" } },
   ];
 
   const relationships = [

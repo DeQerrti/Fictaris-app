@@ -23,12 +23,18 @@ import {
 //  состав, отношения с другими фракциями; ниже — кто ни к кому не
 //  примкнул. «Досье» — список слева, страница фракции справа.
 //
-//  Отношения фракций нигде не хранятся — они выводятся из связей их
-//  людей (relationships.json): у Астры с Варном вражда −90, значит Дом
-//  Вирен и Легион Варна враждуют.
+//  Отношения фракций — relations: { [id другой фракции]: статус }, у
+//  обеих сторон одинаково (как пары у персонажей). Статус — "allies",
+//  "enemies", "neutral" или свой текст («вассалы», «торговый союз»).
 // ══════════════════════════════════════════════
 
 const MODE_KEY = "fictaris_factions_mode";
+const RELATION_STATUSES = [
+  ["allies", "Союзники", "var(--color-8)"],
+  ["enemies", "Враждуют", "var(--color-3)"],
+  ["neutral", "Нейтрально", "var(--text-faint)"],
+];
+const CUSTOM_STATUS = "__custom__";
 const MODES = [
   ["overview", "Расклад сил", "Все фракции рядом"],
   ["dossier", "Досье", "Список слева, страница фракции справа"],
@@ -37,7 +43,6 @@ const MODES = [
 let factions = [];
 let characters = [];
 let locations = [];
-let relationships = [];
 let timeline = [];
 let tagsMap = {};
 let templates = [];
@@ -98,11 +103,10 @@ function blank(templateId) {
 export async function renderFactions(root, focusId) {
   container = root;
   inModal = root.classList.contains("entity-modal-body");
-  [factions, characters, locations, relationships, timeline, tagsMap, templates] = await Promise.all([
+  [factions, characters, locations, timeline, tagsMap, templates] = await Promise.all([
     apiGet("/api/factions"),
     apiGet("/api/characters"),
     apiGet("/api/locations"),
-    apiGet("/api/relationships"),
     apiGet("/api/timeline"),
     loadTagsMap(),
     loadTemplates("factions"),
@@ -128,35 +132,43 @@ function charById(id) {
   return characters.find((c) => c.id === id) || null;
 }
 
-// Отношения с другими фракциями — среднее по связям между их людьми.
-function tiesOf(f) {
-  const mine = new Set(memberIdsOf(f));
-  const ties = [];
-  for (const g of factions) {
-    if (g.id === f.id) continue;
-    const theirs = new Set(memberIdsOf(g));
-    const rels = relationships.filter((r) =>
-      (mine.has(r.charA) && theirs.has(r.charB)) || (mine.has(r.charB) && theirs.has(r.charA)));
-    if (!rels.length) continue;
-    const score = Math.round(rels.reduce((sum, r) => sum + (r.score || 0), 0) / rels.length);
-    ties.push({ faction: g, score, rels });
+function relationsOf(f) {
+  return Object.entries(f.relations || {})
+    .map(([id, status]) => ({ faction: factions.find((g) => g.id === id), status }))
+    .filter((x) => x.faction && x.status);
+}
+
+// Ставит статус обеим сторонам сразу; пустой — убирает отношение.
+function setRelation(a, b, status) {
+  for (const [x, y] of [[a, b], [b, a]]) {
+    if (status) {
+      x.relations = { ...(x.relations || {}), [y.id]: status };
+    } else if (x.relations) {
+      delete x.relations[y.id];
+      if (!Object.keys(x.relations).length) delete x.relations;
+    }
   }
-  return ties.sort((a, b) => a.score - b.score);
 }
 
-function tieWord(score) {
-  return i18n(score <= -30 ? "враждуют" : score >= 30 ? "союзники" : "нейтралитет");
+function statusLabel(status) {
+  const preset = RELATION_STATUSES.find(([key]) => key === status);
+  return preset ? i18n(preset[1]) : status;
 }
 
-function tieColor(score) {
-  return score <= -30 ? "var(--color-3)" : score >= 30 ? "var(--color-8)" : "var(--text-faint)";
+function statusColor(status) {
+  return RELATION_STATUSES.find(([key]) => key === status)?.[2] || "var(--accent)";
 }
 
-function tieDetail(rels) {
-  return rels.map((r) => {
-    const label = `${shortName(charById(r.charA)?.name)} – ${shortName(charById(r.charB)?.name)}`;
-    return r.label ? `${label}: ${r.label}` : label;
-  }).join("; ");
+// Свои статусы, уже заведённые где-нибудь в мире, — в выпадающем
+// списке рядом со стандартными, чтобы не набирать их заново.
+function customStatuses() {
+  const set = new Set();
+  for (const f of factions) {
+    for (const status of Object.values(f.relations || {})) {
+      if (status && !RELATION_STATUSES.some(([key]) => key === status)) set.add(status);
+    }
+  }
+  return [...set];
 }
 
 // События фракции: с участием её людей или в её штаб-квартире.
@@ -191,11 +203,10 @@ function blurb(f) {
   return field ? f[field.key] : "";
 }
 
-function tiesHtml(ties) {
-  return ties.map((t) => `
-    <div class="fac-tie" style="--tie-color:${tieColor(t.score)}">
-      <i></i><b>${escapeHtml(t.faction.name || i18n("Без названия"))}</b><span>${escapeHtml(tieWord(t.score))}</span>
-      <small>${escapeHtml(tieDetail(t.rels))}</small>
+function relationsHtml(list) {
+  return list.map(({ faction, status }) => `
+    <div class="fac-tie" style="--tie-color:${statusColor(status)}">
+      <i></i><b>${escapeHtml(faction.name || i18n("Без названия"))}</b><span>${escapeHtml(statusLabel(status))}</span>
     </div>
   `).join("");
 }
@@ -319,7 +330,7 @@ function buildCard(f) {
   const color = factionTypeInfo(f.type)[3];
   const leader = charById(f.leaderId);
   const members = memberIdsOf(f).map(charById).filter(Boolean);
-  const ties = tiesOf(f);
+  const relations = relationsOf(f);
   const text = blurb(f);
   const events = eventsOf(f);
   const card = document.createElement("button");
@@ -339,7 +350,7 @@ function buildCard(f) {
       : `<div class="fac-leader empty">${escapeHtml(i18n("Глава не назначен"))}</div>`}
     <div class="fac-label">${escapeHtml(i18n("Состав · {n}", { n: members.length }))}</div>
     <div class="fac-members">${members.map((c) => `<span class="fac-member">${personAvatarHtml(c)}${escapeHtml(shortName(c.name))}${c.id === f.leaderId ? `<em>${escapeHtml(i18n("глава"))}</em>` : ""}</span>`).join("") || `<span class="dossier-none">${escapeHtml(i18n("Никого"))}</span>`}</div>
-    ${ties.length ? `<div class="fac-label">${escapeHtml(i18n("Отношения"))}</div>${tiesHtml(ties)}` : ""}
+    ${relations.length ? `<div class="fac-label">${escapeHtml(i18n("Отношения"))}</div>${relationsHtml(relations)}` : ""}
     <div class="cast-card-foot">
       <div class="cast-tags">${parseTags(f.tags).map((t) => `<span class="cast-tag">${escapeHtml(t)}</span>`).join("")}</div>
       <div class="cast-stat">${escapeHtml(events.length ? i18nPlural(events.length, ["{n} событие", "{n} события", "{n} событий"]) : i18n("в сюжете не встречается"))}</div>
@@ -416,6 +427,7 @@ function buildPage(f) {
   delBtn.addEventListener("click", async () => {
     await pushTrash("faction", f);
     factions = factions.filter((x) => x.id !== f.id);
+    for (const g of factions) setRelation(g, f, null);
     activeId = null;
     persist();
     if (inModal) closeEntityModal();
@@ -479,16 +491,7 @@ function buildPage(f) {
   side.appendChild(buildMembers(f));
 
   side.appendChild(sectionHeading(i18n("Отношения с фракциями")));
-  const ties = tiesOf(f);
-  for (const t of ties) {
-    const row = document.createElement("button");
-    row.className = "fac-tie fac-tie-link";
-    row.style.setProperty("--tie-color", tieColor(t.score));
-    row.innerHTML = `<i></i><b>${escapeHtml(t.faction.name || i18n("Без названия"))}</b><span>${escapeHtml(tieWord(t.score))}</span><small>${escapeHtml(i18n("по связям: {list}", { list: tieDetail(t.rels) }))}</small>`;
-    row.addEventListener("click", () => selectFaction(t.faction.id));
-    side.appendChild(row);
-  }
-  if (!ties.length) side.appendChild(buildNone(i18n("Не видно по связям её людей")));
+  side.appendChild(buildRelations(f));
 
   side.appendChild(sectionHeading(i18n("Владения")));
   const hq = locations.find((l) => l.id === f.headquartersId);
@@ -539,4 +542,79 @@ function buildMembers(f) {
     wrap.appendChild(add);
   }
   return wrap;
+}
+
+// Отношения с другими фракциями: у каждой — статус из списка или свой;
+// ниже — с кем ещё завести отношение.
+function buildRelations(f) {
+  const wrap = document.createElement("div");
+  wrap.className = "fac-relations";
+  const update = (g, status) => {
+    setRelation(f, g, status);
+    persist();
+    draw();
+  };
+  for (const { faction: g, status } of relationsOf(f)) {
+    const row = document.createElement("div");
+    row.className = "fac-relation-row";
+    row.style.setProperty("--tie-color", statusColor(status));
+    const name = document.createElement("button");
+    name.className = "fac-relation-name";
+    name.innerHTML = `<i></i>${escapeHtml(g.name || i18n("Без названия"))}`;
+    name.addEventListener("click", () => selectFaction(g.id));
+    const remove = document.createElement("button");
+    remove.className = "fac-member-remove";
+    remove.title = i18n("Убрать отношение");
+    remove.innerHTML = iconSvg("close", 12);
+    remove.addEventListener("click", () => update(g, null));
+    row.append(name, buildStatusControl(status, (value) => update(g, value)), remove);
+    wrap.appendChild(row);
+  }
+  const taken = new Set(Object.keys(f.relations || {}));
+  const others = factions.filter((g) => g.id !== f.id && !taken.has(g.id));
+  if (others.length) {
+    const add = buildSelect([["", "+ Отношение с фракцией…"], ...others.map((g) => [g.id, g.name || i18n("Без названия")])], "", (id) => {
+      const g = factions.find((x) => x.id === id);
+      if (g) update(g, "neutral");
+    }, "fac-member-add");
+    wrap.appendChild(add);
+  } else if (factions.length < 2) {
+    wrap.appendChild(buildNone(i18n("Других фракций пока нет")));
+  }
+  return wrap;
+}
+
+// Статус: стандартные, свои уже заведённые и «Свой статус…» — тогда
+// вместо списка поле ввода; Enter или уход из поля сохраняет, Esc — отмена.
+function buildStatusControl(value, onChange) {
+  const options = [
+    ...RELATION_STATUSES.map(([key, label]) => [key, label]),
+    ...customStatuses().map((status) => [status, status]),
+    [CUSTOM_STATUS, "Свой статус…"],
+  ];
+  const select = buildSelect(options, value, (picked) => {
+    if (picked !== CUSTOM_STATUS) {
+      onChange(picked);
+      return;
+    }
+    const input = document.createElement("input");
+    input.className = "fac-status-input";
+    input.placeholder = i18n("Например: вассалы");
+    select.replaceWith(input);
+    input.focus();
+    let done = false;
+    const finish = (keep) => {
+      if (done) return;
+      done = true;
+      const text = input.value.trim();
+      if (keep && text) onChange(text);
+      else draw();
+    };
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") finish(true);
+      if (e.key === "Escape") finish(false);
+    });
+    input.addEventListener("blur", () => finish(true));
+  }, "kin-kind-select fac-status-select");
+  return select;
 }

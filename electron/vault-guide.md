@@ -1,4 +1,4 @@
-<!-- fictaris-guide v4 – файл создан приложением Fictaris и обновляется им. Чтобы оставить свою версию, удалите эту строку. -->
+<!-- fictaris-guide v5 – файл создан приложением Fictaris и обновляется им. Чтобы оставить свою версию, удалите эту строку. -->
 # Проект Fictaris – как править файлы
 
 Эта папка – проект писательского приложения Fictaris: персонажи, локации, главы рукописи и т.д., по одному JSON-файлу на раздел. Файлы можно править напрямую – открытое приложение заметит изменение и перечитает данные. Если в приложении в этот момент есть несохранённые правки, оно спросит, чью версию оставить.
@@ -34,6 +34,7 @@
 
 ### factions.json – фракции
 Массив. `id`, `name`, `type` (`order` | `monarchy` | `cult` | `military` | `syndicate` | `other`), `description`, `notes`, `tags`, `leaderId` (персонаж или `null`), `headquartersId` (локация или `null`), `memberIds: string[]` (персонажи), `templateId`, `images`.
+- `relations: { [id другой фракции]: статус }` – отношения с другими фракциями. Статус – `"allies"` (союзники), `"enemies"` (враждуют), `"neutral"` (нейтрально) или свой текст («вассалы»). **Симметрично**: у обеих фракций одинаковый статус друг о друге. Нет записи – отношение не задано.
 
 ### relationships.json – связи между персонажами
 Массив. `id`, `charA`, `charB` (id персонажей), `label` – как назвать связь («наставник»), `score` – число от −100 (вражда) до 100 (близость), `note`.
@@ -86,5 +87,5 @@
 Удаляя или объединяя запись, почистите ссылки:
 - **персонаж** – `characters[].parentIds/adoptiveParentIds/uncertainParentIds/partnerIds`, ключи `partnerKinds`, `manuscript.chapters[].characterIds`, `relationships[].charA/charB` (связь удалить целиком), `factions[].leaderId/memberIds`, `timeline[].characterIds`, `board` → `cards[].characterIds`, `map` → `pins[].characterId`, ключи `knowledge.facts[].entries`, упоминания `@Имя` в тексте глав. **Переименование персонажа ломает упоминания** – замените `@Старое имя` в `content` глав.
 - **локация** – `locations[].parentId`, `manuscript.chapters[].locationIds`, `factions[].headquartersId`, `timeline[].locationIds`, карточки досок, метки карт.
-- **фракция** – карточки досок (`factionId`).
+- **фракция** – ключи `factions[].relations` других фракций, карточки досок (`factionId`).
 - **глава** – `canvas` → `cards[].chapterId`, карточки досок (`chapterId`), значения `knowledge.facts[].entries`, `manuscript.activeChapterId`.
