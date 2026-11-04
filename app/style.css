@@ -3202,6 +3202,9 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
 .map-prop .characters-search, .map-prop select { width: 100%; }
 .map-tips { margin: 0 0 12px; padding-left: 18px; display: flex; flex-direction: column; gap: 8px; font-size: 0.84rem; line-height: 1.45; color: var(--text-dim); }
 .map-undo, .map-redo { min-width: 36px; justify-content: center; }
+.map-colors { flex-wrap: wrap; margin: 0; }
+.map-side .segmented { flex-wrap: wrap; }
+.map-underlay { margin-top: 12px; }
 
 /* «Все карты»: миниатюра нарисованной карты и две кнопки добавления. */
 .map-card-drawing { width: 100%; height: 100%; }

@@ -390,7 +390,7 @@ function buildOverview() {
 // рисунок поверх картинки. У одного рисунка размер задаёт aspect-ratio.
 function mapBaseHtml(map) {
   const img = map.imageRelPath ? `<img src="/${map.imageRelPath}" alt="">` : "";
-  const drawing = map.drawing ? `<div class="loc-drawing">${drawingSvg(map.drawing, { withSea: !map.imageRelPath })}</div>` : "";
+  const drawing = map.drawing ? `<div class="loc-drawing">${drawingSvg(map.drawing, { withSea: !map.imageRelPath, factions })}</div>` : "";
   return img + drawing;
 }
 

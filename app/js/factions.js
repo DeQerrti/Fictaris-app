@@ -44,6 +44,7 @@ let factions = [];
 let characters = [];
 let locations = [];
 let timeline = [];
+let mapData = { maps: {} };
 let tagsMap = {};
 let templates = [];
 let activeId = null;
@@ -103,11 +104,12 @@ function blank(templateId) {
 export async function renderFactions(root, focusId) {
   container = root;
   inModal = root.classList.contains("entity-modal-body");
-  [factions, characters, locations, timeline, tagsMap, templates] = await Promise.all([
+  [factions, characters, locations, timeline, mapData, tagsMap, templates] = await Promise.all([
     apiGet("/api/factions"),
     apiGet("/api/characters"),
     apiGet("/api/locations"),
     apiGet("/api/timeline"),
+    apiGet("/api/map"),
     loadTagsMap(),
     loadTemplates("factions"),
   ]);
@@ -428,6 +430,18 @@ function buildPage(f) {
     await pushTrash("faction", f);
     factions = factions.filter((x) => x.id !== f.id);
     for (const g of factions) setRelation(g, f, null);
+    // Границы фракции на картах остаются, но без привязки к ней.
+    let mapChanged = false;
+    for (const m of Object.values(mapData.maps || {})) {
+      for (const shape of m.drawing?.shapes || []) {
+        if (shape.factionId === f.id) {
+          delete shape.factionId;
+          if (!shape.name) shape.name = f.name;
+          mapChanged = true;
+        }
+      }
+    }
+    if (mapChanged) await apiPost("/api/map", mapData);
     activeId = null;
     persist();
     if (inModal) closeEntityModal();
@@ -497,7 +511,14 @@ function buildPage(f) {
   const hq = locations.find((l) => l.id === f.headquartersId);
   if (hq) {
     side.appendChild(buildLinkRow(iconLead(iconSvg(locationTypeInfo(hq.type)[2], 13)), hq.name || i18n("Без имени"), i18n("штаб-квартира"), () => openEntity("location", hq.id)));
-  } else side.appendChild(buildNone(i18n("Штаб-квартира не указана")));
+  }
+  // Земли на картах — границы областей, привязанные к фракции (map-draw.js).
+  const lands = Object.values(mapData.maps || {})
+    .filter((m) => (m.drawing?.shapes || []).some((x) => x.kind === "border" && x.factionId === f.id));
+  for (const m of lands) {
+    side.appendChild(buildLinkRow(iconLead(iconSvg("map", 13)), m.name || i18n("Без названия"), i18n("граница на карте")));
+  }
+  if (!hq && !lands.length) side.appendChild(buildNone(i18n("Ни штаб-квартиры, ни земель на картах")));
 
   cols.append(main, side);
   page.appendChild(cols);

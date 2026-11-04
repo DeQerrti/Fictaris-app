@@ -1,4 +1,4 @@
-<!-- fictaris-guide v6 – файл создан приложением Fictaris и обновляется им. Чтобы оставить свою версию, удалите эту строку. -->
+<!-- fictaris-guide v7 – файл создан приложением Fictaris и обновляется им. Чтобы оставить свою версию, удалите эту строку. -->
 # Проект Fictaris – как править файлы
 
 Эта папка – проект писательского приложения Fictaris: персонажи, локации, главы рукописи и т.д., по одному JSON-файлу на раздел. Файлы можно править напрямую – открытое приложение заметит изменение и перечитает данные. Если в приложении в этот момент есть несохранённые правки, оно спросит, чью версию оставить.
@@ -76,11 +76,12 @@
 ```
 Основа карты – загруженная картинка `imageRelPath`, нарисованная в приложении `drawing` или обе (рисунок поверх картинки).
 
-`drawing`: `{ "width", "height", "shapes": [...] }` – холст в пикселях, фигуры рисуются по порядку массива (позже – выше). Координаты фигур – пиксели холста:
+`drawing`: `{ "width", "height", "style"?, "underlay"?, "shapes": [...] }` – холст в пикселях. `style` – оформление: `"atlas"`, `"ink"` или нет поля (пергамент). `underlay` – прозрачность загруженной картинки под рисунком, 0–1 (нет поля – 1). Фигуры рисуются по порядку массива (позже – выше), но границы всегда под значками и надписями. Координаты фигур – пиксели холста:
 - `{ id, kind: "land" | "water", points: [[x, y], ...] }` – замкнутый контур суши или воды (вода поверх суши – озеро, залив);
 - `{ id, kind: "river" | "road", points: [[x, y], ...], width? }` – линия;
 - `{ id, kind: "stamp", icon: "mountain" | "forest" | "city" | "castle" | "village", x, y, size? }` – значок;
 - `{ id, kind: "label", text, style: "place" | "region" | "sea" | "title", x, y, size? }` – надпись.
+- `{ id, kind: "border", points: [[x, y], ...], color: "#rrggbb", factionId?, name?, fill?, line? }` – граница области: замкнутый контур. `factionId` – фракция из `factions.json` (подпись берётся у неё, если нет `name`), `fill` – непрозрачность заливки 0–1 (по умолчанию 0.12), `line: "solid"` – сплошная линия (нет поля – пунктир).
 
 Метка: `id`, `x`, `y` – **проценты** (0–100) от ширины/высоты карты (картинки или холста рисунка), `label`, `note`, `characterId`, `locationId`, `linkedMapId` (переход на вложенную карту из `maps`) – id или `null`. `rootIds` – карты верхнего уровня.
 
@@ -95,5 +96,5 @@
 Удаляя или объединяя запись, почистите ссылки:
 - **персонаж** – `characters[].parentIds/adoptiveParentIds/uncertainParentIds/partnerIds`, ключи `partnerKinds`, `manuscript.chapters[].characterIds`, `relationships[].charA/charB` (связь удалить целиком), `factions[].leaderId/memberIds`, `timeline[].characterIds`, `board` → `cards[].characterIds`, `map` → `pins[].characterId`, ключи `knowledge.facts[].entries`, упоминания `@Имя` в тексте глав. **Переименование персонажа ломает упоминания** – замените `@Старое имя` в `content` глав.
 - **локация** – `locations[].parentId`, `manuscript.chapters[].locationIds`, `factions[].headquartersId`, `timeline[].locationIds`, карточки досок, метки карт.
-- **фракция** – ключи `factions[].relations` других фракций, карточки досок (`factionId`).
+- **фракция** – ключи `factions[].relations` других фракций, карточки досок (`factionId`), границы на картах `map` → `drawing.shapes[].factionId`.
 - **глава** – `canvas` → `cards[].chapterId`, карточки досок (`chapterId`), значения `knowledge.facts[].entries`, `manuscript.activeChapterId`.

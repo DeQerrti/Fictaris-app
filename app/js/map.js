@@ -6,7 +6,7 @@ import { prepareMapImage } from "./image-compress.js";
 import { exportElementAsPng } from "./png-export.js";
 import { i18n, i18nPlural } from "./i18n.js";
 import { readPref, writePref, buildSegmented, buildSelect, sectionHeading, buildNone, buildLinkRow, openEntity, personAvatarHtml } from "./entity-view.js";
-import { DRAW_TOOLS, LABEL_STYLES, blankDrawing, drawingSvg, attachWorkshop, toolIcon } from "./map-draw.js";
+import { DRAW_TOOLS, LABEL_STYLES, MAP_STYLES, DRAW_LAYERS, BORDER_COLORS, blankDrawing, drawingSvg, attachWorkshop, toolIcon, borderInfo, shapeLayer } from "./map-draw.js";
 
 // ══════════════════════════════════════════════
 //  КАРТА
@@ -73,6 +73,22 @@ function readLayers() {
   }
 }
 let layers = readLayers();
+
+// Слои рисунка (горы, дороги, границы…) — тоже предпочтение устройства.
+const DRAW_LAYERS_KEY = "fictaris_map_draw_layers";
+function readDrawLayers() {
+  try {
+    return JSON.parse(localStorage.getItem(DRAW_LAYERS_KEY) || "{}") || {};
+  } catch {
+    return {};
+  }
+}
+let drawLayers = readDrawLayers(); // { [слой]: false } — спрятан
+const hiddenDrawLayers = () => Object.fromEntries(DRAW_LAYERS.map(([key]) => [key, drawLayers[key] === false]));
+function setDrawLayer(key, visible) {
+  drawLayers = { ...drawLayers, [key]: visible };
+  writePref(DRAW_LAYERS_KEY, JSON.stringify(drawLayers));
+}
 const save = debounceSave((data) => apiPost("/api/map", data));
 
 function persist() {
@@ -183,7 +199,7 @@ function buildMapsHome() {
     open.className = "map-home-open";
     open.innerHTML = `
       <div class="map-card-thumb"${m.imageRelPath ? ` style="background-image:url('/${m.imageRelPath}')"` : ""}>
-        ${m.drawing ? `<div class="map-card-drawing">${drawingSvg(m.drawing, { withSea: !m.imageRelPath })}</div>` : m.imageRelPath ? "" : iconSvg("map", 30)}
+        ${m.drawing ? `<div class="map-card-drawing">${drawingSvg(m.drawing, { withSea: !m.imageRelPath, factions })}</div>` : m.imageRelPath ? "" : iconSvg("map", 30)}
       </div>
       <div class="map-card-footer">
         <div class="char-name">${escapeHtml(m.name || i18n("Без названия"))}</div>
@@ -602,6 +618,8 @@ function buildStage() {
           host: drawingHost,
           preview: previewSvg,
           withSea: !cm.imageRelPath,
+          hidden: hiddenDrawLayers,
+          factions,
           tool: drawTool,
           selectedId: drawSelectedId,
           history: historyFor(cm.id),
@@ -615,6 +633,7 @@ function buildStage() {
           },
           onChange: () => {
             persist();
+            if (img) img.style.opacity = String(cm.drawing.underlay ?? 1);
             // Без выбранной фигуры справа счётчик фигур — обновляем его.
             if (drawSelectedId) refreshUndo();
             else refreshWorkshopSide();
@@ -636,14 +655,18 @@ function buildStage() {
           }),
         });
       } else {
-        drawingHost.innerHTML = drawingSvg(drawing, { withSea: !cm.imageRelPath });
+        drawingHost.innerHTML = drawingSvg(drawing, { withSea: !cm.imageRelPath, hidden: hiddenDrawLayers(), factions });
       }
+      // Подложка бледнее — чтобы обводить её в мастерской.
+      if (img) img.style.opacity = String(drawing.underlay ?? 1);
     }
     if (view) apply();
     else fit();
   };
   if (img) img.addEventListener("load", () => start(img.naturalWidth, img.naturalHeight));
-  else requestAnimationFrame(() => start(cm.drawing.width, cm.drawing.height));
+  // Таймер, а не кадр отрисовки: к этому моменту холст уже в документе,
+  // а кадры в свёрнутом окне не идут.
+  else setTimeout(() => start(cm.drawing.width, cm.drawing.height), 0);
 
   // Колесо — масштаб вокруг курсора.
   stage.addEventListener("wheel", (e) => {
@@ -948,6 +971,8 @@ function buildSide() {
     side.appendChild(row);
   }
 
+  if (cm.drawing?.shapes.length) side.appendChild(buildDrawLayerToggles(() => draw()));
+
   let lists = buildSideLists(cm);
   side.appendChild(lists);
 
@@ -1078,6 +1103,36 @@ function buildToolStrip() {
   return strip;
 }
 
+// Флажки слоёв рисунка — в просмотре и в мастерской; onToggle —
+// перерисовать то, что их показывает.
+function buildDrawLayerToggles(onToggle) {
+  const wrap = document.createElement("div");
+  wrap.className = "map-draw-layers";
+  const counts = {};
+  for (const shape of currentMap().drawing?.shapes || []) {
+    const layer = shapeLayer(shape);
+    if (layer) counts[layer] = (counts[layer] || 0) + 1;
+  }
+  for (const [key, label] of DRAW_LAYERS) {
+    const row = document.createElement("label");
+    row.className = "map-layer";
+    const box = document.createElement("input");
+    box.type = "checkbox";
+    box.checked = drawLayers[key] !== false;
+    box.addEventListener("change", () => {
+      setDrawLayer(key, box.checked);
+      onToggle();
+    });
+    const name = document.createElement("span");
+    name.textContent = i18n(label);
+    const n = document.createElement("small");
+    n.textContent = counts[key] || 0;
+    row.append(box, name, n);
+    wrap.appendChild(row);
+  }
+  return wrap;
+}
+
 function refreshUndo() {
   const h = historyFor(currentMap().id);
   const undoBtn = container.querySelector(".map-undo");
@@ -1093,7 +1148,7 @@ function refreshWorkshopSide() {
 }
 
 const SHAPE_NAMES = {
-  land: "Суша", water: "Вода", river: "Река", road: "Дорога", label: "Надпись",
+  land: "Суша", water: "Вода", river: "Река", road: "Дорога", label: "Надпись", border: "Граница области",
   mountain: "Горы", forest: "Лес", city: "Город", castle: "Замок", village: "Деревня",
 };
 
@@ -1111,6 +1166,7 @@ function buildWorkshopSide() {
       "Реки и дороги – ведите линию.",
       "Горы и лес – щёлкните или ведите: значки лягут грядой.",
       "Город, замок, деревня, надпись – щелчок ставит, потом их можно двигать «Выбором».",
+      "Граница области – обведите контур и привяжите к фракции: подпись и владения появятся у неё.",
       "Delete – удалить выбранное, Ctrl+Z – отменить.",
       "Метки мест ставятся в «Просмотре» – на рисунке их тоже видно.",
     ]) {
@@ -1121,6 +1177,38 @@ function buildWorkshopSide() {
     side.appendChild(tips);
     const count = currentMap().drawing?.shapes.length || 0;
     side.appendChild(buildNone(count ? i18n("Фигур на карте: {n}", { n: count }) : i18n("Карта пока пуста")));
+
+    const drawing = currentMap().drawing;
+    if (drawing && workshop) {
+      side.appendChild(sectionHeading(i18n("Оформление")));
+      side.appendChild(buildSegmented(MAP_STYLES, drawing.style || "parchment", (key) => {
+        workshop.updateDrawing({ style: key === "parchment" ? undefined : key });
+        refreshWorkshopSide();
+      }));
+      if (currentMap().imageRelPath) {
+        const row = document.createElement("label");
+        row.className = "map-prop map-underlay";
+        const span = document.createElement("span");
+        span.textContent = i18n("Картинка");
+        const input = document.createElement("input");
+        input.type = "range";
+        input.min = 0;
+        input.max = 100;
+        input.value = Math.round((drawing.underlay ?? 1) * 100);
+        input.title = i18n("Прозрачность загруженной картинки – бледнее, чтобы обводить");
+        input.addEventListener("change", () => {
+          const value = Number(input.value) / 100;
+          workshop.updateDrawing({ underlay: value >= 1 ? undefined : value });
+        });
+        row.append(span, input);
+        side.appendChild(row);
+      }
+      side.appendChild(sectionHeading(i18n("Слои рисунка")));
+      side.appendChild(buildDrawLayerToggles(() => {
+        workshop.rerender();
+        refreshWorkshopSide();
+      }));
+    }
     return side;
   }
 
@@ -1160,6 +1248,37 @@ function buildWorkshopSide() {
   } else if (shape.kind === "stamp") {
     const base = { mountain: 44, forest: 22, city: 34, castle: 30, village: 28 }[shape.icon] || 30;
     prop(i18n("Размер"), range(shape.size || base, 10, 120, (value) => workshop.update({ size: value })));
+  } else if (shape.kind === "border") {
+    const { faction } = borderInfo(shape, factions);
+    const name = document.createElement("input");
+    name.className = "characters-search map-prop-text";
+    name.value = shape.name || "";
+    name.placeholder = faction?.name || i18n("Без названия");
+    name.addEventListener("change", () => workshop.update({ name: name.value.trim() || undefined }));
+    name.addEventListener("keydown", (e) => { if (e.key === "Enter") name.blur(); });
+    prop(i18n("Название"), name);
+    prop(i18n("Фракция"), buildSelect([["", "– не привязана –"], ...factions.map((f) => [f.id, f.name || i18n("Без названия")])], shape.factionId || "", (value) => {
+      workshop.update({ factionId: value || undefined });
+      refreshWorkshopSide();
+    }));
+    const colors = document.createElement("div");
+    colors.className = "color-row map-colors";
+    for (const color of BORDER_COLORS) {
+      const sw = document.createElement("div");
+      sw.className = "swatch" + ((shape.color || BORDER_COLORS[0]) === color ? " selected" : "");
+      sw.style.background = color;
+      sw.addEventListener("click", () => {
+        workshop.update({ color });
+        refreshWorkshopSide();
+      });
+      colors.appendChild(sw);
+    }
+    prop(i18n("Цвет"), colors);
+    prop(i18n("Заливка"), range(Math.round((shape.fill ?? 0.12) * 100), 0, 50, (value) => workshop.update({ fill: value / 100 })));
+    prop(i18n("Линия"), buildSegmented([["dashed", "Пунктир"], ["solid", "Сплошная"]], shape.line === "solid" ? "solid" : "dashed", (key) => {
+      workshop.update({ line: key === "solid" ? "solid" : undefined });
+      refreshWorkshopSide();
+    }));
   } else if (shape.kind === "river" || shape.kind === "road") {
     prop(i18n("Толщина"), range(shape.width || (shape.kind === "river" ? 3 : 2), 1, 14, (value) => workshop.update({ width: value })));
   }
