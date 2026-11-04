@@ -5,7 +5,7 @@ import { buildEmptyState, escapeHtml } from "./chips.js";
 import { avatarInnerHtml } from "./avatars.js";
 import { iconSvg } from "./icons.js";
 import { exportElementAsPng } from "./png-export.js";
-import { partnerKind, parentKind, isIllegitimate, isDead, relativesOf } from "./kinship.js";
+import { partnerKind, parentKind, isIllegitimate, isDead, relativesOf, familyComponents, surnameHouseName } from "./kinship.js";
 
 // ══════════════════════════════════════════════
 //  РОДОСЛОВНАЯ
@@ -101,47 +101,6 @@ function computeDepths(list, byId) {
     }
   }
   return depth;
-}
-
-// Связные компоненты по parentIds И partnerIds — женитьба объединяет два
-// рода в один точно так же, как общий ребёнок: цепочку читаем и вверх
-// (родители), и вбок (партнёры), не только вниз.
-function connectedComponents(list) {
-  const byId = new Map(list.map((c) => [c.id, c]));
-  const adj = new Map(list.map((c) => [c.id, new Set()]));
-  for (const c of list) {
-    for (const p of c.parentIds || []) {
-      if (!byId.has(p)) continue;
-      adj.get(c.id).add(p);
-      adj.get(p).add(c.id);
-    }
-    for (const p of c.partnerIds || []) {
-      if (!byId.has(p)) continue;
-      adj.get(c.id).add(p);
-      adj.get(p).add(c.id);
-    }
-  }
-  const seen = new Set();
-  const groups = [];
-  for (const c of list) {
-    if (seen.has(c.id)) continue;
-    seen.add(c.id);
-    const stack = [c.id];
-    const group = [];
-    while (stack.length) {
-      const id = stack.pop();
-      group.push(byId.get(id));
-      for (const nb of adj.get(id)) {
-        if (!seen.has(nb)) {
-          seen.add(nb);
-          stack.push(nb);
-        }
-      }
-    }
-    groups.push(group);
-  }
-  groups.sort((a, b) => b.length - a.length); // крупные роды сверху
-  return groups;
 }
 
 // Взаимные пары ("муж считает жену партнёром" И наоборот — иначе не
@@ -346,19 +305,11 @@ function originNotes(c, byId) {
   return notes;
 }
 
-// Самое частое последнее слово имени, если оно встречается хотя бы у
-// двоих, — «Род Вирен»; иначе по первому предку — «Род Старого Варна»
-// звучало бы натужно, поэтому просто «Род: {имя}».
+// Общая фамилия — «Род Вирен» (kinship.js); нет её — по первому предку:
+// «Род Старого Варна» звучало бы натужно, поэтому просто «Род: {имя}».
 function houseName(group, rows) {
-  const counts = new Map();
-  for (const c of group) {
-    const words = (c.name || "").trim().split(/\s+/);
-    if (words.length < 2) continue;
-    const last = words[words.length - 1];
-    counts.set(last, (counts.get(last) || 0) + 1);
-  }
-  const [best, n] = [...counts.entries()].sort((a, b) => b[1] - a[1])[0] || [];
-  if (best && n >= 2) return i18n("Род {name}", { name: best });
+  const bySurname = surnameHouseName(group);
+  if (bySurname) return bySurname;
   const eldest = (rows.get(0) || [])[0]?.members[0];
   const person = group.find((c) => c.id === eldest) || group[0];
   return i18n("Род: {name}", { name: person?.name || i18n("Без имени") });
@@ -368,7 +319,7 @@ function familyGroups() {
   const hasChild = new Set();
   for (const c of characters) for (const p of c.parentIds || []) hasChild.add(p);
   const inTree = characters.filter((c) => (c.parentIds || []).length || hasChild.has(c.id) || (c.partnerIds || []).length);
-  return connectedComponents(inTree).map((list) => {
+  return familyComponents(inTree).map((list) => {
     const byId = new Map(list.map((c) => [c.id, c]));
     const depth = computeDepths(list, byId);
     const unions = mutualUnions(list, byId);

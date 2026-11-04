@@ -105,7 +105,10 @@ export function isIllegitimate(child, byId) {
   return false;
 }
 
+// Умер — стоит тег «Погиб» (Статус, tags.js) или это видно по возрасту
+// («†», «погиб в 212»).
 export function isDead(c) {
+  if (/(^|,)\s*погиб\s*(,|$)/i.test(c?.tags || "")) return true;
   return /†|умер|погиб|мёртв|мертв|dead|deceased/i.test(c?.age || "");
 }
 
@@ -237,4 +240,60 @@ export function relativesOf(focusId, characters) {
   }));
 
   return { me, grandparents, parents, stepParents, siblings, partners, children, stepChildren, grandchildren, auntsUncles, cousins, nephews, inLaws };
+}
+
+// Роды — связные компоненты по parentIds И partnerIds — женитьба объединяет два
+// рода в один точно так же, как общий ребёнок: цепочку читаем и вверх
+// (родители), и вбок (партнёры), не только вниз.
+export function familyComponents(list) {
+  const byId = new Map(list.map((c) => [c.id, c]));
+  const adj = new Map(list.map((c) => [c.id, new Set()]));
+  for (const c of list) {
+    for (const p of c.parentIds || []) {
+      if (!byId.has(p)) continue;
+      adj.get(c.id).add(p);
+      adj.get(p).add(c.id);
+    }
+    for (const p of c.partnerIds || []) {
+      if (!byId.has(p)) continue;
+      adj.get(c.id).add(p);
+      adj.get(p).add(c.id);
+    }
+  }
+  const seen = new Set();
+  const groups = [];
+  for (const c of list) {
+    if (seen.has(c.id)) continue;
+    seen.add(c.id);
+    const stack = [c.id];
+    const group = [];
+    while (stack.length) {
+      const id = stack.pop();
+      group.push(byId.get(id));
+      for (const nb of adj.get(id)) {
+        if (!seen.has(nb)) {
+          seen.add(nb);
+          stack.push(nb);
+        }
+      }
+    }
+    groups.push(group);
+  }
+  groups.sort((a, b) => b.length - a.length); // крупные роды сверху
+  return groups;
+}
+
+// Самое частое последнее слово имени, если оно встречается хотя бы у
+// двоих, — «Род Вирен»; иначе null, и каждый раздел подписывает род
+// по-своему (Родословная — по первому предку).
+export function surnameHouseName(group) {
+  const counts = new Map();
+  for (const c of group) {
+    const words = (c.name || "").trim().split(/\s+/);
+    if (words.length < 2) continue;
+    const last = words[words.length - 1];
+    counts.set(last, (counts.get(last) || 0) + 1);
+  }
+  const [best, n] = [...counts.entries()].sort((a, b) => b[1] - a[1])[0] || [];
+  return best && n >= 2 ? i18n("Род {name}", { name: best }) : null;
 }
