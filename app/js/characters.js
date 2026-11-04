@@ -732,10 +732,9 @@ function buildAppearances(c) {
 }
 
 // Мини-редактор связей прямо в досье — та же коллекция
-// relationships.json, что и редактор ребра по клику в графе проекта
-// (graph.js, openEdgeEditor), просто отфильтрованная под текущего
-// персонажа, без графа и с возможностью завести новую связь (в графе
-// можно только править/удалять уже существующую — новую заводят здесь).
+// relationships.json, что и редактор дуги во вкладке «Отношения»
+// (graph.js, openRelEditor), просто отфильтрованная под текущего
+// персонажа.
 function buildRelationshipsField(c) {
   const wrap = document.createElement("div");
   wrap.className = "rel-mini-field";

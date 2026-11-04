@@ -27,7 +27,7 @@ export function defaultLabels() {
       timeline: i18n("Таймлайн"),
       board: i18n("Доска"),
       map: i18n("Карта"),
-      graph: i18n("Граф"),
+      graph: i18n("Отношения"),
       familytree: i18n("Родословная"),
       canvas: i18n("Холст"),
       continuity: i18n("Проверка"),

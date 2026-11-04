@@ -89,8 +89,8 @@ export function mentionsToLinkedHtml(text, characters, hrefFor) {
 }
 
 // Просто множество id упомянутых персонажей, без HTML — для мест,
-// которым нужна не разметка, а сам факт связи (graph.js: ребро от
-// сущности с текстом к упомянутому в нём персонажу).
+// которым нужна не разметка, а сам факт упоминания (characters.js:
+// в каких главах встречается персонаж).
 export function findMentionedIds(text, characters) {
   const regex = buildMentionRegex(characters);
   const ids = new Set();

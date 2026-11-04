@@ -148,7 +148,7 @@ export const EN_DICT = {
   "Синдикат": "Syndicate",
 
   // ── Связи (мини-редактор в дровере персонажа, characters.js; редактор
-  //    ребра по клику в графе, graph.js) ──
+  //    дуги в «Отношениях», graph.js) ──
   "+ Добавить связь": "+ Add relationship",
   "Метка (наставник, вражда…)": "Label (mentor, rivalry…)",
   "Заметка о связи…": "Note about the relationship…",
@@ -361,14 +361,27 @@ export const EN_DICT = {
   "+ Создать под-карту": "+ Create sub-map",
   "Удалить метку": "Delete pin",
 
-  // ── Граф (graph.js) ──
-  "Добавь персонажей, локаций или фракций, чтобы увидеть граф проекта.":
-    "Add characters, locations or factions to see the project graph.",
-  "Локации/фракции – цвет по типу": "Locations/factions – colored by type",
+  // ── Отношения (graph.js) ──
+  "Добавь персонажей, чтобы увидеть их отношения.": "Add characters to see their relationships.",
+  "{n} отношений": "{n} relationship|{n} relationships",
+  "Рамки – рода, внутри поколения и пары": "Boxes are houses, with generations and couples inside",
+  "Рамки – фракции, глава первым": "Boxes are factions, leader first",
+  "Найти персонажа…": "Find a character…",
+  "Протяни линию от одного персонажа к другому – появится отношение": "Drag a line from one character to another to add a relationship",
+  "глава": "leader",
+  "глава · {name}": "leader · {name}",
+  "вражда": "hostility",
+  "близость": "closeness",
+  "родство и пары": "kinship and couples",
+  "толщина – сила": "thickness – strength",
+  "Все отношения": "All relationships",
+  "От самых сильных. Щелчок по персонажу на карте – только его": "Strongest first. Click a character on the map to see only theirs",
+  "Пока ни одного. Протяни линию от персонажа к персонажу на карте.": "None yet. Drag a line from one character to another on the map.",
+  "Без отношений · {n}": "No relationships · {n}",
+  "Пока ни с кем": "None yet",
+  "Новое отношение – протяни линию от персонажа к другому на карте": "New relationship – drag a line from this character to another on the map",
+  "Открыть досье": "Open dossier",
   "Размер шрифта в тексте главы": "Chapter text font size",
-  "Тащи узлы мышью, крути колесо для зума, клик по узлу открывает карточку, по связи между персонажами – редактирует её":
-    "Drag nodes with your mouse, scroll to zoom, click a node to open its card, click a relationship line between characters to edit it",
-  "Сбросить вид": "Reset view",
 
   // ── Проверка (continuity.js) ──
   "Связь «{label}» ссылается на несуществующего персонажа": "The relationship “{label}” refers to a character that doesn't exist",
@@ -562,7 +575,6 @@ export const EN_DICT = {
   "Таймлайн": "Timeline",
   "Доска": "Board",
   "Карта": "Map",
-  "Граф": "Graph",
   "Родословная": "Family tree",
   "Статистика": "Statistics",
   "Проверка": "Checks",
@@ -778,7 +790,6 @@ export const EN_DICT = {
   "Между этой версией и текущим состоянием нет отличий.": "There's no difference between this version and the current state.",
   "… ещё {count} неизменных строк …": "… {count} more unchanged line …|… {count} more unchanged lines …",
 
-  "пунктир – найдено по «@упоминанию» в тексте, не задано вручную": "dashed – found via an \"@mention\" in text, not set by hand",
 
   "Писательская серия": "Writing streak",
   "Дневная цель по словам – считается по автосохранениям рукописи, не нужно отмечать вручную.":
@@ -799,7 +810,6 @@ export const EN_DICT = {
   "Добавить упоминание": "Add mention",
 
   "Карта сюжета": "Story map",
-  "Сбросить вид": "Reset view",
   "Удалить связь": "Delete connection",
 
   "Знания": "Knowledge",

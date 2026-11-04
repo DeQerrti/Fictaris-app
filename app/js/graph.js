@@ -1,585 +1,705 @@
-import { apiGet, apiPost } from "./api.js";
-import { locationTypeInfo, factionTypeInfo, iconSvg } from "./icons.js";
-import { loadTemplates, templateFor } from "./templates.js";
-import { findMentionedIds } from "./mentions.js";
+import { apiGet, apiPost, uid } from "./api.js";
+import { iconSvg } from "./icons.js";
 import { buildEmptyState } from "./chips.js";
 import { debounceSave } from "./save-badge.js";
 import { pushTrash } from "./trash.js";
 import { openPopover, closeMenu } from "./context-menu.js";
-import { i18n } from "./i18n.js";
+import { familyComponents, surnameHouseName, partnerKind, isDead } from "./kinship.js";
+import { personAvatarHtml, shortName, readPref, writePref, buildSegmented } from "./entity-view.js";
+import { i18n, i18nPlural } from "./i18n.js";
 
 // ══════════════════════════════════════════════
-//  ГРАФ ПРОЕКТА
+//  ОТНОШЕНИЯ
 //
-//  Раньше — статичный круг (позиции фиксировались один раз при отрисовке
-//  и никогда не менялись), без панорамирования, без зума, без
-//  перетаскивания узлов, без клика. По просьбе «сделать более
-//  интерактивным и динамичным как в обсидиане» — здесь простой
-//  рукописный force-directed layout (отталкивание между всеми узлами +
-//  пружина по рёбрам + лёгкое притяжение к центру), который сам крутится
-//  через requestAnimationFrame, плюс: перетаскивание узла мышью, зум
-//  колесом (к курсору), панорамирование перетаскиванием фона, и клик по
-//  узлу открывает нужную карточку (персонажа/локацию/фракцию) — как в
-//  графе Obsidian.
+//  Карта отношений между персонажами (модуль по-прежнему "graph" —
+//  ради порядка вкладок и подписей, уже сохранённых в настройках).
+//  Персонажи стоят рамками по родам (внутри — поколения и пары, как
+//  маленькая родословная) или по фракциям, а записи relationships.json
+//  идут дугами между ними: цвет — близость или вражда, толщина — сила,
+//  на дуге подпись. Протянуть от одного персонажа к другому — новое
+//  отношение, щелчок по дуге — правка. Места и фракции здесь не
+//  узлы: у них свои вкладки, а прежний «граф всего» повторял их.
 // ══════════════════════════════════════════════
 
-let nodes = [];
-let edges = [];
+const GROUP_KEY = "fictaris_graph_group";
+const GROUPS = [
+  ["house", "По родам", "Рамки – рода, внутри поколения и пары"],
+  ["faction", "По фракциям", "Рамки – фракции, глава первым"],
+];
+
+const NS = "http://www.w3.org/2000/svg";
+const COL_W = 132;
+const ROW_H = 118;
+const BOX_GAP = 70;
+const BOX_PAD = 20;
+const BOX_HEAD = 44;
+const MAX_ROW_W = 1500;
+const LOOSE_COLS = 4;
+const FAMILY_COLOR = "#c9944a";
+
 let container = null;
-let raf = null;
-let simWidth = 0;
-let simHeight = 0;
-let simPositionAll = null;
+let characters = [];
+let relationships = [];
+let factions = [];
+let groupBy = readPref(GROUP_KEY, GROUPS.map(([k]) => k), "house");
+let query = "";
+let selectedId = null;
+let view = null; // { x, y, scale } — сдвиг и масштаб сцены, переживает перерисовку
+let viewTouched = false; // двигал ли человек сцену — иначе при смене размера вписываем заново
+let stageEl = null;
+let sideEl = null;
+let metaEl = null;
+let scene = null; // { pos, boxes, bounds } — последняя раскладка
+let stopResizeWatch = null;
 
-// Персонажи и сами связи — нужны только для редактора ребра (см.
-// openEdgeEditor): buildNodes/buildEdges уже переварили их в узлы/рёбра
-// для отрисовки, но чтобы поправить метку/силу/заметку конкретной связи
-// или удалить её, нужны исходные записи и имена персонажей по id.
-let relationshipsData = [];
-let charactersData = [];
 const saveRelationships = debounceSave((list) => apiPost("/api/relationships", list));
-
-// Было 2600 — с подписями узлов (не только их кружками) это позволяло
-// плотным кластерам сходиться настолько тесно, что текст соседних точек
-// перекрывался. Больше отталкивания — реже такая теснота вообще
-// возникает; плашка-подложка под текстом (см. draw()) добивает
-// остальное — то, что даже так иногда окажется рядом, останется
-// читаемым по отдельности, а не сливающимся текстом.
-const REPULSION = 3200;
-const SPRING_LENGTH = 110;
-const SPRING_STRENGTH = 0.02;
-const CENTER_PULL = 0.0025;
-const DAMPING = 0.86;
-const ALPHA_DECAY = 0.985;
-const ALPHA_MIN = 0.01;
-
-function buildNodes(characters, locations, factions) {
-  const list = [];
-  for (const c of characters) list.push({ id: c.id, type: "character", name: c.name, color: c.color || "#7c7157", icon: null });
-  for (const l of locations) {
-    const [, , icon, color] = locationTypeInfo(l.type);
-    list.push({ id: l.id, type: "location", name: l.name, color, icon });
-  }
-  for (const f of factions) {
-    const [, , icon, color] = factionTypeInfo(f.type);
-    list.push({ id: f.id, type: "faction", name: f.name, color, icon });
-  }
-  return list;
-}
-
-// Текстовые поля анкеты (любого типа — input/textarea/richtext, набор
-// свой у каждого шаблона, см. templates.js) могут упоминать персонажа
-// через "@Имя" — mentions.js уже умеет находить такие упоминания для
-// автодополнения и подсветки в самой карточке; здесь та же находка
-// превращается в ребро графа, которое никто не заводил руками ни в
-// relationships.json, ни через leaderId/parentId. kind: "mention" —
-// чтобы отличить такое ребро от явной связи визуально (пунктир, см. draw).
-function mentionEdgesFor(entity, template, characters, add) {
-  for (const f of template?.fields || []) {
-    const value = entity[f.key];
-    if (typeof value !== "string" || !value) continue;
-    for (const id of findMentionedIds(value, characters)) add(entity.id, id, "mention");
-  }
-}
-
-// Рёбра автоматически из связей, состава фракций, отмеченных галочкой
-// участников таймлайна, вложенности локаций (parentId, locations.js),
-// @упоминаний в тексте анкет, в описании события таймлайна (даже если
-// персонаж не отмечен в списке участников явно) и совместных
-// упоминаний в тексте одной главы рукописи — без ручной расстановки.
-// Явные связи добавляются первыми: seen ниже не даёт одной и той же
-// паре узлов получить второе ребро, так что если персонаж и так
-// упомянут в relationships.json, найденное в тексте @упоминание не
-// понижает эту связь до пунктирной — seen её просто не пропустит
-// повторно.
-function buildEdges({ relationships, factions, timeline, locations, characters, manuscript, charTemplates, locTemplates, factionTemplates }) {
-  const seen = new Set();
-  const list = [];
-  const add = (a, b, kind = "explicit", relId = null) => {
-    if (!a || !b || a === b) return;
-    const key = [a, b].sort().join("|");
-    if (seen.has(key)) return;
-    seen.add(key);
-    list.push({ a, b, kind, relId });
-  };
-
-  // kind "relationship" (а не просто "explicit", как у рёбер из состава
-  // фракции/вложенности локации ниже) — единственный вид ребра, у
-  // которого relId ведёт на настоящую запись в relationships.json:
-  // только по клику на такое ребро есть что редактировать (см.
-  // openEdgeEditor в draw()). Раз связь заведена явно первой — seen
-  // не даст более позднему @упоминанию понизить её до пунктирной.
-  for (const r of relationships) add(r.charA, r.charB, "relationship", r.id);
-
-  for (const f of factions) {
-    if (f.leaderId) add(f.id, f.leaderId);
-    if (f.headquartersId) add(f.id, f.headquartersId);
-    for (const m of f.memberIds || []) add(f.id, m);
-  }
-
-  // Персонаж × локация из события — раньше только те, что отмечены
-  // явно (characterIds/locationIds). Персонажи, упомянутые в свободном
-  // тексте description ("@Надя добралась туда"), но не отмеченные
-  // галочкой в списке участников, событием не связывались вовсе —
-  // теперь связываются тоже, пунктиром.
-  for (const ev of timeline) {
-    const locIds = ev.locationIds || [];
-    const taggedChars = ev.characterIds || [];
-    for (const c of taggedChars) {
-      for (const l of locIds) add(c, l, "explicit");
-    }
-    for (const c of findMentionedIds(ev.description || "", characters)) {
-      if (taggedChars.includes(c)) continue;
-      for (const l of locIds) add(c, l, "mention");
-    }
-  }
-
-  for (const l of locations) {
-    if (l.parentId) add(l.id, l.parentId);
-  }
-
-  for (const c of characters) mentionEdgesFor(c, templateFor(charTemplates, c.templateId), characters, add);
-  for (const l of locations) mentionEdgesFor(l, templateFor(locTemplates, l.templateId), characters, add);
-  for (const f of factions) mentionEdgesFor(f, templateFor(factionTemplates, f.templateId), characters, add);
-
-  // Персонажи, совместно упомянутые в тексте одной главы рукописи, —
-  // у главы нет полей "участники" вроде события таймлайна, только сам
-  // текст, поэтому раньше рукопись графом не учитывалась вообще.
-  for (const ch of manuscript?.chapters || []) {
-    const mentioned = [...findMentionedIds(ch.content || "", characters)];
-    for (let i = 0; i < mentioned.length; i++) {
-      for (let j = i + 1; j < mentioned.length; j++) add(mentioned[i], mentioned[j], "mention");
-    }
-  }
-
-  return list;
-}
 
 export async function renderGraph(root) {
   container = root;
-  if (raf) cancelAnimationFrame(raf);
-  const [characters, locations, factions, relationships, timeline, manuscript, charTemplates, locTemplates, factionTemplates] = await Promise.all([
+  [characters, relationships, factions] = await Promise.all([
     apiGet("/api/characters"),
-    apiGet("/api/locations"),
-    apiGet("/api/factions"),
     apiGet("/api/relationships"),
-    apiGet("/api/timeline"),
-    apiGet("/api/manuscript"),
-    loadTemplates("characters"),
-    loadTemplates("locations"),
-    loadTemplates("factions"),
+    apiGet("/api/factions"),
   ]);
-  relationshipsData = relationships;
-  charactersData = characters;
-  nodes = buildNodes(characters, locations, factions);
-  edges = buildEdges({ relationships, factions, timeline, locations, characters, manuscript, charTemplates, locTemplates, factionTemplates });
-  draw();
+  if (selectedId && !characters.some((c) => c.id === selectedId)) selectedId = null;
+  view = null;
+  viewTouched = false;
+  buildShell();
 }
 
-function draw() {
-  container.innerHTML = "";
+const byId = (id) => characters.find((c) => c.id === id);
+const relsOf = (id) => relationships.filter((r) => r.charA === id || r.charB === id);
+const otherOf = (r, id) => (r.charA === id ? r.charB : r.charA);
+const scoreText = (s) => `${s > 0 ? "+" : ""}${s || 0}`;
 
-  if (nodes.length < 2) {
-    const empty = buildEmptyState(i18n("Добавь персонажей, локаций или фракций, чтобы увидеть граф проекта."), "network");
-    container.appendChild(empty);
+function scoreColor(s) {
+  if (s >= 30) return "#6fa772";
+  if (s <= -30) return "#c25a4c";
+  return "#a99977";
+}
+
+function escapeHtml(s) {
+  return String(s ?? "").replace(/[&<>"]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[ch]);
+}
+
+function svgEl(tag, attrs, parent) {
+  const e = document.createElementNS(NS, tag);
+  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+
+function isMain(c) {
+  const tags = (c.tags || "").split(",").map((t) => t.trim());
+  return tags.some((t) => ["Протагонист", "Антагонист", "Рассказчик"].includes(t));
+}
+
+// ── Шапка и каркас ─────────────────────────────
+function buildShell() {
+  container.innerHTML = "";
+  if (!characters.length) {
+    container.appendChild(buildEmptyState(i18n("Добавь персонажей, чтобы увидеть их отношения."), "network"));
     return;
   }
 
   const wrap = document.createElement("div");
-  wrap.className = "pgraph-view";
+  wrap.className = "relmap-view";
 
-  // Раньше был зажат в 920×680 и центрирован в узкой карточке — почти
-  // всё окно вкладки пустовало вокруг. Теперь весь размер под
-  // viewBox — почти вся доступная площадь #content за вычетом полосы
-  // тулбара/легенды сверху/снизу (buildToolbar/buildLegend, ~110px);
-  // сам SVG растягивается на 100% контейнера через CSS (.pgraph-holder,
-  // style.css) — toGraphPoint ниже уже переводит координаты клика через
-  // отношение отрисованного размера к width/height viewBox, так что
-  // несовпадение реального рендер-размера с этими числами не ломает ни
-  // клики, ни перетаскивание, ни зум.
-  const width = Math.max(560, container.clientWidth || 900);
-  const height = Math.max(440, (container.clientHeight || 700) - 110);
-  const cx = width / 2;
-  const cy = height / 2;
-
-  // Начальная раскладка — по кругу, как и раньше; дальше её берёт на
-  // себя симуляция, но стартовать со случайного разброса точек и дать
-  // физике тысячи итераций само по себе некрасиво трясётся на глазах —
-  // круг как отправная точка успокаивается за пару секунд куда мягче.
-  const r = Math.min(width, height) / 2 - 70;
-  nodes.forEach((n, i) => {
-    const angle = (2 * Math.PI * i) / nodes.length - Math.PI / 2;
-    if (n.x === undefined) {
-      n.x = cx + r * Math.cos(angle);
-      n.y = cy + r * Math.sin(angle);
-    }
-    n.vx = 0;
-    n.vy = 0;
-    n.dragging = false;
+  const bar = document.createElement("div");
+  bar.className = "timeline-toolbar";
+  const heading = document.createElement("div");
+  heading.className = "timeline-heading";
+  heading.textContent = i18n("Отношения");
+  metaEl = document.createElement("div");
+  metaEl.className = "timeline-meta";
+  const seg = buildSegmented(GROUPS, groupBy, (key) => {
+    groupBy = key;
+    writePref(GROUP_KEY, key);
+    view = null;
+    viewTouched = false;
+    buildShell();
   });
+  const spacer = document.createElement("div");
+  spacer.style.flex = "1";
+  const search = document.createElement("input");
+  search.type = "search";
+  search.className = "characters-search";
+  search.placeholder = i18n("Найти персонажа…");
+  search.value = query;
+  search.addEventListener("input", () => {
+    query = search.value;
+    drawScene();
+  });
+  bar.append(heading, metaEl, seg, spacer, search);
 
-  const svgNS = "http://www.w3.org/2000/svg";
-  const svg = document.createElementNS(svgNS, "svg");
-  // width/height растягиваются через CSS (.pgraph-svg) на весь холдер —
-  // viewBox остаётся в логических координатах симуляции, toGraphPoint
-  // сам пересчитывает клики через отношение отрисованного размера к
-  // этим числам (см. attachInteraction).
-  svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
-  svg.setAttribute("preserveAspectRatio", "none");
-  svg.classList.add("pgraph-svg");
+  const body = document.createElement("div");
+  body.className = "relmap-body";
+  stageEl = document.createElement("div");
+  stageEl.className = "relmap-stage";
+  sideEl = document.createElement("div");
+  sideEl.className = "relmap-side";
+  body.append(stageEl, sideEl);
 
-  const viewport = document.createElementNS(svgNS, "g");
-  viewport.classList.add("graph-viewport");
-  svg.appendChild(viewport);
-
-  const lineByNode = new Map();
-  const lineEls = new Map();
-  const hitEls = new Map();
-  for (const e of edges) {
-    const line = document.createElementNS(svgNS, "line");
-    line.setAttribute("stroke", "var(--border)");
-    line.setAttribute("stroke-width", "1.5");
-    if (e.kind === "mention") line.setAttribute("stroke-dasharray", "4 3");
-    line.dataset.a = e.a;
-    line.dataset.b = e.b;
-    viewport.appendChild(line);
-    lineEls.set(e, line);
-    for (const id of [e.a, e.b]) {
-      if (!lineByNode.has(id)) lineByNode.set(id, []);
-      lineByNode.get(id).push(line);
-    }
-
-    // Только у явной связи (relId ведёт на запись в relationships.json)
-    // есть что редактировать по клику — у рёбер из состава фракции,
-    // вложенности локации или @упоминания своей формы нет, их правят на
-    // самой карточке. Полоса-приёмник шире видимой линии (14px против
-    // 1.5px) — иначе попасть кликом в тонкую линию мышью почти нереально.
-    if (e.kind === "relationship") {
-      const hit = document.createElementNS(svgNS, "line");
-      hit.setAttribute("stroke", "transparent");
-      hit.setAttribute("stroke-width", "14");
-      hit.classList.add("graph-edge-hit");
-      hit.addEventListener("click", (ev) => {
-        ev.stopPropagation();
-        openEdgeEditor(e, ev.clientX, ev.clientY);
-      });
-      viewport.appendChild(hit);
-      hitEls.set(e, hit);
-    }
-  }
-
-  const nodeEls = new Map();
-  for (const n of nodes) {
-    const g = document.createElementNS(svgNS, "g");
-    g.classList.add("graph-node");
-
-    const circle = document.createElementNS(svgNS, "circle");
-    circle.setAttribute("r", 14);
-    circle.setAttribute("fill", n.color);
-    g.appendChild(circle);
-
-    if (n.icon) {
-      const fo = document.createElementNS(svgNS, "foreignObject");
-      fo.setAttribute("width", 18);
-      fo.setAttribute("height", 18);
-      fo.setAttribute("x", -9);
-      fo.setAttribute("y", -9);
-      fo.innerHTML = `<div xmlns="http://www.w3.org/1999/xhtml" style="color:#14110d">${iconSvg(n.icon, 18)}</div>`;
-      g.appendChild(fo);
-    }
-
-    // Плашка-подложка под подписью — при кучности узлов (сила
-    // отталкивания считает расстояние между самими узлами, не между
-    // подписями) текст соседних точек иначе перекрывался и становился
-    // совсем нечитаемым — не только друг с другом, но и поверх линий
-    // связей. Ширина — грубая оценка по числу символов (точных метрик
-    // текста тут не измерить дёшево, а +- пара пикселей роли не играет,
-    // плашка всё равно с запасом), не идеальная подгонка, но полностью
-    // решает нечитаемость.
-    const label = n.name || "?";
-    const haloWidth = Math.max(22, label.length * 6.4 + 8);
-    const halo = document.createElementNS(svgNS, "rect");
-    halo.setAttribute("x", -haloWidth / 2);
-    halo.setAttribute("y", 18);
-    halo.setAttribute("width", haloWidth);
-    halo.setAttribute("height", 14);
-    halo.setAttribute("rx", 4);
-    halo.setAttribute("fill", "var(--panel)");
-    halo.setAttribute("opacity", "0.85");
-    g.appendChild(halo);
-
-    const text = document.createElementNS(svgNS, "text");
-    text.setAttribute("text-anchor", "middle");
-    text.setAttribute("y", 26);
-    text.setAttribute("fill", "#a99977");
-    text.setAttribute("font-size", "11");
-    text.setAttribute("font-family", "Inter,sans-serif");
-    text.textContent = label;
-    g.appendChild(text);
-
-    g.addEventListener("mouseenter", () => { if (!dragState) highlight(n.id, lineByNode, nodeEls); });
-    g.addEventListener("mouseleave", () => { if (!dragState) resetHighlight(lineByNode, nodeEls); });
-
-    viewport.appendChild(g);
-    nodeEls.set(n.id, g);
-  }
-
-  function positionAll() {
-    for (const n of nodes) {
-      nodeEls.get(n.id).setAttribute("transform", `translate(${n.x},${n.y})`);
-    }
-    for (const [e, line] of lineEls) {
-      const a = nodes.find((n) => n.id === e.a);
-      const b = nodes.find((n) => n.id === e.b);
-      if (!a || !b) continue;
-      line.setAttribute("x1", a.x);
-      line.setAttribute("y1", a.y);
-      line.setAttribute("x2", b.x);
-      line.setAttribute("y2", b.y);
-      const hit = hitEls.get(e);
-      if (hit) {
-        hit.setAttribute("x1", a.x);
-        hit.setAttribute("y1", a.y);
-        hit.setAttribute("x2", b.x);
-        hit.setAttribute("y2", b.y);
-      }
-    }
-  }
-  positionAll();
-
-  const holder = document.createElement("div");
-  holder.className = "pgraph-holder";
-  holder.appendChild(svg);
-  wrap.appendChild(holder);
-  wrap.appendChild(buildToolbar());
-  wrap.appendChild(buildLegend());
+  wrap.append(bar, body);
   container.appendChild(wrap);
 
-  simWidth = width;
-  simHeight = height;
-  simPositionAll = positionAll;
-  runSimulation();
-  attachInteraction(svg, viewport, width, height, nodeEls, lineByNode);
-}
+  // Размер сцены известен только после вставки в документ; rAF в
+  // свёрнутом окне не идёт, поэтому setTimeout.
+  setTimeout(() => {
+    drawScene();
+    renderSide();
+  }, 0);
 
-// ── Симуляция ─────────────────────────────────
-function runSimulation() {
-  const cx = simWidth / 2;
-  const cy = simHeight / 2;
-  let alpha = 1;
-
-  function tick() {
-    for (let i = 0; i < nodes.length; i++) {
-      const a = nodes[i];
-      if (a.dragging) continue;
-      for (let j = i + 1; j < nodes.length; j++) {
-        const b = nodes[j];
-        let dx = a.x - b.x;
-        let dy = a.y - b.y;
-        let distSq = dx * dx + dy * dy;
-        if (distSq < 1) distSq = 1;
-        const dist = Math.sqrt(distSq);
-        const force = (REPULSION * alpha) / distSq;
-        const fx = (dx / dist) * force;
-        const fy = (dy / dist) * force;
-        a.vx += fx;
-        a.vy += fy;
-        if (!b.dragging) { b.vx -= fx; b.vy -= fy; }
-      }
-      // лёгкое притяжение к центру, чтобы граф не расползался за края
-      a.vx += (cx - a.x) * CENTER_PULL * alpha;
-      a.vy += (cy - a.y) * CENTER_PULL * alpha;
-    }
-
-    for (const e of edges) {
-      const a = nodes.find((n) => n.id === e.a);
-      const b = nodes.find((n) => n.id === e.b);
-      if (!a || !b) continue;
-      const dx = b.x - a.x;
-      const dy = b.y - a.y;
-      const dist = Math.max(1, Math.sqrt(dx * dx + dy * dy));
-      const force = (dist - SPRING_LENGTH) * SPRING_STRENGTH * alpha;
-      const fx = (dx / dist) * force;
-      const fy = (dy / dist) * force;
-      if (!a.dragging) { a.vx += fx; a.vy += fy; }
-      if (!b.dragging) { b.vx -= fx; b.vy -= fy; }
-    }
-
-    for (const n of nodes) {
-      if (n.dragging) continue;
-      n.vx *= DAMPING;
-      n.vy *= DAMPING;
-      n.x += n.vx;
-      n.y += n.vy;
-    }
-
-    simPositionAll();
-    alpha *= ALPHA_DECAY;
-    if (alpha > ALPHA_MIN || nodes.some((n) => n.dragging)) {
-      raf = requestAnimationFrame(tick);
-    } else {
-      raf = null;
-    }
-  }
-
-  raf = requestAnimationFrame(tick);
-}
-
-function reheat() {
-  // Перетаскивание будит уже остывшую симуляцию — без этого граф после
-  // первого успокоения навсегда становится статичным опять, что и было
-  // исходной жалобой на «недостаточно динамичный» граф.
-  if (!raf) runSimulation();
-}
-
-// ── Панорамирование, зум, перетаскивание узлов, клик ──
-let dragState = null;
-
-function attachInteraction(svg, viewport, width, height, nodeEls, lineByNode) {
-  const view = { x: 0, y: 0, scale: 1 };
-  const MIN_SCALE = 0.4;
-  const MAX_SCALE = 2.5;
-
-  function applyView() {
-    viewport.setAttribute("transform", `translate(${view.x},${view.y}) scale(${view.scale})`);
-  }
-
-  function toGraphPoint(clientX, clientY) {
-    const rect = svg.getBoundingClientRect();
-    const sx = ((clientX - rect.left) / rect.width) * width;
-    const sy = ((clientY - rect.top) / rect.height) * height;
-    return { x: (sx - view.x) / view.scale, y: (sy - view.y) / view.scale };
-  }
-
-  svg.addEventListener(
-    "wheel",
-    (e) => {
-      e.preventDefault();
-      const before = toGraphPoint(e.clientX, e.clientY);
-      const delta = e.deltaY > 0 ? 0.9 : 1.1;
-      view.scale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, view.scale * delta));
-      const after = toGraphPoint(e.clientX, e.clientY);
-      // держим точку под курсором на месте, а не центр — привычнее, чем
-      // зум «от нуля координат»
-      view.x += (after.x - before.x) * view.scale;
-      view.y += (after.y - before.y) * view.scale;
-      applyView();
-    },
-    { passive: false }
-  );
-
-  let panStart = null;
-  svg.addEventListener("pointerdown", (e) => {
-    // узлы обрабатывают своё перетаскивание отдельно, полоса-приёмник
-    // ребра (.graph-edge-hit) — свой click на редактор связи, не пан.
-    if (e.target.closest(".graph-node") || e.target.closest(".graph-edge-hit")) return;
-    panStart = { x: e.clientX, y: e.clientY, vx: view.x, vy: view.y };
-    svg.setPointerCapture(e.pointerId);
-    svg.classList.add("panning");
-  });
-  svg.addEventListener("pointermove", (e) => {
-    if (!panStart) return;
-    view.x = panStart.vx + (e.clientX - panStart.x);
-    view.y = panStart.vy + (e.clientY - panStart.y);
-    applyView();
-  });
-  const endPan = () => {
-    if (!panStart) return;
-    panStart = null;
-    svg.classList.remove("panning");
+  // Окно или сайдбар поменяли размер — viewBox сцены должен совпасть с
+  // новым размером, иначе картинка ужимается. Кроме ResizeObserver ещё и
+  // resize окна: в свёрнутой панели кадры не идут, и наблюдатель молчит.
+  stopResizeWatch?.();
+  const stage = stageEl;
+  let lastSize = "";
+  const check = () => {
+    if (!stage.isConnected) return stopResizeWatch?.();
+    const size = `${stage.clientWidth}x${stage.clientHeight}`;
+    if (size === lastSize) return;
+    const first = !lastSize;
+    lastSize = size;
+    if (first) return;
+    if (!viewTouched) view = null;
+    drawScene();
   };
-  svg.addEventListener("pointerup", endPan);
-  svg.addEventListener("pointerleave", endPan);
+  const observer = new ResizeObserver(check);
+  observer.observe(stage);
+  window.addEventListener("resize", check);
+  stopResizeWatch = () => {
+    observer.disconnect();
+    window.removeEventListener("resize", check);
+    stopResizeWatch = null;
+  };
+  setTimeout(check, 0);
+}
 
-  for (const n of nodes) {
-    const g = nodeEls.get(n.id);
-    g.addEventListener("pointerdown", (e) => {
-      e.stopPropagation();
-      const start = toGraphPoint(e.clientX, e.clientY);
-      dragState = { id: n.id, moved: false, offX: start.x - n.x, offY: start.y - n.y };
-      n.dragging = true;
-      g.setPointerCapture(e.pointerId);
-      reheat();
-    });
-    g.addEventListener("pointermove", (e) => {
-      if (!dragState || dragState.id !== n.id) return;
-      const p = toGraphPoint(e.clientX, e.clientY);
-      n.x = p.x - dragState.offX;
-      n.y = p.y - dragState.offY;
-      n.vx = 0;
-      n.vy = 0;
-      dragState.moved = true;
-    });
-    const endDrag = () => {
-      if (!dragState || dragState.id !== n.id) return;
-      n.dragging = false;
-      const wasClick = !dragState.moved;
-      dragState = null;
-      resetHighlight(lineByNode, nodeEls);
-      if (wasClick) {
-        document.dispatchEvent(new CustomEvent("fictaris:open-entity", { detail: { type: n.type, id: n.id } }));
+function updateMeta() {
+  const people = i18nPlural(characters.length, ["{n} персонаж", "{n} персонажа", "{n} персонажей"]);
+  const rels = i18nPlural(relationships.length, ["{n} отношение", "{n} отношения", "{n} отношений"]);
+  metaEl.textContent = `${people} · ${rels}`;
+}
+
+// ── Раскладка ──────────────────────────────────
+// Рамки: по родам — связные компоненты по родителям и парам (как в
+// Родословной и «Составе» персонажей), одиночки — в общую «Вне родов»;
+// по фракциям — состав каждой фракции, человек в первой из своих.
+function buildBoxes() {
+  if (groupBy === "faction") {
+    const placed = new Set();
+    const boxes = [];
+    for (const f of factions) {
+      const ids = [f.leaderId, ...(f.memberIds || [])].filter((id, i, a) => id && a.indexOf(id) === i);
+      const members = ids.map(byId).filter((c) => c && !placed.has(c.id));
+      if (!members.length) continue;
+      members.forEach((c) => placed.add(c.id));
+      boxes.push({ title: f.name || i18n("Без названия"), members, leaderId: f.leaderId, grid: true });
+    }
+    const rest = characters.filter((c) => !placed.has(c.id));
+    if (rest.length) boxes.push({ title: i18n("Вне фракций"), members: rest, grid: true, loose: true });
+    return boxes;
+  }
+  const boxes = [];
+  const loners = [];
+  for (const group of familyComponents(characters)) {
+    if (group.length < 2) {
+      loners.push(...group);
+      continue;
+    }
+    const ids = new Set(group.map((c) => c.id));
+    const eldest = group.find((c) => !(c.parentIds || []).some((p) => ids.has(p))) || group[0];
+    const title = surnameHouseName(group) || i18n("Род: {name}", { name: eldest?.name || i18n("Без имени") });
+    boxes.push({ title, members: group, grid: false });
+  }
+  // familyComponents сортирует рода по размеру — порядок внутри рамки
+  // возвращаем к порядку персонажей в данных.
+  const order = new Map(characters.map((c, i) => [c.id, i]));
+  for (const b of boxes) b.members.sort((a, b2) => order.get(a.id) - order.get(b2.id));
+  loners.sort((a, b) => order.get(a.id) - order.get(b.id));
+  if (loners.length) boxes.push({ title: i18n("Вне родов"), members: loners, grid: true, loose: true });
+  return boxes;
+}
+
+// Ряды внутри рамки рода: поколение = на одно ниже родителей, пары —
+// в одном ряду и рядом (у кого пар больше — посередине, пары по бокам).
+function generationRows(members) {
+  const ids = new Set(members.map((c) => c.id));
+  const depth = new Map(members.map((c) => [c.id, 0]));
+  for (let pass = 0; pass < members.length + 1; pass++) {
+    let changed = false;
+    for (const c of members) {
+      for (const p of c.parentIds || []) {
+        if (ids.has(p) && depth.get(c.id) < depth.get(p) + 1) { depth.set(c.id, depth.get(p) + 1); changed = true; }
       }
-    };
-    g.addEventListener("pointerup", endDrag);
-    g.addEventListener("pointercancel", endDrag);
+      for (const p of c.partnerIds || []) {
+        if (!ids.has(p)) continue;
+        const d = Math.max(depth.get(c.id), depth.get(p));
+        if (depth.get(c.id) !== d || depth.get(p) !== d) { depth.set(c.id, d); depth.set(p, d); changed = true; }
+      }
+    }
+    if (!changed) break;
   }
+  const rows = [];
+  for (const c of members) (rows[depth.get(c.id)] ||= []).push(c);
+  return rows.filter(Boolean).map((row) => orderRow(row));
+}
 
-  const resetBtn = container.querySelector(".graph-reset-btn");
-  if (resetBtn) {
-    resetBtn.addEventListener("click", () => {
-      view.x = 0;
-      view.y = 0;
-      view.scale = 1;
-      applyView();
+function orderRow(row) {
+  const left = [...row];
+  const out = [];
+  const partnersIn = (c) => (c.partnerIds || []).map((id) => left.find((x) => x.id === id)).filter(Boolean);
+  // В порядке данных; у кого две пары и больше — он посередине.
+  while (left.length) {
+    const c = left[0];
+    const ps = partnersIn(c);
+    const chunk = [...ps.slice(1), c, ...ps.slice(0, 1)];
+    for (const x of chunk) left.splice(left.indexOf(x), 1);
+    out.push(...chunk);
+  }
+  return out;
+}
+
+function layout() {
+  const boxes = buildBoxes();
+  const pos = new Map();
+  let x = 0;
+  let y = 0;
+  let rowH = 0;
+  for (const box of boxes) {
+    const rows = box.grid
+      ? Array.from({ length: Math.ceil(box.members.length / LOOSE_COLS) }, (_, i) => box.members.slice(i * LOOSE_COLS, (i + 1) * LOOSE_COLS))
+      : generationRows(box.members);
+    const cols = Math.max(...rows.map((r) => r.length));
+    const w = cols * COL_W + BOX_PAD * 2;
+    const h = rows.length * ROW_H + BOX_HEAD;
+    if (x > 0 && x + w > MAX_ROW_W) {
+      x = 0;
+      y += rowH + BOX_GAP;
+      rowH = 0;
+    }
+    rows.forEach((row, ri) => {
+      const off = (cols - row.length) * COL_W / 2;
+      row.forEach((c, ci) => pos.set(c.id, { x: x + BOX_PAD + off + ci * COL_W + COL_W / 2, y: y + BOX_HEAD + ri * ROW_H + 30, top: y }));
     });
+    box.x = x;
+    box.y = y;
+    box.w = w;
+    box.h = h;
+    x += w + BOX_GAP;
+    rowH = Math.max(rowH, h);
   }
-
-  applyView();
+  const bounds = {
+    x0: Math.min(...boxes.map((b) => b.x)),
+    y0: Math.min(...boxes.map((b) => b.y)),
+    x1: Math.max(...boxes.map((b) => b.x + b.w)),
+    y1: Math.max(...boxes.map((b) => b.y + b.h)),
+  };
+  return { boxes, pos, bounds };
 }
 
-function highlight(id, lineByNode, nodeEls) {
-  const connected = new Set([id]);
-  for (const line of lineByNode.get(id) || []) {
-    line.setAttribute("stroke", "var(--accent)");
-    line.setAttribute("stroke-width", "2.5");
-    connected.add(line.dataset.a);
-    connected.add(line.dataset.b);
-  }
-  for (const [nid, g] of nodeEls) {
-    g.style.opacity = connected.has(nid) ? "1" : "0.25";
-  }
+// ── Сцена ──────────────────────────────────────
+function radiusOf(c) {
+  return isMain(c) ? 24 : 19;
 }
 
-function resetHighlight(lineByNode, nodeEls) {
-  for (const lines of lineByNode.values()) {
-    for (const line of lines) {
-      line.setAttribute("stroke", "var(--border)");
-      line.setAttribute("stroke-width", "1.5");
+function drawScene() {
+  if (!stageEl) return;
+  updateMeta();
+  scene = layout();
+  const { boxes, pos, bounds } = scene;
+  const arcs = arcGeometry(pos);
+  for (const a of arcs) bounds.y0 = Math.min(bounds.y0, a.pill.y - 20);
+  const w = stageEl.clientWidth || 900;
+  const h = stageEl.clientHeight || 600;
+  if (!view) view = fitView(bounds, w, h);
+
+  stageEl.innerHTML = "";
+  const svg = svgEl("svg", { class: "relmap-svg", viewBox: `0 0 ${w} ${h}` });
+  const vp = svgEl("g", { transform: `translate(${view.x},${view.y}) scale(${view.scale})` }, svg);
+  const gBoxes = svgEl("g", {}, vp);
+  const gFamily = svgEl("g", { class: "relmap-family" }, vp);
+  const gRels = svgEl("g", {}, vp);
+  const gNodes = svgEl("g", {}, vp);
+  const gPills = svgEl("g", {}, vp);
+  const gTemp = svgEl("g", {}, vp);
+
+  for (const b of boxes) {
+    svgEl("rect", { x: b.x, y: b.y, width: b.w, height: b.h, rx: 18, class: b.loose ? "relmap-box loose" : "relmap-box" }, gBoxes);
+    const t = svgEl("text", { x: b.x + 18, y: b.y + 28, class: "relmap-box-title" }, gBoxes);
+    t.textContent = b.title;
+  }
+
+  if (groupBy === "house") drawFamily(gFamily, pos);
+
+  for (const { r, d, color } of arcs) {
+    const g = svgEl("g", { class: "relmap-rel", "data-rel": r.id, "data-a": r.charA, "data-b": r.charB }, gRels);
+    svgEl("path", { d, class: "relmap-rel-hit" }, g);
+    svgEl("path", { d, class: "relmap-rel-line", stroke: color, "stroke-width": 1.8 + Math.abs(r.score || 0) / 28 }, g);
+  }
+  for (const p of arcs.map((a) => a.pill)) {
+    const text = [p.r.label, scoreText(p.r.score)].filter(Boolean).join(" ");
+    const pw = text.length * 6.3 + 16;
+    const g = svgEl("g", { class: "relmap-pill", "data-rel": p.r.id, "data-a": p.r.charA, "data-b": p.r.charB, transform: `translate(${p.x},${p.y})` }, gPills);
+    svgEl("rect", { x: -pw / 2, y: -10, width: pw, height: 20, rx: 10, stroke: p.color }, g);
+    const t = svgEl("text", { "text-anchor": "middle", dy: "0.35em", fill: p.color }, g);
+    t.textContent = text;
+  }
+
+  const q = query.trim().toLowerCase();
+  for (const c of characters) {
+    const p = pos.get(c.id);
+    if (!p) continue;
+    const r = radiusOf(c);
+    const cls = ["relmap-node"];
+    if (isDead(c)) cls.push("dead");
+    if (c.id === selectedId) cls.push("selected");
+    if (q && !(c.name || "").toLowerCase().includes(q)) cls.push("faded");
+    const g = svgEl("g", { class: cls.join(" "), "data-id": c.id, transform: `translate(${p.x},${p.y})` }, gNodes);
+    svgEl("circle", { r: r + 5, class: "relmap-node-ring" }, g);
+    const fo = svgEl("foreignObject", { x: -r, y: -r, width: r * 2, height: r * 2 }, g);
+    fo.innerHTML = `<div xmlns="http://www.w3.org/1999/xhtml" class="relmap-avatar" style="--size:${r * 2}px">${personAvatarHtml(c, "cast-avatar")}</div>`;
+    const name = svgEl("text", { y: r + 17, class: isMain(c) ? "relmap-name main" : "relmap-name" }, g);
+    name.textContent = c.name || i18n("Без имени");
+    const sub = subLabel(c);
+    if (sub) {
+      const s = svgEl("text", { y: r + 31, class: "relmap-sub" }, g);
+      s.textContent = sub.length > 26 ? sub.slice(0, 25) + "…" : sub;
     }
   }
-  for (const g of nodeEls.values()) g.style.opacity = "1";
+
+  stageEl.appendChild(svg);
+  stageEl.appendChild(buildStageControls(bounds));
+  if (!relationships.length) {
+    const hint = document.createElement("div");
+    hint.className = "relmap-hint";
+    hint.textContent = i18n("Протяни линию от одного персонажа к другому – появится отношение");
+    stageEl.appendChild(hint);
+  }
+  attachInteraction(svg, vp, gTemp);
+  applyFocus(svg, selectedId);
 }
 
-// ── Редактор связи по клику на ребро ────────────
-// Вкладки «Связи» больше нет (её список и мини-граф целиком задваивали
-// то, что уже есть на карточке персонажа и здесь, в общем графе) —
-// вместо неё правка прямо по клику на ребро, тем же приёмом, что и в
-// articy:draft: холст остаётся единственным местом, где видно все связи
-// сразу, а форма всплывает по месту, а не уводит на отдельный экран.
-// Метка/сила/заметка — те же поля и те же CSS-классы, что и у
-// мини-редактора в дровере персонажа (characters.js) — общий взгляд на
-// одни и те же данные, просто с другой стороны.
-function openEdgeEditor(edge, x, y) {
-  const rel = relationshipsData.find((r) => r.id === edge.relId);
+// Дуги поднимаются над рамками обоих персонажей (вершина — выше их
+// верхнего края), каждая следующая чуть выше, чтобы дуги между одними
+// и теми же рамками не сливались в одну. Почти вертикальные — изгибом
+// вбок.
+function arcGeometry(pos) {
+  const arcs = [];
+  relationships.forEach((r, i) => {
+    const a = pos.get(r.charA);
+    const b = pos.get(r.charB);
+    if (!a || !b) return;
+    const color = scoreColor(r.score || 0);
+    let cx = (a.x + b.x) / 2;
+    let cy;
+    if (Math.abs(b.x - a.x) > 60) {
+      const peak = Math.min(a.top, b.top) - 18 - (i % 4) * 26;
+      cy = 2 * peak - (a.y + b.y) / 2;
+    } else {
+      cx += 70 + (i % 4) * 20;
+      cy = (a.y + b.y) / 2;
+    }
+    const sa = towards(a, { x: cx, y: cy }, radiusOf(byId(r.charA)) + 4);
+    const sb = towards(b, { x: cx, y: cy }, radiusOf(byId(r.charB)) + 4);
+    arcs.push({
+      r,
+      color,
+      d: `M${sa.x},${sa.y} Q${cx},${cy} ${sb.x},${sb.y}`,
+      pill: { r, color, x: (sa.x + 2 * cx + sb.x) / 4, y: (sa.y + 2 * cy + sb.y) / 4 },
+    });
+  });
+  spreadPills(arcs.map((a) => a.pill));
+  return arcs;
+}
+
+function towards(from, to, dist) {
+  const len = Math.hypot(to.x - from.x, to.y - from.y) || 1;
+  return { x: from.x + ((to.x - from.x) / len) * dist, y: from.y + ((to.y - from.y) / len) * dist };
+}
+
+// Подписи дуг не должны лежать друг на друге: раздвигаем вверх, в
+// пустое место над рамками.
+function spreadPills(pills) {
+  const sorted = [...pills].sort((a, b) => b.y - a.y);
+  for (let i = 0; i < sorted.length; i++) {
+    for (let j = 0; j < i; j++) {
+      const a = sorted[j];
+      const b = sorted[i];
+      const wa = ([a.r.label, scoreText(a.r.score)].join(" ").length * 6.3 + 16) / 2;
+      const wb = ([b.r.label, scoreText(b.r.score)].join(" ").length * 6.3 + 16) / 2;
+      if (Math.abs(a.x - b.x) < wa + wb + 4 && Math.abs(a.y - b.y) < 24) b.y = a.y - 24;
+    }
+  }
+  return sorted;
+}
+
+function subLabel(c) {
+  if (groupBy === "faction") {
+    return factions.some((f) => f.leaderId === c.id) ? i18n("глава") : "";
+  }
+  const f = factions.find((x) => x.leaderId === c.id) || factions.find((x) => (x.memberIds || []).includes(c.id));
+  if (!f) return "";
+  return f.leaderId === c.id ? i18n("глава · {name}", { name: f.name }) : f.name;
+}
+
+// Семья внутри рамки рода — тонко, чтобы не спорить с отношениями:
+// дети уголком от середины пары родителей, пары — прямой (любовники
+// пунктиром).
+function drawFamily(g, pos) {
+  for (const c of characters) {
+    const pc = pos.get(c.id);
+    if (!pc) continue;
+    const parents = (c.parentIds || []).map((id) => pos.get(id)).filter(Boolean);
+    if (parents.length) {
+      const px = parents.reduce((s, p) => s + p.x, 0) / parents.length;
+      const py = Math.max(...parents.map((p) => p.y));
+      const midY = (py + pc.y) / 2 - 6;
+      const uncertain = (c.uncertainParentIds || []).length > 0;
+      const adoptive = (c.adoptiveParentIds || []).length > 0;
+      svgEl("path", {
+        d: `M${px},${py} V${midY} H${pc.x} V${pc.y - radiusOf(c) - 2}`,
+        stroke: FAMILY_COLOR,
+        "stroke-dasharray": uncertain ? "1 4" : adoptive ? "5 4" : "",
+      }, g);
+    }
+    for (const id of c.partnerIds || []) {
+      if (c.id > id) continue;
+      const q = pos.get(id);
+      const other = byId(id);
+      if (!q || !other) continue;
+      const kind = partnerKind(c, id);
+      const sa = towards(pc, q, radiusOf(c) + 3);
+      const sb = towards(q, pc, radiusOf(other) + 3);
+      svgEl("line", {
+        x1: sa.x, y1: sa.y, x2: sb.x, y2: sb.y,
+        stroke: FAMILY_COLOR,
+        "stroke-dasharray": kind === "lover" ? "4 3" : kind === "divorced" ? "1 4" : "",
+      }, g);
+    }
+  }
+}
+
+function fitView(bounds, w, h) {
+  const pad = 40;
+  const bw = bounds.x1 - bounds.x0;
+  const bh = bounds.y1 - bounds.y0;
+  const scale = Math.min(1.4, Math.max(0.3, Math.min((w - pad * 2) / bw, (h - pad * 2) / bh)));
+  return {
+    scale,
+    x: (w - bw * scale) / 2 - bounds.x0 * scale,
+    y: (h - bh * scale) / 2 - bounds.y0 * scale,
+  };
+}
+
+function buildStageControls(bounds) {
+  const box = document.createElement("div");
+  box.className = "relmap-zoom";
+  const mk = (html, title, fn) => {
+    const b = document.createElement("button");
+    b.className = "btn";
+    b.innerHTML = html;
+    b.title = title;
+    b.setAttribute("aria-label", title);
+    b.addEventListener("click", fn);
+    box.appendChild(b);
+  };
+  const zoomBy = (k) => {
+    viewTouched = true;
+    const w = stageEl.clientWidth;
+    const h = stageEl.clientHeight;
+    zoomAround(w / 2, h / 2, k);
+    drawScene();
+  };
+  mk("−", i18n("Отдалить"), () => zoomBy(1 / 1.2));
+  mk("+", i18n("Приблизить"), () => zoomBy(1.2));
+  mk(iconSvg("focus", 14), i18n("Вписать"), () => {
+    view = fitView(bounds, stageEl.clientWidth, stageEl.clientHeight);
+    viewTouched = false;
+    drawScene();
+  });
+  return box;
+}
+
+function zoomAround(sx, sy, k) {
+  const scale = Math.min(2.5, Math.max(0.25, view.scale * k));
+  const gx = (sx - view.x) / view.scale;
+  const gy = (sy - view.y) / view.scale;
+  view = { scale, x: sx - gx * scale, y: sy - gy * scale };
+}
+
+// Подсветка: выбранный (или тот, над кем курсор) и его отношения ярко,
+// остальное приглушено.
+function applyFocus(svg, id) {
+  svg.classList.toggle("has-focus", !!id);
+  const near = new Set(id ? [id, ...relsOf(id).map((r) => otherOf(r, id))] : []);
+  for (const n of svg.querySelectorAll(".relmap-node")) n.classList.toggle("near", near.has(n.dataset.id));
+  for (const e of svg.querySelectorAll(".relmap-rel, .relmap-pill")) {
+    e.classList.toggle("near", !!id && (e.dataset.a === id || e.dataset.b === id));
+  }
+}
+
+// ── Мышь: сдвиг, масштаб, выбор, протянуть новое отношение ──
+function attachInteraction(svg, vp, gTemp) {
+  const toScene = (e) => {
+    const rect = svg.getBoundingClientRect();
+    return { sx: e.clientX - rect.left, sy: e.clientY - rect.top };
+  };
+  const toWorld = (e) => {
+    const { sx, sy } = toScene(e);
+    return { x: (sx - view.x) / view.scale, y: (sy - view.y) / view.scale };
+  };
+  const applyView = () => vp.setAttribute("transform", `translate(${view.x},${view.y}) scale(${view.scale})`);
+  const capture = (el, id) => { try { el.setPointerCapture(id); } catch {} };
+
+  svg.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    const { sx, sy } = toScene(e);
+    zoomAround(sx, sy, e.deltaY > 0 ? 0.9 : 1.1);
+    viewTouched = true;
+    applyView();
+  }, { passive: false });
+
+  let drag = null;
+  let lastClick = { id: null, at: 0 };
+  svg.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0) return;
+    const node = e.target.closest(".relmap-node");
+    const rel = e.target.closest(".relmap-rel, .relmap-pill");
+    if (rel && !node) return;
+    capture(svg, e.pointerId);
+    if (node) {
+      const from = node.dataset.id;
+      drag = { kind: "link", from, start: scene.pos.get(from), x: e.clientX, y: e.clientY, moved: false, line: null, target: null };
+    } else {
+      drag = { kind: "pan", x: e.clientX, y: e.clientY, vx: view.x, vy: view.y, moved: false };
+      svg.classList.add("panning");
+    }
+  });
+
+  svg.addEventListener("pointermove", (e) => {
+    if (!drag) {
+      if (!selectedId) {
+        const node = e.target.closest(".relmap-node");
+        const id = node?.dataset.id || null;
+        if (svg.dataset.hover !== (id || "")) {
+          svg.dataset.hover = id || "";
+          applyFocus(svg, id);
+        }
+      }
+      return;
+    }
+    if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 4) drag.moved = true;
+    if (drag.kind === "pan") {
+      view = { ...view, x: drag.vx + (e.clientX - drag.x), y: drag.vy + (e.clientY - drag.y) };
+      viewTouched = true;
+      applyView();
+      return;
+    }
+    if (!drag.moved) return;
+    const p = toWorld(e);
+    if (!drag.line) drag.line = svgEl("line", { class: "relmap-temp" }, gTemp);
+    drag.line.setAttribute("x1", drag.start.x);
+    drag.line.setAttribute("y1", drag.start.y);
+    drag.line.setAttribute("x2", p.x);
+    drag.line.setAttribute("y2", p.y);
+    const under = document.elementFromPoint(e.clientX, e.clientY)?.closest?.(".relmap-node");
+    const target = under && under.dataset.id !== drag.from ? under.dataset.id : null;
+    if (target !== drag.target) {
+      svg.querySelector(".relmap-node.drop")?.classList.remove("drop");
+      if (target) under.classList.add("drop");
+      drag.target = target;
+    }
+  });
+
+  const end = (e) => {
+    if (!drag) return;
+    const d = drag;
+    drag = null;
+    svg.classList.remove("panning");
+    if (d.kind === "pan") {
+      if (!d.moved && selectedId) select(null);
+      return;
+    }
+    d.line?.remove();
+    if (!d.moved) {
+      // Двойной щелчок ловим сами: из-за захвата указателя событие
+      // dblclick приходит на svg, а не на узел. Второй щелчок не снимает
+      // выбор, а открывает досье.
+      const now = Date.now();
+      const repeat = lastClick.id === d.from && now - lastClick.at < 400;
+      lastClick = repeat ? { id: null, at: 0 } : { id: d.from, at: now };
+      if (repeat) document.dispatchEvent(new CustomEvent("fictaris:open-entity", { detail: { type: "character", id: d.from } }));
+      else select(selectedId === d.from ? null : d.from);
+      return;
+    }
+    if (d.target) linkPeople(d.from, d.target, e.clientX, e.clientY);
+    else svg.querySelector(".relmap-node.drop")?.classList.remove("drop");
+  };
+  svg.addEventListener("pointerup", end);
+  svg.addEventListener("pointercancel", () => {
+    drag?.line?.remove();
+    drag = null;
+    svg.classList.remove("panning");
+  });
+
+  svg.addEventListener("click", (e) => {
+    const rel = e.target.closest(".relmap-rel, .relmap-pill");
+    if (rel) openRelEditor(rel.dataset.rel, e.clientX, e.clientY);
+  });
+
+  svg.addEventListener("pointerleave", () => {
+    if (!drag && !selectedId) {
+      svg.dataset.hover = "";
+      applyFocus(svg, null);
+    }
+  });
+}
+
+// Без перерисовки сцены: иначе второй щелчок двойного попадал бы уже в
+// новый svg и «открыть досье» по двойному щелчку не срабатывало бы.
+function select(id) {
+  selectedId = id;
+  const svg = stageEl?.querySelector(".relmap-svg");
+  if (svg) {
+    for (const n of svg.querySelectorAll(".relmap-node")) n.classList.toggle("selected", n.dataset.id === id);
+    applyFocus(svg, id);
+  }
+  renderSide();
+}
+
+function linkPeople(a, b, x, y) {
+  let rel = relationships.find((r) => (r.charA === a && r.charB === b) || (r.charA === b && r.charB === a));
+  if (!rel) {
+    rel = { id: uid(), charA: a, charB: b, label: "", score: 0, note: "" };
+    relationships.push(rel);
+    saveRelationships(relationships);
+  }
+  selectedId = a;
+  drawScene();
+  renderSide();
+  openRelEditor(rel.id, x, y, true);
+}
+
+// ── Правка отношения ───────────────────────────
+function openRelEditor(relId, x, y, focusLabel = false) {
+  const rel = relationships.find((r) => r.id === relId);
   if (!rel) return;
-  const charName = (id) => charactersData.find((c) => c.id === id)?.name || i18n("?");
+  const name = (id) => byId(id)?.name || i18n("?");
+  const changed = () => {
+    saveRelationships(relationships);
+    drawScene();
+    renderSide();
+  };
 
   const wrap = document.createElement("div");
   wrap.className = "graph-edge-editor";
 
   const title = document.createElement("div");
   title.className = "graph-edge-editor-title";
-  title.textContent = `${charName(rel.charA)} ↔ ${charName(rel.charB)}`;
+  title.textContent = `${name(rel.charA)} ↔ ${name(rel.charB)}`;
   wrap.appendChild(title);
 
   const label = document.createElement("input");
@@ -588,7 +708,7 @@ function openEdgeEditor(edge, x, y) {
   label.value = rel.label || "";
   label.addEventListener("input", () => {
     rel.label = label.value;
-    saveRelationships(relationshipsData);
+    changed();
   });
   wrap.appendChild(label);
 
@@ -596,7 +716,7 @@ function openEdgeEditor(edge, x, y) {
   sliderRow.className = "rel-sliders";
   const scoreLabel = document.createElement("span");
   scoreLabel.className = "rel-score-label";
-  scoreLabel.textContent = rel.score || 0;
+  scoreLabel.textContent = scoreText(rel.score);
   const slider = document.createElement("input");
   slider.type = "range";
   slider.className = "rel-slider";
@@ -605,11 +725,16 @@ function openEdgeEditor(edge, x, y) {
   slider.value = rel.score || 0;
   slider.addEventListener("input", () => {
     rel.score = Number(slider.value);
-    scoreLabel.textContent = rel.score;
-    saveRelationships(relationshipsData);
+    scoreLabel.textContent = scoreText(rel.score);
+    changed();
   });
   sliderRow.append(scoreLabel, slider);
   wrap.appendChild(sliderRow);
+
+  const scale = document.createElement("div");
+  scale.className = "relmap-scale";
+  scale.innerHTML = `<span>${i18n("вражда")}</span><span>${i18n("близость")}</span>`;
+  wrap.appendChild(scale);
 
   const note = document.createElement("textarea");
   note.className = "field-inline-control rel-note";
@@ -617,7 +742,8 @@ function openEdgeEditor(edge, x, y) {
   note.value = rel.note || "";
   note.addEventListener("input", () => {
     rel.note = note.value;
-    saveRelationships(relationshipsData);
+    saveRelationships(relationships);
+    renderSide();
   });
   wrap.appendChild(note);
 
@@ -626,45 +752,129 @@ function openEdgeEditor(edge, x, y) {
   delBtn.textContent = i18n("Удалить связь");
   delBtn.addEventListener("click", async () => {
     await pushTrash("relationship", rel);
-    relationshipsData = relationshipsData.filter((r) => r.id !== rel.id);
-    await apiPost("/api/relationships", relationshipsData);
-    // Прямая правка edges/draw(), а не полный renderGraph() — тот заново
-    // спросил бы сервер и мог обогнать debounce-сохранение остальных
-    // полей (см. saveRelationships), draw() просто перерисовывает уже
-    // обновлённый в памяти список рёбер, ничего не пересчитывая заново.
-    edges = edges.filter((e) => e !== edge);
+    relationships = relationships.filter((r) => r.id !== rel.id);
+    await apiPost("/api/relationships", relationships);
     closeMenu();
-    draw();
+    drawScene();
+    renderSide();
   });
   wrap.appendChild(delBtn);
 
   openPopover(x, y, wrap, "graph-edge-popover");
+  if (focusLabel) setTimeout(() => label.focus(), 0);
 }
 
-function buildToolbar() {
-  const bar = document.createElement("div");
-  bar.className = "graph-toolbar";
-
-  const hint = document.createElement("span");
-  hint.className = "graph-hint";
-  hint.textContent = i18n("Тащи узлы мышью, крути колесо для зума, клик по узлу открывает карточку, по связи между персонажами – редактирует её");
-  bar.appendChild(hint);
-
-  const resetBtn = document.createElement("button");
-  resetBtn.className = "btn graph-reset-btn";
-  resetBtn.textContent = i18n("Сбросить вид");
-  bar.appendChild(resetBtn);
-
-  return bar;
-}
-
-function buildLegend() {
+// ── Панель справа ──────────────────────────────
+function renderSide() {
+  if (!sideEl) return;
+  sideEl.innerHTML = "";
+  const c = selectedId && byId(selectedId);
+  if (c) renderPersonSide(c);
+  else renderAllSide();
   const legend = document.createElement("div");
-  legend.className = "graph-legend";
+  legend.className = "relmap-legend";
   legend.innerHTML = `
-    <span><span class="legend-dot" style="background:#c9944a"></span>${i18n("Персонажи")}</span>
-    <span><span class="legend-dot" style="background:#6a8fae"></span>${i18n("Локации/фракции – цвет по типу")}</span>
-    <span><span class="legend-line legend-line-dashed"></span>${i18n("пунктир – найдено по «@упоминанию» в тексте, не задано вручную")}</span>
-  `;
-  return legend;
+    <span><i style="border-color:#6fa772"></i>${i18n("близость")}</span>
+    <span><i style="border-color:#c25a4c"></i>${i18n("вражда")}</span>
+    ${groupBy === "house" ? `<span><i class="thin" style="border-color:${FAMILY_COLOR}"></i>${i18n("родство и пары")}</span>` : ""}
+    <span>${i18n("толщина – сила")}</span>`;
+  sideEl.appendChild(legend);
+}
+
+function sideHead(titleHtml, sub) {
+  const head = document.createElement("div");
+  head.className = "relmap-side-head";
+  head.innerHTML = `${titleHtml}<div class="relmap-side-sub">${escapeHtml(sub)}</div>`;
+  sideEl.appendChild(head);
+}
+
+function relRow(lead, text, r) {
+  const row = document.createElement("button");
+  row.className = "relmap-row";
+  row.innerHTML = `${lead}<span class="relmap-row-main"><span class="relmap-row-name">${text}</span>${r.label || r.note ? `<span class="relmap-row-note">${escapeHtml([r.label, r.note].filter(Boolean).join(" – "))}</span>` : ""}</span>
+    <span class="relmap-row-score" style="color:${scoreColor(r.score || 0)}">${scoreText(r.score)}</span>`;
+  row.addEventListener("click", (e) => {
+    const rect = row.getBoundingClientRect();
+    openRelEditor(r.id, rect.left - 280, rect.top);
+    e.stopPropagation();
+  });
+  return row;
+}
+
+function sectionTitle(text) {
+  const t = document.createElement("div");
+  t.className = "relmap-sec";
+  t.textContent = text;
+  return t;
+}
+
+function renderAllSide() {
+  sideHead(`<h3>${i18n("Все отношения")}</h3>`, i18n("От самых сильных. Щелчок по персонажу на карте – только его"));
+  const list = document.createElement("div");
+  list.className = "relmap-list";
+  const sorted = [...relationships].sort((a, b) => Math.abs(b.score || 0) - Math.abs(a.score || 0));
+  for (const r of sorted) {
+    const a = byId(r.charA);
+    const b = byId(r.charB);
+    if (!a || !b) continue;
+    list.appendChild(relRow("", `${escapeHtml(shortName(a.name))} ↔ ${escapeHtml(shortName(b.name))}`, r));
+  }
+  if (!sorted.length) {
+    const none = document.createElement("div");
+    none.className = "relmap-side-sub";
+    none.textContent = i18n("Пока ни одного. Протяни линию от персонажа к персонажу на карте.");
+    list.appendChild(none);
+  }
+  sideEl.appendChild(list);
+
+  const lonely = characters.filter((c) => !relsOf(c.id).length);
+  if (lonely.length && relationships.length) {
+    const sec = document.createElement("div");
+    sec.appendChild(sectionTitle(i18n("Без отношений · {n}", { n: lonely.length })));
+    const chips = document.createElement("div");
+    chips.className = "relmap-chips";
+    for (const c of lonely) {
+      const chip = document.createElement("button");
+      chip.className = "relmap-chip";
+      chip.innerHTML = `${personAvatarHtml(c)}<span>${escapeHtml(c.name || i18n("Без имени"))}</span>`;
+      chip.addEventListener("click", () => select(c.id));
+      chips.appendChild(chip);
+    }
+    sec.appendChild(chips);
+    sideEl.appendChild(sec);
+  }
+}
+
+function renderPersonSide(c) {
+  const rels = relsOf(c.id).sort((a, b) => Math.abs(b.score || 0) - Math.abs(a.score || 0));
+  sideHead(
+    `<div class="relmap-side-title">${personAvatarHtml(c, "cast-avatar cast-avatar-md")}<h3>${escapeHtml(c.name || i18n("Без имени"))}</h3></div>`,
+    rels.length ? i18nPlural(rels.length, ["{n} отношение", "{n} отношения", "{n} отношений"]) : i18n("Пока ни с кем")
+  );
+  const list = document.createElement("div");
+  list.className = "relmap-list";
+  for (const r of rels) {
+    const other = byId(otherOf(r, c.id));
+    if (!other) continue;
+    list.appendChild(relRow(personAvatarHtml(other), escapeHtml(other.name || i18n("Без имени")), r));
+  }
+  sideEl.appendChild(list);
+
+  const hint = document.createElement("div");
+  hint.className = "relmap-side-sub";
+  hint.textContent = i18n("Новое отношение – протяни линию от персонажа к другому на карте");
+  sideEl.appendChild(hint);
+
+  const actions = document.createElement("div");
+  actions.className = "relmap-actions";
+  const open = document.createElement("button");
+  open.className = "btn";
+  open.textContent = i18n("Открыть досье");
+  open.addEventListener("click", () => document.dispatchEvent(new CustomEvent("fictaris:open-entity", { detail: { type: "character", id: c.id } })));
+  const back = document.createElement("button");
+  back.className = "btn";
+  back.textContent = i18n("Все отношения");
+  back.addEventListener("click", () => select(null));
+  actions.append(open, back);
+  sideEl.appendChild(actions);
 }

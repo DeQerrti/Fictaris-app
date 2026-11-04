@@ -68,7 +68,7 @@ svg { flex-shrink: 0; }
 
 /* ── Базовые стили нативных элементов ──
    Подложка для select/range без отдельного класса (мини-редактор связей
-   в дровере персонажа, characters.js; редактор ребра в графе, graph.js) —
+   в дровере персонажа, characters.js; редактор дуги в «Отношениях», graph.js) —
    раньше они рисовались голым браузерным стилем поверх тёмной темы и
    сильно из неё выпадали. Любой более специфичный класс (.field select
    и т.п.) по-прежнему приоритетнее этих правил. */
@@ -551,8 +551,8 @@ body.focus-mode .sidebar { display: none; }
   max-width: 380px;
 }
 
-/* Попап редактора связи по клику на ребро в графе проекта (graph.js,
-   openEdgeEditor) — форма вместо списка пунктов, шире обычного меню. */
+/* Попап редактора связи по клику на дугу в «Отношениях» (graph.js,
+   openRelEditor) — форма вместо списка пунктов, шире обычного меню. */
 .context-menu.graph-edge-popover {
   padding: 12px;
   min-width: 260px;
@@ -2065,7 +2065,7 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
 /* Мини-редактор связей внутри дровера персонажа (characters.js) — те же
    .rel-row/.rel-sliders и т.п., просто без графа и в узкой колонке
    дровера. Второе место с теми же полями — редактор ребра по клику в
-   графе проекта (graph.js, .graph-edge-editor ниже), общий .rel-note
+   «Отношениях» (graph.js, .graph-edge-editor ниже), общий .rel-note
    там и там. */
 .rel-mini-list { display: flex; flex-direction: column; gap: 10px; }
 .rel-mini-row { padding: 10px; background: var(--panel); border-radius: 8px; }
@@ -2073,11 +2073,10 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
 .rel-note { width: 100%; margin-top: 8px; resize: vertical; min-height: 36px; }
 
 /* Отдельной вкладки "Связи" больше нет — правка конкретной связи теперь
-   по клику на ребро между персонажами прямо в графе проекта (graph.js,
-   openEdgeEditor), всплывающим попапом того же вида, что и обычное
+   по клику на дугу между персонажами во вкладке «Отношения» (graph.js,
+   openRelEditor), всплывающим попапом того же вида, что и обычное
    контекстное меню (openPopover, context-menu.js), просто с формой
    вместо списка пунктов. */
-.graph-edge-hit { cursor: pointer; }
 .graph-edge-editor { display: flex; flex-direction: column; gap: 10px; }
 .graph-edge-editor-title { font-weight: 600; color: var(--text); margin-bottom: 2px; }
 .graph-edge-editor-del { width: 100%; }
@@ -3538,39 +3537,145 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
 .diff-line.diff-equal { color: var(--text-faint); }
 .diff-line.diff-gap { color: var(--text-faint); font-style: italic; text-align: center; padding: 2px 0; }
 
-/* ── Граф проекта ──────────────────────────── */
-
-.pgraph-view {
+/* ── Отношения (app/js/graph.js) ──────────────
+   Персонажи рамками по родам или фракциям, отношения — дугами между
+   ними, справа список отношений или выбранного персонажа. */
+.relmap-view {
+  container-type: inline-size;
   flex: 1;
   min-height: 0;
+  height: 100%;
+  box-sizing: border-box;
   overflow: hidden;
   padding: 16px 20px 20px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
-
-.pgraph-holder {
+.relmap-body { flex: 1; min-height: 0; display: flex; gap: 14px; }
+.relmap-stage {
   flex: 1;
-  min-height: 0;
+  min-width: 0;
+  position: relative;
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 12px;
   overflow: hidden;
 }
-
-.pgraph-holder svg text { pointer-events: none; user-select: none; }
-
-.pgraph-svg { display: block; width: 100%; height: 100%; cursor: grab; touch-action: none; }
-.pgraph-svg.panning { cursor: grabbing; }
-.graph-node { cursor: pointer; transition: opacity 0.15s; }
-
-.graph-toolbar {
+.relmap-svg { display: block; width: 100%; height: 100%; cursor: grab; touch-action: none; user-select: none; }
+.relmap-svg.panning { cursor: grabbing; }
+.relmap-svg text { pointer-events: none; font-family: var(--font-ui); }
+.relmap-box { fill: var(--panel-alt); stroke: var(--border); }
+.relmap-box.loose { stroke-dasharray: 5 5; }
+.relmap-box-title { fill: var(--text-dim); font-family: var(--font-book) !important; font-size: 14px; font-weight: 600; }
+.relmap-family path, .relmap-family line { fill: none; stroke-width: 1.4; opacity: 0.6; }
+.relmap-rel { cursor: pointer; transition: opacity 0.15s; }
+.relmap-rel-hit { fill: none; stroke: transparent; stroke-width: 14; }
+.relmap-rel-line { fill: none; stroke-linecap: round; }
+.relmap-rel:hover .relmap-rel-line { filter: brightness(1.25); }
+.relmap-pill { cursor: pointer; transition: opacity 0.15s; }
+.relmap-pill rect { fill: var(--panel-alt); stroke-width: 1; }
+.relmap-pill text { font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.relmap-pill:hover rect { fill: var(--panel); }
+.relmap-node { cursor: pointer; transition: opacity 0.15s; }
+.relmap-node-ring { fill: none; stroke: var(--accent); stroke-width: 2; opacity: 0; }
+.relmap-node.selected .relmap-node-ring, .relmap-node.drop .relmap-node-ring { opacity: 1; }
+.relmap-node.drop .relmap-node-ring { stroke-dasharray: 4 3; }
+.relmap-avatar { width: 100%; height: 100%; }
+.relmap-avatar .cast-avatar { --size: inherit; border-radius: 50%; }
+.relmap-node.dead .cast-avatar { filter: grayscale(0.7) brightness(0.8); }
+.relmap-name {
+  text-anchor: middle;
+  fill: var(--text);
+  font-size: 12px;
+  paint-order: stroke;
+  stroke: var(--panel-alt);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+}
+.relmap-name.main { font-weight: 600; font-size: 13px; }
+.relmap-sub { text-anchor: middle; fill: var(--text-faint); font-size: 10.5px; }
+.relmap-node.faded { opacity: 0.25; }
+.relmap-svg.has-focus .relmap-node:not(.near) { opacity: 0.25; }
+.relmap-svg.has-focus .relmap-rel:not(.near),
+.relmap-svg.has-focus .relmap-pill:not(.near) { opacity: 0.12; }
+.relmap-temp { stroke: var(--accent); stroke-width: 2; stroke-dasharray: 5 4; pointer-events: none; }
+.relmap-zoom { position: absolute; right: 12px; bottom: 12px; display: flex; gap: 4px; }
+.relmap-zoom .btn { min-width: 32px; height: 32px; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
+.relmap-hint {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  background: var(--panel-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 10px;
+}
+.relmap-side {
+  width: 300px;
+  flex: none;
+  background: var(--panel-alt);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.relmap-side h3 { margin: 0; font: 600 1.15rem var(--font-book); color: var(--text); }
+.relmap-side-title { display: flex; align-items: center; gap: 10px; }
+.relmap-side-title .cast-avatar { border-radius: 50%; }
+.relmap-side-sub { font-size: 0.8rem; color: var(--text-faint); margin-top: 4px; }
+.relmap-sec { font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-faint); margin-bottom: 8px; }
+.relmap-list { display: flex; flex-direction: column; gap: 2px; }
+.relmap-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  gap: 10px;
   width: 100%;
+  padding: 8px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--text);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+.relmap-row:hover { background: var(--card); }
+.relmap-row .cast-avatar { border-radius: 50%; }
+.relmap-row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.relmap-row-name { font-size: 0.88rem; }
+.relmap-row-note { font-size: 0.78rem; color: var(--text-faint); }
+.relmap-row-score { font-weight: 600; font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+.relmap-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.relmap-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px 3px 3px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.relmap-chip:hover { color: var(--text); border-color: var(--accent); }
+.relmap-chip .cast-avatar { border-radius: 50%; }
+.relmap-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.relmap-legend { margin-top: auto; display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 0.78rem; color: var(--text-faint); }
+.relmap-legend i { display: inline-block; width: 18px; height: 0; border-top: 3px solid; vertical-align: middle; margin-right: 6px; }
+.relmap-legend i.thin { border-top-width: 1.5px; }
+.relmap-scale { display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--text-faint); margin: -6px 0 0 46px; }
+
+@container (max-width: 760px) {
+  .relmap-body { flex-direction: column; }
+  .relmap-side { width: auto; max-height: 40%; }
 }
 
 /* .rel-row/.rel-row-top/.rel-row-label/.rel-sliders/.rel-score-label/
@@ -3589,18 +3694,6 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
   text-align: right;
 }
 .rel-slider { flex: 1; }
-
-.graph-hint {
-  font-size: 0.78rem;
-  color: var(--text-faint);
-}
-
-.graph-legend {
-  display: flex;
-  gap: 20px;
-  font-size: 0.8rem;
-  color: var(--text-faint);
-}
 
 /* Знания (app/js/knowledge.js) — список карточек-фактов, у каждой
    строка на причастного персонажа с выбором главы. */
@@ -3628,24 +3721,6 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
 .knowledge-row-name { flex: 0 0 140px; color: var(--text); font-size: 0.88rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .knowledge-row select { flex: 1; }
 .knowledge-empty-row { color: var(--text-faint); font-size: 0.85rem; }
-
-.legend-dot {
-  display: inline-block;
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  margin-right: 6px;
-}
-
-.legend-line {
-  display: inline-block;
-  width: 18px;
-  height: 0;
-  border-top: 1.5px solid var(--text-faint);
-  margin-right: 6px;
-  vertical-align: middle;
-}
-.legend-line-dashed { border-top-style: dashed; }
 
 /* ── Родословная (app/js/family-tree.js) ──────
    «Древо» — все рода (или выбранный) на одном панорамируемом полотне:
