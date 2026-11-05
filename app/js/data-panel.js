@@ -1,5 +1,5 @@
 import { apiGet, apiPost } from "./api.js";
-import { buildDemoBundle } from "./demo-data.js";
+import { buildDemoBundle, withDemoSettings, stripDemoSettings } from "./demo-data.js";
 import { exportSiteZip } from "./export-site.js";
 import { exportWorldPdf } from "./export-pdf.js";
 import { diffLines, collapseContext } from "./diff.js";
@@ -61,8 +61,21 @@ async function applyAll(bundle) {
 // «Заполнить примером» ниже, но без подтверждения: на первом запуске
 // заменять нечего, проект и так пуст.
 export async function fillWithDemoData() {
-  await applyAll(await buildDemoBundle());
+  await applyDemo();
   location.reload();
+}
+
+// Пример = данные мира + его настройки (календарь, статусы глав, шаблоны
+// анкет с полями «Дата мира»): без них в примере не видно Календаря и
+// дней рождения. Остальные настройки пользователя не трогаются.
+async function applyDemo() {
+  await applyAll(await buildDemoBundle());
+  await updateSettings(withDemoSettings);
+}
+
+async function updateSettings(fn) {
+  const settings = await apiGet("/api/site-settings").catch(() => ({}));
+  await apiPost("/api/site-settings", fn(settings || {}));
 }
 
 // Инлайн-подтверждение вместо browser confirm() — общая полоска
@@ -464,7 +477,7 @@ function buildImportSection() {
 function buildDemoSection() {
   const section = document.createElement("div");
   section.className = "data-section";
-  section.innerHTML = `<h3>${i18n("Заполнить примером")}</h3><p>${i18n("Связный тестовый сюжет – персонажи, локации, связи, фракции, таймлайн, доска, карта и две главы рукописи, чтобы сразу увидеть, как модули работают вместе.")}</p>`;
+  section.innerHTML = `<h3>${i18n("Заполнить примером")}</h3><p>${i18n("Связный тестовый мир – две книги с частями и главами, персонажи четырёх поколений, локации, фракции, отношения, таймлайн с календарём мира, доски, холсты, карты и знания, чтобы сразу увидеть, как модули работают вместе.")}</p>`;
 
   const btn = document.createElement("button");
   btn.className = "btn";
@@ -472,7 +485,7 @@ function buildDemoSection() {
   const confirmBar = document.createElement("div");
   btn.addEventListener("click", () => {
     showConfirmBar(confirmBar, i18n("Текущие данные будут заменены примером. Продолжить?"), async () => {
-      await applyAll(await buildDemoBundle());
+      await applyDemo();
       location.reload();
     });
   });
@@ -495,6 +508,7 @@ function buildDemoSection() {
       i18n("Все текущие данные будут стёрты без возможности отменить. Продолжить?"),
       async () => {
         await applyAll({});
+        await updateSettings(stripDemoSettings);
         location.reload();
       },
       i18n("Да, стереть")

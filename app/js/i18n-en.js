@@ -926,8 +926,8 @@ export const EN_DICT = {
   "Отмена": "Cancel",
 
   "Заполнить примером": "Fill with example",
-  "Связный тестовый сюжет – персонажи, локации, связи, фракции, таймлайн, доска, карта и две главы рукописи, чтобы сразу увидеть, как модули работают вместе.":
-    "A connected sample story – characters, locations, relationships, factions, timeline, board, map and two manuscript chapters, so you can see right away how the modules work together.",
+  "Связный тестовый мир – две книги с частями и главами, персонажи четырёх поколений, локации, фракции, отношения, таймлайн с календарём мира, доски, холсты, карты и знания, чтобы сразу увидеть, как модули работают вместе.":
+    "A connected sample world – two books with parts and chapters, four generations of characters, locations, factions, relationships, a timeline with a world calendar, boards, canvases, maps and knowledge, so you can see right away how the modules work together.",
   "Текущие данные будут заменены примером. Продолжить?": "Current data will be replaced with the example. Continue?",
 
   "История версий": "Version history",
