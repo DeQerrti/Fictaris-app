@@ -90,6 +90,7 @@ export function openTemplateEditorModal({ initialFields, onSave }) {
       ["input", i18n("Строка")],
       ["textarea", i18n("Текст в несколько строк")],
       ["richtext", i18n("Текст с разделами (оглавление)")],
+      ["date", i18n("Дата мира")],
     ]) {
       const opt = document.createElement("option");
       opt.value = value;

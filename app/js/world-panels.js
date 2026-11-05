@@ -5,10 +5,6 @@ import { i18n } from "./i18n.js";
 // мест, где ими пользуются. Импорт ленивый: редакторы сами импортируют
 // tags.js и templates.js, откуда эти панели и зовут.
 
-async function fill(body, nodes) {
-  for (const el of Array.isArray(nodes) ? nodes : [nodes]) body.appendChild(el);
-}
-
 export function openTagsPanel() {
   return openSidePanel({
     title: i18n("Теги"),
@@ -27,10 +23,11 @@ export function openTemplatesPanel(kind) {
   });
 }
 
-export function openCalendarPanel() {
+// tab — какую вкладку открыть сразу (months | week | holidays | today).
+export function openCalendarPanel(tab) {
   return openSidePanel({
     title: i18n("Календарь мира"),
-    subtitle: i18n("Свои месяцы и длина года для таймлайна"),
-    build: async (body) => fill(body, await (await import("./settings-panel.js")).buildCalendarSection()),
+    subtitle: i18n("Месяцы, неделя, праздники – видно в режиме «Календарь» Таймлайна"),
+    build: async (body) => (await import("./calendar-editor.js")).renderCalendarEditor(body, tab),
   });
 }

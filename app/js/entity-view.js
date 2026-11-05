@@ -4,6 +4,7 @@ import { avatarInnerHtml } from "./avatars.js";
 import { i18n } from "./i18n.js";
 import { iconSvg } from "./icons.js";
 import { openTemplatesPanel } from "./world-panels.js";
+import { cachedCalendar, parseWorldDate, stringifyWorldDate } from "./calendar.js";
 
 // ══════════════════════════════════════════════
 //  ОБЗОР И ДОСЬЕ
@@ -262,6 +263,14 @@ export function buildTemplateFields(entity, fields, skip, onChange) {
     field.appendChild(lab);
     const hint = buildFieldHint(f.type);
     if (hint) field.appendChild(hint);
+    if (f.type === "date") {
+      field.appendChild(buildWorldDateInput(entity[f.key], (value) => {
+        entity[f.key] = value;
+        onChange(f.key);
+      }));
+      grid.appendChild(field);
+      continue;
+    }
     const input = document.createElement(f.type === "input" ? "input" : "textarea");
     input.value = entity[f.key] || "";
     input.placeholder = i18n("Не заполнено");
@@ -277,6 +286,54 @@ export function buildTemplateFields(entity, fields, skip, onChange) {
     grid.appendChild(field);
   }
   return grid;
+}
+
+// Поле вида «Дата мира»: день, месяц по календарю мира, год. Хранится
+// строкой "год-месяц-день" (calendar.js) — по ней Календарь в Таймлайне
+// показывает дни рождения и памятные даты. Без своего календаря месяц —
+// просто номер.
+function buildWorldDateInput(value, onChange) {
+  const cal = cachedCalendar();
+  const d = parseWorldDate(value);
+  const row = document.createElement("span");
+  row.className = "world-date-input";
+  const day = document.createElement("input");
+  day.type = "number";
+  day.min = "1";
+  day.placeholder = i18n("день");
+  day.value = d ? d.day : "";
+  const month = document.createElement("select");
+  month.innerHTML = `<option value="">${i18n("месяц")}</option>`;
+  const names = cal ? cal.months.map((m) => m.name) : Array.from({ length: 12 }, (_, i) => String(i + 1));
+  names.forEach((name, i) => {
+    const opt = document.createElement("option");
+    opt.value = String(i);
+    opt.textContent = name;
+    if (d && d.month === i) opt.selected = true;
+    month.appendChild(opt);
+  });
+  const year = document.createElement("input");
+  year.type = "number";
+  year.placeholder = cal?.eraLabel || i18n("год");
+  year.value = d ? d.year : "";
+  const apply = () => {
+    if (year.value === "" || month.value === "" || day.value === "") {
+      if (year.value === "" && month.value === "" && day.value === "") onChange("");
+      return;
+    }
+    const m = Number(month.value);
+    const max = cal?.months[m]?.days || 31;
+    const dd = Math.max(1, Math.min(max, Number(day.value) || 1));
+    day.value = dd;
+    onChange(stringifyWorldDate({ year: Number(year.value) || 0, month: m, day: dd }));
+  };
+  for (const el of [day, month, year]) {
+    el.addEventListener("change", apply);
+    // щелчок по полю не должен уводить фокус на <label> вокруг
+    el.addEventListener("click", (e) => e.stopPropagation());
+  }
+  row.append(day, month, year);
+  return row;
 }
 
 // Строка-ссылка в боковой колонке досье: lead — аватарка или иконка (HTML).

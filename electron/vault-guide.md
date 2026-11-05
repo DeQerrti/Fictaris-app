@@ -1,4 +1,4 @@
-<!-- fictaris-guide v10 – файл создан приложением Fictaris и обновляется им. Чтобы оставить свою версию, удалите эту строку. -->
+<!-- fictaris-guide v11 – файл создан приложением Fictaris и обновляется им. Чтобы оставить свою версию, удалите эту строку. -->
 # Проект Fictaris – как править файлы
 
 Эта папка – проект писательского приложения Fictaris: персонажи, локации, главы рукописи и т.д., по одному JSON-файлу на раздел. Файлы можно править напрямую – открытое приложение заметит изменение и перечитает данные. Если в приложении в этот момент есть несохранённые правки, оно спросит, чью версию оставить.
@@ -20,7 +20,7 @@
 Массив объектов.
 - `id`, `name` – обязательны.
 - `color` – `#rrggbb`, цвет карточки.
-- `templateId` – id шаблона анкеты (`"default"`, если не уверены). Шаблоны лежат в `site-settings.json` → `templates.characters[]` (`fields[]: {key, label, type: "input"|"textarea"}`); значение поля анкеты хранится прямо в персонаже под ключом `key`. Стандартные ключи: `role`, `age`, `appearance`, `personality`, `motivation`, `goal`, `flaws`, `backstory` – строки.
+- `templateId` – id шаблона анкеты (`"default"`, если не уверены). Шаблоны лежат в `site-settings.json` → `templates.characters[]` (`fields[]: {key, label, type: "input"|"textarea"|"richtext"|"date"}`); значение поля анкеты хранится прямо в персонаже под ключом `key`. У поля `"date"` («Дата мира») значение – строка `"год-месяц-день"`, месяц с 1 (`"214-6-9"`); поле с «рожд» в названии календарь показывает днём рождения. Стандартные ключи: `role`, `age`, `appearance`, `personality`, `motivation`, `goal`, `flaws`, `backstory` – строки.
 - `tags` – **строка** через запятую: `"протагонист, изгнанница"`.
 - `gender` – `"male"` | `"female"` или нет поля. Нужен Родословной, чтобы писать «отец», «сестра», а не «родитель», «брат или сестра».
 - `parentIds: string[]` – родители (id персонажей). Подмножества `parentIds`, не пересекаются: `adoptiveParentIds` – приёмные, `uncertainParentIds` – предполагаемые (отцовство под вопросом, тайна).
@@ -56,7 +56,9 @@
 Папка: `id`, `name`, `bookId`, `parentId` (папка той же книги или `null`), `status`, `collapsed`. Папки верхнего уровня – части книги в «Обзоре».
 
 ### timeline.json – таймлайн
-Массив событий. `id`, `order` – число, по нему события стоят на шкале, `date` – свободный текст («год 214, весна»), `title`, `description`, `characterIds: string[]`, `locationIds: string[]`.
+Массив событий. `id`, `order` – число, по нему события стоят на шкале, `date` – свободный текст («год 214, весна»), `title`, `description`, `characterIds: string[]`, `locationIds: string[]`. При своём календаре у события ещё `dateYear`, `dateMonth` (с 0), `dateDay` – точная дата.
+
+Свой календарь мира – `site-settings.json` → `calendar`: `months: [{name, days, season?}]` (`season`: `winter`|`spring`|`summer`|`autumn`), `eraLabel` («год»), `weekdays: string[]` (дни недели), `weekOffset` (день недели 1-го дня 1-го года), `holidays: [{id, name, month, day, kind: "holiday"|"memorial"|"mourning", color}]` – повторяются каждый год, месяц с 0, `today: {year, month, day}` – «сегодня в мире», `enabled: false` – выключен (данные сохраняются).
 
 ### board.json – доски (канбан)
 ```

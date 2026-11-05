@@ -16,23 +16,27 @@ import { i18n } from "./i18n.js";
 //  [{ id, name, fields: [{ key, label, type }] }] (templates.js).
 // ══════════════════════════════════════════════
 
+// «Дата мира» — день, месяц и год по календарю мира; дата рождения
+// такого вида попадает в Календарь Таймлайна днём рождения.
 const TYPES = [
   ["input", "Строка"],
   ["textarea", "Текст"],
   ["richtext", "Текст с разделами"],
+  ["date", "Дата мира"],
 ];
+const HALF = new Set(["input", "date"]);
 
 const PRESETS = {
   characters: [
-    ["Родина", "input"], ["Происхождение", "textarea"], ["Голос и речь", "textarea"], ["Страхи", "textarea"],
+    ["Дата рождения", "date"], ["Родина", "input"], ["Происхождение", "textarea"], ["Голос и речь", "textarea"], ["Страхи", "textarea"],
     ["Секрет", "textarea"], ["Вера", "input"], ["Привычки", "textarea"], ["Навыки", "textarea"], ["Внутренний конфликт", "textarea"],
   ],
   locations: [
-    ["Население", "input"], ["Климат", "input"], ["Правитель", "input"], ["История", "textarea"],
+    ["Дата основания", "date"], ["Население", "input"], ["Климат", "input"], ["Правитель", "input"], ["История", "textarea"],
     ["Достопримечательности", "textarea"], ["Опасности", "textarea"], ["Слухи", "textarea"],
   ],
   factions: [
-    ["Девиз", "input"], ["Символ", "input"], ["Цели", "textarea"], ["Ресурсы", "textarea"],
+    ["Дата основания", "date"], ["Девиз", "input"], ["Символ", "input"], ["Цели", "textarea"], ["Ресурсы", "textarea"],
     ["Враги", "textarea"], ["История", "textarea"], ["Как вступают", "textarea"],
   ],
 };
@@ -133,7 +137,7 @@ async function render() {
   for (const field of tpl.fields) {
     const n = filled(field.key);
     const card = document.createElement("div");
-    card.className = "fe-field" + (field.type === "input" ? "" : " wide") + (n ? "" : " empty");
+    card.className = "fe-field" + (HALF.has(field.type) ? "" : " wide") + (n ? "" : " empty");
     card.draggable = true;
     card.dataset.key = field.key;
 

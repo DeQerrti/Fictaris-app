@@ -1,5 +1,6 @@
 import { escapeHtml } from "./chips.js";
 import { parseRichSections } from "./templates.js";
+import { formatWorldDate } from "./calendar.js";
 import { mentionsToLinkedHtml } from "./mentions.js";
 
 // ══════════════════════════════════════════════
@@ -63,6 +64,8 @@ export function renderFieldsHtml(template, entity, characters, hrefForChar, idPr
         if (s.text) html += `<p>${mentionsToLinkedHtml(s.text, characters, hrefForChar)}</p>`;
       }
       html += `</div>`;
+    } else if (f.type === "date") {
+      html += `<div class="field-block"><div class="field-label">${escapeHtml(f.label)}</div><p>${escapeHtml(formatWorldDate(String(value)))}</p></div>`;
     } else {
       html += `<div class="field-block"><div class="field-label">${escapeHtml(f.label)}</div><p>${mentionsToLinkedHtml(String(value), characters, hrefForChar)}</p></div>`;
     }

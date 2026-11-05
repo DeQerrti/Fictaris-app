@@ -420,7 +420,7 @@ function summaryFields(c) {
   const fields = (templateFor(templates, c.templateId)?.fields || []).filter((f) => (c[f.key] || "").trim());
   const preferred = ["goal", "motivation", "flaws"].map((k) => fields.find((f) => f.key === k)).filter(Boolean);
   if (preferred.length) return preferred;
-  return fields.filter((f) => f.type !== "input" && !["appearance", "backstory"].includes(f.key)).slice(0, 3);
+  return fields.filter((f) => f.type !== "input" && f.type !== "date" && !["appearance", "backstory"].includes(f.key)).slice(0, 3);
 }
 
 function buildMainCard(c) {

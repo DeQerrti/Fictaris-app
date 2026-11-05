@@ -1962,12 +1962,149 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
 
 /* ── Календарь ─────────────────────────────── */
 
-.calendar-editor { margin-top: 14px; max-width: 420px; }
-.calendar-months { display: flex; flex-direction: column; gap: 6px; margin: 12px 0; }
-.calendar-month-row { display: flex; align-items: center; gap: 8px; }
-.calendar-month-row input[type="text"] { flex: 1; }
-.calendar-month-row input[type="number"] { width: 56px; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--panel-alt); color: var(--text); font-family: inherit; font-size: 0.85rem; }
-.calendar-days-label { color: var(--text-faint); font-size: 0.78rem; flex-shrink: 0; }
+/* Настройка календаря мира (calendar-editor.js) — боковая панель. */
+.cale-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+.cale-tab { border: none; background: none; color: var(--text-dim); font-family: inherit; font-size: 0.85rem; padding: 6px 10px; border-radius: 7px; cursor: pointer; }
+.cale-tab:hover { color: var(--text); background: var(--panel); }
+.cale-tab.active { background: var(--card); color: var(--text); box-shadow: inset 0 -2px 0 var(--accent); }
+.cale-summary { font-size: 0.78rem; color: var(--text-faint); font-variant-numeric: tabular-nums; }
+.cale-body { display: flex; flex-direction: column; gap: 8px; }
+.cale-hint { font-size: 0.8rem; color: var(--text-dim); line-height: 1.45; }
+.cale-row-label { display: flex; align-items: center; gap: 10px; font-size: 0.82rem; color: var(--text-dim); }
+.cale-row-label span { width: 150px; flex-shrink: 0; }
+.cale-row-label input, .cale-row-label select { flex: 1; min-width: 0; }
+.cale-month { display: grid; grid-template-columns: 14px minmax(0, 1fr) 62px 96px 24px; gap: 6px; align-items: center; }
+.cale-month-head { font-size: 0.66rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-faint); margin-top: 6px; }
+.cale-month input, .cale-month select { min-width: 0; width: 100%; box-sizing: border-box; }
+.cale-weekdays { display: flex; flex-wrap: wrap; gap: 6px; }
+.cale-weekday { display: inline-flex; align-items: center; gap: 2px; }
+.cale-weekday input { width: 64px; }
+.cale-hol { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border: 1px solid var(--border); border-left: 3px solid var(--hol); border-radius: 9px; background: var(--card); }
+.cale-hol-top { display: flex; align-items: center; gap: 6px; }
+.cale-hol-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.cale-hol-row input[type="number"] { width: 64px; }
+.cale-colors { display: inline-flex; gap: 4px; margin-left: auto; }
+.cale-color { width: 18px; height: 18px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; padding: 0; }
+.cale-color.active { border-color: var(--text); }
+.cale-off { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+
+/* Поле анкеты «Дата мира» (entity-view.js) */
+.world-date-input { display: flex; gap: 6px; align-items: center; }
+.world-date-input input, .world-date-input select {
+  min-width: 0;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel-alt);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.85rem;
+}
+.world-date-input input[type="number"] { width: 72px; }
+.world-date-input select { flex: 1; }
+
+/* ── Календарь мира: режим Таймлайна (world-calendar.js) ── */
+.wcal { flex: 1; min-height: 0; display: flex; gap: 14px; padding: 4px 24px 24px; }
+.wcal-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; }
+.wcal-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.wcal-nav { padding: 4px 8px; display: inline-flex; align-items: center; }
+.wcal-title { border: none; background: none; color: var(--text); font-family: var(--font-book); font-weight: 600; font-size: 1.25rem; cursor: pointer; padding: 2px 6px; border-radius: 6px; }
+.wcal-title:hover { background: var(--panel); }
+.wcal-year-input { width: 110px; font-size: 1.05rem; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--accent); background: var(--panel-alt); color: var(--text); }
+.wcal-year { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; align-content: start; }
+.wcal-month {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--card);
+  color: inherit;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.wcal-month:hover { border-color: var(--text-faint); }
+.wcal-month.current { border-color: var(--accent); }
+.wcal-month-head { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; }
+.wcal-month-name { font-family: var(--font-book); font-weight: 600; font-size: 0.92rem; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wcal-month-sub { font-size: 0.68rem; color: var(--text-faint); white-space: nowrap; }
+.wcal-mini { display: grid; gap: 2px; }
+.wcal-wd { font-size: 0.58rem; color: var(--text-faint); text-align: center; padding-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wcal-d { position: relative; aspect-ratio: 1; border-radius: 5px; display: grid; place-items: center; font-size: 0.68rem; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.wcal-d.hol { background: rgba(164, 72, 60, 0.28); color: #f0a596; font-weight: 600; }
+.wcal-d.bd { box-shadow: inset 0 0 0 1.5px #7d6a9e; }
+.wcal-d.ev::after { content: ""; position: absolute; bottom: 2px; width: 4px; height: 4px; border-radius: 50%; background: var(--accent); }
+.wcal-d.today { background: var(--accent); color: #14110d; font-weight: 700; }
+.wcal-bigmonth { display: flex; flex-direction: column; gap: 8px; }
+.wcal-loose { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.wcal-loose-k { font-size: 0.76rem; color: var(--text-faint); }
+.wcal-grid { display: grid; gap: 4px; }
+.wcal-cell {
+  min-height: 84px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 4px 5px 6px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  min-width: 0;
+}
+.wcal-cell.hol { background: rgba(164, 72, 60, 0.12); }
+.wcal-cell.today { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.wcal-num { align-self: flex-start; border: none; background: none; color: var(--text-dim); font-family: inherit; font-size: 0.76rem; font-variant-numeric: tabular-nums; padding: 1px 5px; border-radius: 5px; cursor: pointer; }
+.wcal-num:hover { background: var(--panel); color: var(--text); }
+.wcal-cell.today .wcal-num { background: var(--accent); color: #14110d; font-weight: 700; }
+.wcal-tag {
+  display: block;
+  width: 100%;
+  border: none;
+  border-radius: 4px;
+  padding: 2px 6px;
+  background: var(--panel-alt);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.7rem;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.wcal-loose .wcal-tag { width: auto; }
+.wcal-tag.event { box-shadow: inset 2px 0 0 var(--accent); }
+.wcal-tag.holiday { background: color-mix(in srgb, var(--hol, #a4483c) 40%, transparent); }
+.wcal-tag.birthday { background: rgba(125, 106, 158, 0.3); }
+.wcal-tag.date { box-shadow: inset 2px 0 0 var(--text-faint); }
+.wcal-tag:hover { filter: brightness(1.2); }
+.wcal-side { width: 280px; flex: none; display: flex; flex-direction: column; gap: 12px; padding: 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--panel-alt); overflow-y: auto; }
+.wcal-k { font-size: 0.66rem; letter-spacing: 0.09em; text-transform: uppercase; color: var(--text-faint); }
+.wcal-now { font-family: var(--font-book); font-weight: 600; font-size: 1.05rem; color: var(--text); margin-top: 2px; }
+.wcal-sub { font-size: 0.76rem; color: var(--text-faint); }
+.wcal-legend { display: flex; flex-wrap: wrap; gap: 6px 12px; font-size: 0.72rem; color: var(--text-faint); }
+.wcal-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.wcal-legend b { display: inline-block; width: 10px; height: 10px; border-radius: 3px; }
+.wcal-legend b.today { background: var(--accent); }
+.wcal-legend b.hol { background: rgba(164, 72, 60, 0.5); }
+.wcal-legend b.bd { box-shadow: inset 0 0 0 1.5px #7d6a9e; }
+.wcal-legend b.ev { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+.wcal-list { display: flex; flex-direction: column; gap: 4px; }
+.wcal-row { display: flex; gap: 9px; align-items: flex-start; width: 100%; padding: 7px 8px; border: none; border-radius: 8px; background: var(--card); color: var(--text); font-family: inherit; font-size: 0.82rem; text-align: left; cursor: pointer; }
+.wcal-row:hover { filter: brightness(1.15); }
+.wcal-row i { width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; background: var(--accent); }
+.wcal-row.holiday i { background: var(--hol, #a4483c); }
+.wcal-row.birthday i { background: #7d6a9e; }
+.wcal-row.date i { background: var(--text-faint); }
+.wcal-row-main { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.wcal-row-sub { font-size: 0.72rem; color: var(--text-faint); }
+.context-menu.wcal-popover { padding: 6px; min-width: 250px; }
+.wcal-daymenu-title { padding: 4px 8px 6px; font-family: var(--font-book); font-weight: 600; color: var(--text); font-size: 0.9rem; }
+@container (max-width: 820px) {
+  .wcal { flex-direction: column; }
+  .wcal-side { width: auto; }
+}
 
 .timeline-date-fields { display: flex; gap: 8px; align-items: center; }
 .timeline-date-fields input[type="number"] { width: 70px; }

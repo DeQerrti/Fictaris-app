@@ -5,7 +5,8 @@ import { locationTypeInfo, iconSvg } from "./icons.js";
 import { attachMentionAutocomplete, attachMentionContextMenu } from "./mentions.js";
 import { pushTrash } from "./trash.js";
 import { buildExportPngButton } from "./png-export.js";
-import { loadCalendar, absoluteDay, formatDate, yearLength } from "./calendar.js";
+import { loadCalendar, loadCalendarSettings, saveCalendar, defaultCalendar, absoluteDay, formatDate, yearLength } from "./calendar.js";
+import { buildWorldCalendar, resetWorldCalendarCache, eventDateFields } from "./world-calendar.js";
 import { openPopover } from "./context-menu.js";
 import { openCalendarPanel } from "./world-panels.js";
 import { avatarInnerHtml } from "./avatars.js";
@@ -67,19 +68,23 @@ export async function renderTimeline(root, focusId) {
     loadCalendar(),
   ]);
   if (focusId && events.some((e) => e.id === focusId)) activeId = focusId;
+  resetWorldCalendarCache();
   draw();
 }
 
-// ── Два режима ───────────────────────────────────
+// ── Три режима ───────────────────────────────────
 // «Летопись» — вертикальная ось: события по порядку, сгруппированные по
 // годам, между группами — сколько лет прошло. «Шкала» — время слева
 // направо, у каждого персонажа своя дорожка, годы без событий сжаты в
-// узкий разрыв. Выбор — предпочтение этого устройства, а не часть мира,
-// поэтому localStorage, а не site-settings.json.
+// узкий разрыв. «Календарь» — год и месяцы по календарю мира, с
+// праздниками и днями рождения (world-calendar.js). Выбор —
+// предпочтение этого устройства, а не часть мира, поэтому localStorage,
+// а не site-settings.json.
 const MODE_KEY = "fictaris_timeline_mode";
 const MODES = [
   ["chronicle", "Летопись", "Вертикальная ось с группами по годам"],
   ["lanes", "Шкала", "Время слева направо, дорожка у каждого персонажа"],
+  ["calendar", "Календарь", "Год и месяцы по календарю мира – праздники, дни рождения"],
 ];
 
 function readMode() {
@@ -151,7 +156,9 @@ function draw() {
   pane.className = "timeline-pane";
   pane.appendChild(buildToolbar());
   const items = visibleEvents();
-  if (!items.length) {
+  if (mode === "calendar") {
+    pane.appendChild(buildCalendarMode(items));
+  } else if (!items.length) {
     // Иконка — только для честно пустого таймлайна, не для "отфильтровали
     // всё подчистую": та временная (снял фильтр — событий полно), а
     // иконка нужна ровно для "здесь пока правда нечего показывать".
@@ -176,6 +183,39 @@ function draw() {
   });
 
   container.appendChild(view);
+}
+
+function buildCalendarMode(items) {
+  if (!calendar) {
+    const empty = buildEmptyState(i18n("Свой календарь мира не включён: месяцы, неделя, праздники и дни рождения – по твоим правилам."), "clock");
+    empty.classList.add("timeline-empty");
+    const btn = document.createElement("button");
+    btn.className = "btn accent";
+    btn.textContent = i18n("Включить свой календарь");
+    btn.addEventListener("click", async () => {
+      const existing = await loadCalendarSettings();
+      await saveCalendar(existing ? { ...existing, enabled: true } : defaultCalendar());
+      calendar = await loadCalendar();
+      draw();
+      openCalendarPanel("months");
+    });
+    empty.appendChild(btn);
+    return empty;
+  }
+  return buildWorldCalendar({
+    calendar,
+    events: items,
+    eventTime,
+    onOpenEvent: (id) => { activeId = id; draw(); },
+    onAddEvent: (date) => {
+      const ev = { ...blank(), ...eventDateFields(calendar, date) };
+      events.push(ev);
+      activeId = ev.id;
+      persist();
+      draw();
+    },
+    onEditCalendar: (tab) => openCalendarPanel(tab),
+  });
 }
 
 function addEvent() {

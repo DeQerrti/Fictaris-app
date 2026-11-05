@@ -7,7 +7,6 @@ import { iconSvg } from "./icons.js";
 import { defaultLabels, saveLabels, resetLabels } from "./labels.js";
 import { getHiddenTabs, setTabHidden, getTabOrder, setTabOrder, TAB_SECTIONS } from "./visibility.js";
 import { captureKey, saveShortcut, clearShortcut, navOrder } from "./shortcuts.js";
-import { defaultMonths, loadCalendar, saveCalendar } from "./calendar.js";
 import {
   getSyncConfig,
   saveSyncConfig,
@@ -537,127 +536,6 @@ function buildFolderSection(info) {
 
 function bindingLabel(binding) {
   return (binding.shift ? "Shift+" : "") + binding.label;
-}
-
-// ── Календарь ─────────────────────────────────
-// Выключен по умолчанию — таймлайн работает как раньше, свободный
-// текст с числом внутри двигает событие по шкале (timeline.js,
-// orderFromDate). Включив, получаешь три поля вместо текста: год/
-// месяц/день по названиям месяцев отсюда, и точный порядок на шкале
-// вместо эвристики.
-
-export async function buildCalendarSection() {
-  const section = document.createElement("div");
-  section.className = "data-section";
-  section.innerHTML = `<h3>${i18n("Календарь")}</h3><p>${i18n("Своё летоисчисление для таймлайна – свои месяцы вместо реальных, произвольная длина года.")}</p>`;
-
-  const calendar = await loadCalendar();
-  const toggleBtn = document.createElement("button");
-  toggleBtn.className = "btn";
-  toggleBtn.textContent = calendar ? i18n("Отключить свой календарь") : i18n("Включить свой календарь");
-
-  const body = document.createElement("div");
-  body.className = "calendar-editor";
-
-  function renderBody(cal) {
-    body.innerHTML = "";
-    if (!cal) return;
-
-    const eraRow = document.createElement("div");
-    eraRow.className = "field";
-    eraRow.innerHTML = `<label>${i18n("Название года")}</label>`;
-    const eraInput = document.createElement("input");
-    eraInput.type = "text";
-    eraInput.value = cal.eraLabel || i18n("год");
-    let eraTimer;
-    eraInput.addEventListener("input", () => {
-      clearTimeout(eraTimer);
-      eraTimer = setTimeout(async () => {
-        cal.eraLabel = eraInput.value.trim() || "год";
-        await saveCalendar(cal);
-      }, 500);
-    });
-    eraRow.appendChild(eraInput);
-    body.appendChild(eraRow);
-
-    const monthsList = document.createElement("div");
-    monthsList.className = "calendar-months";
-    cal.months.forEach((m, i) => {
-      const row = document.createElement("div");
-      row.className = "calendar-month-row";
-
-      const nameInput = document.createElement("input");
-      nameInput.type = "text";
-      nameInput.value = m.name;
-      let nameTimer;
-      nameInput.addEventListener("input", () => {
-        clearTimeout(nameTimer);
-        nameTimer = setTimeout(async () => {
-          m.name = nameInput.value.trim() || m.name;
-          await saveCalendar(cal);
-        }, 500);
-      });
-
-      const daysInput = document.createElement("input");
-      daysInput.type = "number";
-      daysInput.min = "1";
-      daysInput.max = "99";
-      daysInput.value = m.days;
-      daysInput.addEventListener("change", async () => {
-        m.days = Math.max(1, Math.min(99, Number(daysInput.value) || 30));
-        daysInput.value = m.days;
-        await saveCalendar(cal);
-      });
-
-      const daysLabel = document.createElement("span");
-      daysLabel.className = "calendar-days-label";
-      daysLabel.textContent = i18n("дней");
-
-      const removeBtn = document.createElement("button");
-      removeBtn.className = "btn shortcut-clear";
-      removeBtn.textContent = "×";
-      removeBtn.title = i18n("Убрать месяц");
-      removeBtn.addEventListener("click", async () => {
-        if (cal.months.length <= 1) return;
-        cal.months.splice(i, 1);
-        await saveCalendar(cal);
-        renderBody(cal);
-      });
-
-      row.append(nameInput, daysInput, daysLabel, removeBtn);
-      monthsList.appendChild(row);
-    });
-    body.appendChild(monthsList);
-
-    const addBtn = document.createElement("button");
-    addBtn.className = "btn";
-    addBtn.textContent = i18n("Добавить месяц");
-    addBtn.addEventListener("click", async () => {
-      cal.months.push({ name: `Месяц ${cal.months.length + 1}`, days: 30 });
-      await saveCalendar(cal);
-      renderBody(cal);
-    });
-    body.appendChild(addBtn);
-  }
-
-  let current = calendar;
-  renderBody(current);
-
-  toggleBtn.addEventListener("click", async () => {
-    if (current) {
-      current = null;
-      await saveCalendar(null);
-      toggleBtn.textContent = i18n("Включить свой календарь");
-    } else {
-      current = { months: defaultMonths().map((m) => ({ ...m })), eraLabel: i18n("год") };
-      await saveCalendar(current);
-      toggleBtn.textContent = i18n("Отключить свой календарь");
-    }
-    renderBody(current);
-  });
-
-  section.append(toggleBtn, body);
-  return section;
 }
 
 // ── Синхронизация ────────────────────────────

@@ -29,6 +29,7 @@ import { initEntityModal, openEntityModal, refreshEntityModal } from "./entity-m
 import { initExternalChanges } from "./external-changes.js";
 import { recordRecent } from "./recent-nav.js";
 import { hasPendingSaves } from "./save-badge.js";
+import { loadCalendar } from "./calendar.js";
 import { initSidebarOverview, refreshSidebar, openPanel } from "./sidebar-overview.js";
 
 // Только окна поверх экрана — ни вкладкой, ни разделом «по умолчанию».
@@ -227,6 +228,7 @@ initExternalChanges(reloadAfterExternalChange);
 async function boot() {
   await loadLang(); // до всего остального — applyLabels и любой другой i18n() ниже должны видеть уже загруженный язык
   applyTheme(); // независимо от info — кэш уже применён инлайн-скриптом, здесь только свежие данные
+  loadCalendar(); // месяцы мира — полю «Дата мира» в анкетах (calendar.js, cachedCalendar)
   applyNavIcons();
   applyLabels();
   applyTabOrder();
