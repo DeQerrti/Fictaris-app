@@ -1,3 +1,4 @@
+import { overlayOpen } from "./overlay.js";
 import { apiGet, apiPost, uid } from "./api.js";
 import { debounceSave } from "./save-badge.js";
 import { characterSelect, escapeHtml, buildEmptyState } from "./chips.js";
@@ -1053,6 +1054,7 @@ function buildSideLists(cm) {
 document.addEventListener("keydown", (e) => {
   if (!workshop || !container?.isConnected || mode !== "workshop") return;
   if (e.target.closest?.("input, textarea, select, [contenteditable]")) return;
+  if (overlayOpen()) return;
   const mod = e.ctrlKey || e.metaKey;
   if (mod && e.key.toLowerCase() === "z") {
     e.preventDefault();

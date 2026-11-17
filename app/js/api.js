@@ -1,11 +1,42 @@
+// Файлы, которые не удалось прочитать (испорченный JSON и т.п.), — путь
+// API → текст ошибки. Пока файл в этом списке, запись в него запрещена:
+// раньше ответ {error} уходил в код раздела как данные, раздел подставлял
+// пустые значения и при первом же сохранении затирал файл пустым. Список
+// очищается, как только файл снова прочитался (например, после отката
+// версии в Настройки → Данные → История).
+const brokenFiles = new Map();
+
+function apiKey(path) {
+  return path.split("?")[0];
+}
+
+export function brokenFileError(path) {
+  return brokenFiles.get(apiKey(path)) || null;
+}
+
 export async function apiGet(path) {
   const res = await fetch(path);
-  return res.json();
+  const data = await res.json();
+  const key = apiKey(path);
+  if (!res.ok) {
+    const message = data?.error || `HTTP ${res.status}`;
+    // Файлы данных — это /api/<имя> (characters, board, site-settings…);
+    // служебные /api/app/*, /api/history/* и т.п. ничего не записывают.
+    if (/^\/api\/[a-z-]+$/.test(key) && !brokenFiles.has(key)) {
+      brokenFiles.set(key, message);
+      document.dispatchEvent(new CustomEvent("fictaris:file-broken", { detail: { path: key, error: message } }));
+    }
+    throw new Error(message);
+  }
+  brokenFiles.delete(key);
+  return data;
 }
 
 // После записи — событие: сайдбар (sidebar-overview.js) пересчитывает
 // счётчики, не зная, какой модуль что сохранил.
 export async function apiPost(path, body) {
+  const broken = brokenFiles.get(apiKey(path));
+  if (broken) throw new Error(broken);
   const res = await fetch(path, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

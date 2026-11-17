@@ -182,7 +182,9 @@ async function exportPdfAction(chapters, title) {
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && focusMode) {
     focusMode = false;
-    draw();
+    // Ушли из Рукописи, не выйдя из фокус-режима — рисовать некуда, иначе
+    // рукопись легла бы поверх открытого сейчас раздела.
+    if (container?.isConnected) draw();
   }
 });
 

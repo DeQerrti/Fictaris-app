@@ -164,6 +164,7 @@ async function buildAppearanceSection() {
   resetBtn.textContent = i18n("Сбросить акцент");
   resetBtn.addEventListener("click", async () => {
     await saveTheme({ accent: null });
+    await window.__flushPendingSaves?.();
     location.reload(); // проще перечитать цвет темы по умолчанию, чем тянуть его сюда из style.css
   });
 
@@ -225,6 +226,7 @@ function buildPaletteSection(settings) {
   resetBtn.textContent = i18n("Сбросить палитру");
   resetBtn.addEventListener("click", async () => {
     await saveTheme({ customColors: null });
+    await window.__flushPendingSaves?.();
     location.reload();
   });
 
@@ -358,6 +360,7 @@ async function buildSectionsSection() {
   resetBtn.style.marginTop = "12px";
   resetBtn.addEventListener("click", async () => {
     await resetLabels();
+    await window.__flushPendingSaves?.();
     location.reload(); // проще перечитать раздел заново, чем гонять новые значения по всем полям формы
   });
   section.appendChild(resetBtn);

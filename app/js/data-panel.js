@@ -57,10 +57,32 @@ async function applyAll(bundle) {
   ]);
 }
 
+// Пуст ли проект: ни персонажей, ни мест, ни фракций, ни событий, ни
+// текста (одна пустая глава — та, что Рукопись заводит сама). Окно
+// первого запуска (onboarding.js) показывается один раз на устройство,
+// а не на проект, — его могли увидеть впервые и на уже заполненной
+// папке (новый компьютер, синхронизированный проект).
+export async function isProjectEmpty() {
+  try {
+    const [chars, locs, facs, events, ms] = await Promise.all([
+      apiGet("/api/characters"),
+      apiGet("/api/locations"),
+      apiGet("/api/factions"),
+      apiGet("/api/timeline"),
+      apiGet("/api/manuscript"),
+    ]);
+    const chapters = Array.isArray(ms?.chapters) ? ms.chapters : [];
+    return ![chars, locs, facs, events].some((a) => Array.isArray(a) && a.length) && chapters.length <= 1 && !chapters.some((c) => (c.content || "").trim());
+  } catch {
+    return false; // не прочитали — значит, не уверены, что заменять нечего
+  }
+}
+
 // Используется онбордингом (onboarding.js) — тот же путь, что и кнопка
-// «Заполнить примером» ниже, но без подтверждения: на первом запуске
-// заменять нечего, проект и так пуст.
+// «Заполнить примером» ниже, но без подтверждения. Поэтому сначала
+// проверяем, что заменять действительно нечего.
 export async function fillWithDemoData() {
+  if (!(await isProjectEmpty())) return;
   await applyDemo();
   location.reload();
 }

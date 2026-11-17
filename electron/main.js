@@ -15,7 +15,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Vault } from "./vault.js";
 import { watchVault } from "./watcher.js";
-import { registerAppScheme, registerAppProtocol, appUrl } from "./protocol.js";
+import { registerAppScheme, registerAppProtocol, appUrl, APP_SCHEME, APP_HOST } from "./protocol.js";
 import { ROUTES, ApiError } from "../core/api.js";
 import { findUpdate, openDownload } from "./update.js";
 import { titleBarOptions, titleBarCss, overlayColors } from "./chrome.js";
@@ -89,7 +89,40 @@ async function askForVault() {
     properties: ["openDirectory", "createDirectory"],
     buttonLabel: "Выбрать папку",
   });
-  return canceled ? null : filePaths[0];
+  if (canceled) return null;
+  pickedVaultPaths.add(path.resolve(filePaths[0]));
+  return filePaths[0];
+}
+
+// Папки, которые человек сам выбрал в системном диалоге за этот запуск.
+// use-vault принимает только их или уже известные проекты — иначе код
+// страницы (например, внедрённый через испорченные данные проекта) мог
+// бы завести «проект» в любой папке диска и писать туда файлы.
+const pickedVaultPaths = new Set();
+
+function isAllowedVaultPath(p) {
+  const resolved = path.resolve(p);
+  return pickedVaultPaths.has(resolved) || (config.vaults || []).some((v) => path.resolve(v.path) === resolved);
+}
+
+// Наружу (в браузер) открываем только https-ссылки. Всё остальное —
+// file:, UNC-пути, ms-*: и прочие схемы — ShellExecute запустил бы как
+// программу или протокол системы.
+function isSafeExternalUrl(url) {
+  try {
+    return new URL(url).protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+function isAppUrl(url) {
+  try {
+    const u = new URL(url);
+    return u.protocol === `${APP_SCHEME}:` && u.host === APP_HOST;
+  } catch {
+    return false;
+  }
 }
 
 let stopWatching = () => {};
@@ -256,6 +289,7 @@ function appRoutes() {
 
     "POST /api/app/use-vault": async ({ body }) => {
       if (!body.path) throw new Error("Не указана папка");
+      if (!isAllowedVaultPath(body.path)) throw new ApiError("Папку нужно выбрать в окне выбора папки", 403);
       // Язык выбирают на экране приветствия (electron/ui/welcome.html) до
       // того, как у проекта появится site-settings.json — если папка
       // совсем новая (или пустая), сразу пишем туда выбор, чтобы
@@ -357,7 +391,11 @@ function inQueue(task) {
   return result;
 }
 
-ipcMain.handle("api", async (_event, { method, path: rawPath, body }) => {
+ipcMain.handle("api", async (event, { method, path: rawPath, body }) => {
+  // Отвечаем только своим страницам (app://local/…). Если окно каким-то
+  // образом ушло на чужой адрес, preload там тоже есть — без этой
+  // проверки чужая страница получила бы весь API проекта.
+  if (!isAppUrl(event.senderFrame?.url)) return { status: 403, data: { error: "Forbidden" } };
   const url = new URL(rawPath, "app://local");
   const pathname = url.pathname;
   const query = url.searchParams;
@@ -577,7 +615,7 @@ function buildMenu() {
         label: "Файл",
         submenu: [
           { role: "quit", label: "Выход" },
-          { label: "Обновить", accelerator: "F5", click: () => win?.reload() },
+          { label: "Обновить", accelerator: "F5", click: () => reloadKeepingEdits() },
           { label: "Инструменты разработчика", accelerator: "F12", click: () => win?.webContents.toggleDevTools() },
         ],
       },
@@ -592,6 +630,17 @@ function buildMenu() {
       },
     ])
   );
+}
+
+// F5: сначала дописать отложенные правки страницы (save-badge.js), потом
+// перезагрузить — иначе набранное за последние полсекунды терялось.
+function reloadKeepingEdits() {
+  if (!win || win.webContents.isDestroyed()) return;
+  const flushed = win.webContents
+    .executeJavaScript("window.__flushPendingSaves ? window.__flushPendingSaves() : null")
+    .catch(() => {});
+  const timeout = new Promise((resolve) => setTimeout(resolve, 3000));
+  Promise.race([flushed, timeout]).then(() => win?.reload());
 }
 
 function openMain() {
@@ -633,9 +682,19 @@ function createWindow() {
   });
   if (process.platform !== "darwin") win.removeMenu();
   win.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
+    if (isSafeExternalUrl(url)) shell.openExternal(url);
     return { action: "deny" };
   });
+  // Окно приложения никогда не уходит со своих страниц: ни по ссылке без
+  // target, ни по перетащенному в окно файлу или адресу. https-ссылку
+  // открываем в браузере, остальное просто отменяем.
+  const blockNavigation = (e, url) => {
+    if (isAppUrl(url)) return;
+    e.preventDefault();
+    if (isSafeExternalUrl(url)) shell.openExternal(url);
+  };
+  win.webContents.on("will-navigate", blockNavigation);
+  win.webContents.on("will-redirect", blockNavigation);
 
   // Полосу для перетаскивания вставляем на каждую загрузку страницы (и
   // главного экрана, и /welcome) — dom-ready, а не did-finish-load: тот

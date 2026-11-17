@@ -830,6 +830,16 @@ body.focus-mode .sidebar { display: none; }
   display: flex;
 }
 
+/* Контейнер текущего раздела (main.js, openModule) — ведёт себя как сам
+   #content, чтобы раскладка разделов не зависела от лишней обёртки. */
+.module-host {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+}
+
 .empty-state {
   margin: auto;
   text-align: center;

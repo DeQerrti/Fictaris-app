@@ -61,7 +61,7 @@ export class Vault {
       if (e.code === "ENOENT") return fallback;
       if (e instanceof SyntaxError) {
         throw new Error(
-          `Файл ${name} испорчен и не читается. Загляни в .history — там лежат прошлые версии.`
+          `Файл ${name} испорчен (не JSON).`
         );
       }
       throw e;
@@ -195,7 +195,9 @@ export class Vault {
   // сгенерированным именем, как в saveImage выше.
   #imagePath(relPath) {
     const clean = String(relPath).replace(/^\/+/, "");
-    if (!clean.startsWith("maps/") || clean.includes("..")) {
+    // Только картинки: иначе резервная копия или синхронизация с чужими
+    // данными могли бы положить в папку проекта .exe/.html и т.п.
+    if (!clean.startsWith("maps/") || clean.includes("..") || !/\.(jpe?g|png|webp)$/i.test(clean)) {
       throw new Error(`Недопустимый путь изображения: ${relPath}`);
     }
     return path.join(this.root, clean);
@@ -208,7 +210,7 @@ export class Vault {
     } catch {
       return [];
     }
-    return entries.filter((f) => !f.startsWith(".")).map((f) => `maps/${f}`);
+    return entries.filter((f) => !f.startsWith(".") && /\.(jpe?g|png|webp)$/i.test(f)).map((f) => `maps/${f}`);
   }
 
   async readImage(relPath) {

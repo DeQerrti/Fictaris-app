@@ -13,6 +13,7 @@ function closeMenu() {
 async function pickAndUse() {
   const picked = await apiPost("/api/app/pick-vault", {});
   if (!picked.path) return;
+  await window.__flushPendingSaves?.(); // правки текущего проекта – на диск до смены папки
   const used = await apiPost("/api/app/use-vault", { path: picked.path });
   if (used.error) {
     alert(used.error);
@@ -74,6 +75,7 @@ async function openMenu() {
     if (v.path) nameBtn.title = v.path;
     nameBtn.addEventListener("click", async () => {
       if (v.id === info.currentVaultId) return;
+      await window.__flushPendingSaves?.(); // правки текущего проекта – на диск до смены папки
       await apiPost("/api/app/switch-vault", { id: v.id });
       location.reload();
     });
@@ -135,6 +137,7 @@ async function openMenu() {
     addBtn.textContent = i18n("+ Новый проект…");
     addBtn.addEventListener("click", () => {
       const { row, input } = promptForNameRow(async (name) => {
+        await window.__flushPendingSaves?.(); // правки текущего проекта – на диск до смены папки
         const res = await apiPost("/api/app/add-vault", { name });
         if (res.error) {
           alert(res.error);

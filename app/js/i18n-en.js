@@ -1414,4 +1414,7 @@ export const EN_DICT = {
   "Исследование": "Research",
   "Тайна": "Mystery",
   "{shown} из {total} карточек": "{shown} of {total} card|{shown} of {total} cards",
+  "Файл не читается, правки в нём не сохраняются, чтобы не затереть данные: {error} Верни прошлую версию: Настройки → Этот мир → Данные → История версий.": "A file can't be read, so edits to it are not saved to avoid overwriting your data: {error} Restore an earlier version: Settings → This world → Data → Version history.",
+  "Понятно": "Got it",
+  "Не удалось открыть раздел: {error}": "Could not open this section: {error}",
 };

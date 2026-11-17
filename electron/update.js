@@ -88,5 +88,5 @@ export async function findUpdate(currentVersion) {
 }
 
 export function openDownload(update) {
-  shell.openExternal(update.downloadUrl);
+  if (/^https:\/\//i.test(update.downloadUrl || "")) shell.openExternal(update.downloadUrl);
 }

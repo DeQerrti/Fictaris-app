@@ -12,7 +12,7 @@ import { renderStats } from "./stats.js";
 import { renderFamilyTree } from "./family-tree.js";
 import { renderCanvas } from "./canvas.js";
 import { renderKnowledge } from "./knowledge.js";
-import { fillWithDemoData, maybeRunHistoryCleanup } from "./data-panel.js";
+import { fillWithDemoData, isProjectEmpty, maybeRunHistoryCleanup } from "./data-panel.js";
 import { renderSettings } from "./settings-panel.js";
 import { initProjectSwitcher } from "./project-switcher.js";
 import { initUpdateBanner } from "./update-banner.js";
@@ -29,6 +29,7 @@ import { initEntityModal, openEntityModal, refreshEntityModal } from "./entity-m
 import { initExternalChanges } from "./external-changes.js";
 import { recordRecent } from "./recent-nav.js";
 import { hasPendingSaves } from "./save-badge.js";
+import { buildEmptyState } from "./chips.js";
 import { loadCalendar } from "./calendar.js";
 import { initSidebarOverview, refreshSidebar, openPanel } from "./sidebar-overview.js";
 
@@ -127,8 +128,23 @@ async function openModule(name, arg) {
   if (focused instanceof HTMLElement && focused.classList.contains("nav-item")) {
     focused.blur();
   }
-  content.innerHTML = "";
-  await MODULES[name](content, arg);
+  // Каждый раздел рисуется в свой новый контейнер, а не прямо в общий
+  // #content. Тогда раздел, который ещё догружается после переключения,
+  // рисует в уже отсоединённый узел и не перетирает новый, а его
+  // глобальные обработчики (клавиши Мастерской карты, Esc фокус-режима)
+  // по проверке root.isConnected видят, что раздел закрыт.
+  const host = document.createElement("div");
+  host.className = "module-host";
+  content.replaceChildren(host);
+  try {
+    await MODULES[name](host, arg);
+  } catch (e) {
+    // Раздел не открылся (например, его файл испорчен — см. api.js): вместо
+    // пустого экрана говорим, что случилось.
+    if (requestId !== openRequestId) return;
+    host.replaceChildren(buildEmptyState(i18n("Не удалось открыть раздел: {error}", { error: e?.message || String(e) })));
+    return;
+  }
   if (requestId !== openRequestId) return; // за это время выбрали другой модуль — не перетираем его
   appEl.classList.remove("sidebar-open"); // на телефоне — сайдбар выезжающий, после выбора закрываем
   recordRecent(name, typeof arg === "string" ? arg : null);
@@ -255,7 +271,9 @@ async function boot() {
   openModule(defaultModule);
   initSidebarOverview({ openModule, openEntityModal, getCurrent: () => currentModuleName });
   initProjectSwitcher();
-  maybeShowOnboarding({ onFillDemo: fillWithDemoData });
+  if (!localStorage.getItem("fictaris_onboarding_seen")) {
+    maybeShowOnboarding({ onFillDemo: fillWithDemoData, projectEmpty: await isProjectEmpty() });
+  }
   // На телефоне обновления проверяет сам mobile.bundle.js (полностью на
   // клиенте, без /api/app/update-status) — там своя полоска.
   if (!info.mobile) initUpdateBanner();

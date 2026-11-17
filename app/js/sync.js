@@ -368,5 +368,9 @@ if (typeof window !== "undefined") scheduleAutoSync(AUTOSYNC_ON_OPEN_DELAY);
 // это только для компьютера.
 window.__syncBeforeQuit = async () => {
   clearTimeout(autoSyncTimer);
+  // Сначала дописать на диск отложенные правки (save-badge.js), и только
+  // потом синхронизировать — иначе последние правки не попали бы ни на
+  // диск, ни в репозиторий.
+  await window.__flushPendingSaves?.();
   await runAutoSync();
 };

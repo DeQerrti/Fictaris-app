@@ -226,6 +226,7 @@ export async function renderBoard(root, focusId) {
   locations = locs;
   chapters = manuscriptData.chapters || [];
   books = manuscriptData.books || [];
+  const rawJson = JSON.stringify(rawBoard);
   data = migrateBoards(rawBoard);
   // Один персонаж на карточку (characterId) → список участников
   // (characterIds): сцена почти всегда про нескольких.
@@ -240,7 +241,10 @@ export async function renderBoard(root, focusId) {
     Object.assign(board, defaultColumns());
   }
   activeCardId = focusId && board.cards[focusId] ? focusId : null;
-  persist();
+  // Записываем, только если перевод старого формата что-то поменял:
+  // раньше доска сохранялась при каждом открытии, плодя одинаковые копии
+  // в .history и вытесняя из неё настоящие прошлые версии.
+  if (JSON.stringify(data) !== rawJson) persist();
   draw();
 }
 

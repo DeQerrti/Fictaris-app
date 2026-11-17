@@ -62,5 +62,6 @@ export async function loadLang() {
 export async function setLang(newLang) {
   const settings = (await apiGet("/api/site-settings").catch(() => ({}))) || {};
   await apiPost("/api/site-settings", { ...settings, lang: newLang === "en" ? "en" : "ru" });
+  await window.__flushPendingSaves?.();
   location.reload(); // проще перечитать весь интерфейс заново, чем гонять новый язык по всем модулям
 }

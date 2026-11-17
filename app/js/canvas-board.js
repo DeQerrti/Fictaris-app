@@ -1,3 +1,4 @@
+import { overlayOpen } from "./overlay.js";
 import { uid, apiPost } from "./api.js";
 import { escapeHtml } from "./chips.js";
 import { iconSvg, locationTypeInfo, factionTypeInfo } from "./icons.js";
@@ -1581,6 +1582,7 @@ export function buildBoard(ctx) {
       return;
     }
     if (e.target.closest?.("input, textarea, select, [contenteditable]")) return;
+    if (overlayOpen()) return; // клавиши — окну поверх холста, а не холсту под ним
     const mod = e.ctrlKey || e.metaKey;
     const key = e.key.toLowerCase();
     if (mod && key === "z") {

@@ -53,6 +53,7 @@
       "icon": "app/icons/icon-512.png"
     },
     "mac": {
+      "artifactName": "Fictaris-Setup-${version}-${arch}.${ext}",
       "target": [
         {
           "target": "dmg",

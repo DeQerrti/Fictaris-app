@@ -1,3 +1,4 @@
+import { overlayOpen } from "./overlay.js";
 import { apiGet, apiPost } from "./api.js";
 import { i18n } from "./i18n.js";
 
@@ -33,6 +34,7 @@ export function initShortcuts(onOpenModule) {
     if (isTyping(e.target)) return;
     if (e.code === "Slash" || e.key === "Escape") return; // свои обработчики (поиск и т.п.)
     if (document.querySelector(".search-overlay:not(.hidden)")) return;
+    if (overlayOpen()) return; // в открытом окне цифры не переключают раздел под ним
 
     for (const [module, binding] of Object.entries(customBindings)) {
       if (matches(e, binding)) {

@@ -15,7 +15,7 @@ import { i18n } from "./i18n.js";
 
 const SEEN_KEY = "fictaris_onboarding_seen";
 
-export function maybeShowOnboarding({ onFillDemo }) {
+export function maybeShowOnboarding({ onFillDemo, projectEmpty = false }) {
   if (localStorage.getItem(SEEN_KEY)) return;
 
   const overlay = document.createElement("div");
@@ -47,7 +47,10 @@ export function maybeShowOnboarding({ onFillDemo }) {
   skipBtn.textContent = i18n("Понятно, дальше сам");
   skipBtn.addEventListener("click", dismiss);
 
-  actions.append(demoBtn, skipBtn);
+  // В непустом проекте пример затёр бы чужие данные — кнопку не даём,
+  // заполнить можно из Настроек, там с подтверждением.
+  if (projectEmpty) actions.append(demoBtn);
+  actions.append(skipBtn);
   card.appendChild(actions);
   overlay.appendChild(card);
   document.body.appendChild(overlay);

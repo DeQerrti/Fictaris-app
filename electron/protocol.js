@@ -81,8 +81,11 @@ export function registerAppProtocol({ appDir, getVault }) {
 
     // ── Картинки карты — из хранилища, не из appDir ──
     if (pathname.startsWith("/maps/")) {
+      // Только картинки и только из maps/ — «maps/..%2fsite-settings.json»
+      // проходит resolveInside (внутри проекта), но это уже не картинка.
       const vault = getVault();
-      const target = vault && resolveInside(vault.root, pathname);
+      const target = vault && resolveInside(path.join(vault.root, "maps"), pathname.slice("/maps".length));
+      if (!target || !/\.(jpe?g|png|webp)$/i.test(target)) return new Response("Не найдено", { status: 404 });
       const res = target && (await fileResponse(target));
       if (res) return res;
       return new Response("Не найдено", { status: 404 });

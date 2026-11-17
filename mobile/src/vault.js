@@ -74,7 +74,7 @@ export class MobileVault {
       return JSON.parse(data);
     } catch (e) {
       if (e instanceof SyntaxError) {
-        throw new Error(`Файл ${name} испорчен и не читается. Загляни в .history — там лежат прошлые версии.`);
+        throw new Error(`Файл ${name} испорчен (не JSON).`);
       }
       return fallback; // файла нет — не поломка, а первый запуск
     }
