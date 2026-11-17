@@ -15,9 +15,10 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Версия для релиза (например 0.1.0)"
+        # Без значения по умолчанию: случайный запуск не должен создать
+        # черновик какой-то старой версии.
+        description: "Версия для релиза, как в package.json (например 0.3.23)"
         required: true
-        default: "0.1.0"
       publish:
         description: "Опубликовать сразу (иначе релиз останется черновиком)"
         required: false
@@ -74,11 +75,17 @@ jobs:
           # этой переменной electron-builder попробует подписать сам и
           # упадёт на отсутствующем сертификате.
           CSC_IDENTITY_AUTO_DISCOVERY: false
+      - name: Описание релиза из CHANGELOG.md
+        shell: bash
+        env:
+          VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
+        run: bash scripts/release-notes.sh "$VERSION" release-notes.md
       - uses: softprops/action-gh-release@v3
         with:
           # По тегу имя релиза берётся из него самого; при ручном запуске
           # тега нет, поэтому версию спрашиваем во входных данных.
           tag_name: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', inputs.version) || github.ref_name }}
+          body_path: release-notes.md
           files: |
             dist/*.exe
             dist/*.dmg
@@ -114,20 +121,43 @@ jobs:
       - run: npm run build:mobile
       - run: npx cap sync android
       - run: chmod +x android/gradlew
-      # Сборка отладочная, и это осознанно: обычную Android отказывается
-      # ставить без подписи, а для подписи нужен ключ, который в открытом
-      # репозитории держать нельзя. Отладочная подписана общим ключом и
-      # ставится с телефона как есть.
-      - run: ./gradlew assembleDebug
+      # Release-сборка, подписанная постоянным ключом из секретов репозитория
+      # (ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS,
+      # ANDROID_KEY_PASSWORD): только с одним и тем же ключом Android ставит
+      # новую версию поверх старой, не удаляя приложение и данные. Ключ в
+      # открытом репозитории не лежит — он приходит из секретов и живёт
+      # только на время сборки. Пока секретов нет, собирается отладочная
+      # версия, как раньше (её каждый раз подписывает новый ключ).
+      - name: Собрать APK
         working-directory: android
-      - name: Назвать файл по-человечески
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          version=${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.keystore"
+            export ANDROID_KEYSTORE_PATH="$RUNNER_TEMP/release.keystore"
+            ./gradlew assembleRelease
+            cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/fictaris.apk"
+            rm -f "$RUNNER_TEMP/release.keystore"
+          else
+            echo "::warning::Нет ключа подписи Android в секретах – собираю отладочную версию"
+            ./gradlew assembleDebug
+            cp app/build/outputs/apk/debug/app-debug.apk "$RUNNER_TEMP/fictaris.apk"
+          fi
+      - name: Назвать файл по-человечески
+        env:
+          VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
+        run: |
           mkdir -p dist
-          cp android/app/build/outputs/apk/debug/app-debug.apk "dist/Fictaris-${version#v}.apk"
+          cp "$RUNNER_TEMP/fictaris.apk" "dist/Fictaris-${VERSION#v}.apk"
+          bash scripts/release-notes.sh "$VERSION" release-notes.md
       - uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', inputs.version) || github.ref_name }}
+          body_path: release-notes.md
           files: dist/*.apk
           draft: true
           fail_on_unmatched_files: false

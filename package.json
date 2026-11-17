@@ -2,7 +2,15 @@
   "name": "fictaris",
   "version": "0.3.22",
   "private": true,
-  "description": "Fictaris — инструмент для писателей и мастеров миров. Настольное приложение: данные лежат папкой на твоём диске.",
+  "description": "Fictaris – стол писателя и мастера миров: рукопись, персонажи, локации, карты и таймлайн. Данные лежат папкой на вашем диске.",
+  "author": "DeQerrti",
+  "license": "SEE LICENSE IN LICENSE",
+  "homepage": "https://github.com/DeQerrti/Fictaris-app",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/DeQerrti/Fictaris-app.git"
+  },
+  "bugs": "https://github.com/DeQerrti/Fictaris-app/issues",
   "type": "module",
   "main": "electron/main.js",
   "scripts": {
@@ -11,7 +19,7 @@
     "build:win": "electron-builder --win --publish never",
     "build:mac": "electron-builder --mac --publish never",
     "build:linux": "electron-builder --linux --publish never",
-    "build:mobile": "esbuild mobile/src/main.js --bundle --format=iife --outfile=app/js/mobile.bundle.js --minify --legal-comments=none",
+    "build:mobile": "esbuild mobile/src/main.js --bundle --format=iife --outfile=app/js/mobile.bundle.js --minify --legal-comments=eof",
     "mobile:sync": "npm run build:mobile && npx cap sync android"
   },
   "dependencies": {
@@ -39,7 +47,8 @@
       "app/**/*",
       "core/**/*",
       "electron/**/*",
-      "package.json"
+      "package.json",
+      "LICENSE"
     ],
     "publish": {
       "provider": "github",

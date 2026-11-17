@@ -1,18 +1,43 @@
 Copyright (c) 2026 DeQerrti. All rights reserved.
 
-This software is proprietary. Copying, modification, distribution,
-sublicensing, reverse engineering, resale, or publication of modified
-versions of the source code or the application, without prior written
-permission from the copyright holder, is prohibited.
+1. YOUR WORK IS YOURS
 
-The public visibility of this repository does not grant any license,
-express or implied, to use, copy, or redistribute its contents.
+Everything you create with Fictaris – manuscripts, characters, worlds,
+maps, notes and any other content and data – belongs to you. The
+copyright holder claims no rights to it. You may use, publish, sell and
+license your work in any way, including commercially, without
+attribution and without any obligation to the copyright holder.
+
+2. USING THE APPLICATION
 
 Compiled application releases published by the copyright holder (via
-GitHub Releases or another official channel) may be freely downloaded
-and used by end users for personal, non-commercial writing projects,
-in unmodified form. This permission does not extend to the source code, and does
-not allow redistributing the application under another name or as
-someone else's product.
+GitHub Releases or another official channel) may be freely downloaded,
+installed and used by anyone, on any number of devices, for any
+purpose, including professional and commercial writing, in unmodified
+form and free of charge.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
+3. WHAT IS NOT PERMITTED
+
+The software itself (the source code and the compiled application) is
+proprietary. Without prior written permission from the copyright holder
+you may not copy, modify, distribute, sublicense, sell or publish the
+source code or modified versions of the application, or redistribute
+the application under another name or as someone else's product.
+
+The public visibility of this repository does not grant any license to
+the source code beyond reading it.
+
+4. THIRD-PARTY COMPONENTS
+
+The application includes third-party components under their own
+licenses (Electron and Chromium, Capacitor, html2canvas-pro – MIT and
+others); their license notices are included with the respective
+components. Fonts are loaded from Google Fonts under the SIL Open Font
+License.
+
+5. NO WARRANTY
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+OR IMPLIED. IN NO EVENT SHALL THE COPYRIGHT HOLDER BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, INCLUDING LOSS OF DATA, ARISING FROM
+THE USE OF THE SOFTWARE. KEEP BACKUPS OF YOUR WORK.
