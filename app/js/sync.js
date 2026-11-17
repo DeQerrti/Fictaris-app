@@ -34,29 +34,83 @@ import { i18n } from "./i18n.js";
 
 const SYNC_CONFIG_KEY = "fictaris_sync_config"; // { token, owner, repo }
 const SYNC_STATE_KEY = "fictaris_sync_state"; // { files: {путь:{hash,sha}}, images: {путь:{hash,sha}}, lastSyncAt }
-export const AUTOSYNC_CONFLICTS_KEY = "fictaris_sync_has_conflicts";
+const AUTOSYNC_CONFLICTS_KEY = "fictaris_sync_has_conflicts";
+
+// Настройки синхронизации — свои у каждого проекта (ключ localStorage с id
+// проекта). Раньше они были одни на устройство: настроили синхронизацию в
+// мире A, переключились на мир B — и B уходил в репозиторий A, а на
+// другом устройстве A заменялся данными B. Пока main.js не сообщил,
+// какой проект открыт (setSyncVault), синхронизации нет вовсе.
+let syncVaultId = null;
+
+function vaultKey(base) {
+  return syncVaultId ? `${base}:${syncVaultId}` : null;
+}
+
+// vaultCount — сколько всего проектов. Старые общие ключи переносим в
+// открытый проект, только если проект один: иначе неизвестно, для
+// какого из них синхронизацию настраивали, — тогда её нужно подключить
+// заново в нужном проекте.
+export function setSyncVault(id, vaultCount = 1) {
+  syncVaultId = id ? String(id) : null;
+  if (!syncVaultId) return;
+  try {
+    const legacy = localStorage.getItem(SYNC_CONFIG_KEY);
+    if (legacy === null) return;
+    if (vaultCount <= 1 && localStorage.getItem(vaultKey(SYNC_CONFIG_KEY)) === null) {
+      for (const base of [SYNC_CONFIG_KEY, SYNC_STATE_KEY, AUTOSYNC_CONFLICTS_KEY]) {
+        const value = localStorage.getItem(base);
+        if (value !== null) localStorage.setItem(vaultKey(base), value);
+      }
+    }
+    for (const base of [SYNC_CONFIG_KEY, SYNC_STATE_KEY, AUTOSYNC_CONFLICTS_KEY]) localStorage.removeItem(base);
+  } catch {
+    // localStorage недоступен — синхронизации просто не будет
+  }
+}
+
+function readKey(base) {
+  const key = vaultKey(base);
+  if (!key) return null;
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writeKey(base, value) {
+  const key = vaultKey(base);
+  if (!key) return;
+  if (value === null) localStorage.removeItem(key);
+  else localStorage.setItem(key, value);
+}
+
+export function hasAutosyncConflicts() {
+  return readKey(AUTOSYNC_CONFLICTS_KEY) === "1";
+}
 
 export function getSyncConfig() {
   try {
-    return JSON.parse(localStorage.getItem(SYNC_CONFIG_KEY)) || null;
+    return JSON.parse(readKey(SYNC_CONFIG_KEY)) || null;
   } catch {
     return null;
   }
 }
 
 export function saveSyncConfig(config) {
-  localStorage.setItem(SYNC_CONFIG_KEY, JSON.stringify(config));
+  writeKey(SYNC_CONFIG_KEY, JSON.stringify(config));
 }
 
 export function clearSyncConfig() {
-  localStorage.removeItem(SYNC_CONFIG_KEY);
-  localStorage.removeItem(SYNC_STATE_KEY);
-  localStorage.removeItem(AUTOSYNC_CONFLICTS_KEY);
+  writeKey(SYNC_CONFIG_KEY, null);
+  writeKey(SYNC_STATE_KEY, null);
+  writeKey(AUTOSYNC_CONFLICTS_KEY, null);
 }
 
 export function getSyncState() {
   try {
-    const raw = JSON.parse(localStorage.getItem(SYNC_STATE_KEY));
+    const raw = JSON.parse(readKey(SYNC_STATE_KEY));
     return raw && typeof raw === "object" ? { files: {}, images: {}, ...raw } : { files: {}, images: {} };
   } catch {
     return { files: {}, images: {} };
@@ -64,7 +118,7 @@ export function getSyncState() {
 }
 
 function saveSyncState(state) {
-  localStorage.setItem(SYNC_STATE_KEY, JSON.stringify(state));
+  writeKey(SYNC_STATE_KEY, JSON.stringify(state));
 }
 
 // ── base64 ↔ текст ──────────────────────────────
@@ -258,7 +312,7 @@ export async function runSync(config, onProgress) {
 
   state.lastSyncAt = new Date().toISOString();
   saveSyncState(state);
-  localStorage.setItem(AUTOSYNC_CONFLICTS_KEY, result.conflicts.length ? "1" : "");
+  writeKey(AUTOSYNC_CONFLICTS_KEY, result.conflicts.length ? "1" : "");
 
   return result;
 }
@@ -323,8 +377,17 @@ async function runAutoSync() {
   if (!config || syncInFlight) return;
   syncInFlight = true;
   try {
+    // Отложенные правки — на диск до синхронизации: иначе они не уйдут в
+    // репозиторий, а после загрузки чужой версии затёрли бы её старой
+    // копией из памяти.
+    await window.__flushPendingSaves?.();
     const result = await runSync(config);
     await pullPayload(result.pulledFiles, result.pulledImages);
+    // Забрали что-то с другого устройства — открытый раздел перечитывает
+    // данные (main.js), чтобы не писать поверх них то, что в памяти.
+    if (Object.keys(result.pulledFiles || {}).length || Object.keys(result.pulledImages || {}).length) {
+      document.dispatchEvent(new CustomEvent("fictaris:data-replaced"));
+    }
   } catch {
     // Тихая синхронизация: сеть могла быть недоступна, токен — истечь.
     // Ручная кнопка покажет причину явно, если человек попробует сам.
@@ -337,7 +400,8 @@ function isAutoSyncTrigger(pathname, method) {
   if (method !== "POST") return false;
   if (!pathname.startsWith("/api/")) return false;
   if (pathname.startsWith("/api/app/")) return false; // настройки самого приложения — не хранилище
-  if (pathname === "/api/site-settings") return false; // тема — предпочтение устройства, не мира
+  // site-settings: шаблоны, календарь и статусы глав из него синхронизируются
+  // (world-settings.json в core/api.js), поэтому его сохранение тоже повод.
   return pathname !== "/api/restore-backup" && pathname !== "/api/export-backup" && pathname !== "/api/history/restore";
 }
 

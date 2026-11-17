@@ -8,7 +8,7 @@ import { openContextMenu, openPopover, closeMenu } from "./context-menu.js";
 import { loadStatuses, buildStatusDot, buildStatusManagePanel } from "./chapter-status.js";
 import { pushTrash } from "./trash.js";
 import { iconSvg, locationTypeInfo } from "./icons.js";
-import { applyInlineMarkupHtml } from "./text-format.js";
+import { applyInlineMarkupHtml, toReaderText } from "./text-format.js";
 import { recordToday, loadWritingLog, computeStats } from "./writing-goal.js";
 import { openEntityModal } from "./entity-modal.js";
 import { i18n, i18nPlural } from "./i18n.js";
@@ -152,7 +152,7 @@ function downloadBlob(blob, filename) {
 // через ПКМ на ней в списке (см. buildChapterList).
 function exportMarkdown(chapters = manuscript.chapters, filename = "manuscript.md") {
   const body = chapters
-    .map((ch) => `# ${ch.title || i18n("Без названия")}\n\n${ch.content || ""}`)
+    .map((ch) => `# ${ch.title || i18n("Без названия")}\n\n${toReaderText(ch.content)}`)
     .join("\n\n---\n\n");
   downloadBlob(new Blob([body], { type: "text/markdown" }), filename);
 }

@@ -17,10 +17,9 @@
 // ══════════════════════════════════════════════
 
 import { Filesystem, Directory, Encoding } from "@capacitor/filesystem";
-import { isAllowedFile, historyDate } from "../../core/files.js";
+import { isAllowedFile, historyDate, historyToPrune, newestHistoryTime, HISTORY_MIN_INTERVAL_MS, KNOWN_FILE_NAMES } from "../../core/files.js";
 
 const DIR = Directory.Data;
-const HISTORY_LIMIT = 50;
 
 // Первый проект живёт прямо в Fictaris/ — так у него самый короткий
 // путь, а он и есть тот, что создаётся автоматически при первом
@@ -80,25 +79,51 @@ export class MobileVault {
     }
   }
 
-  async writeJson(name, data) {
+  // Записи идут строго по очереди, как на компьютере (inQueue в
+  // electron/main.js): два сохранения одного файла с долгим архивированием
+  // иначе могли закончиться в обратном порядке, и на диске оставалось старое.
+  writeJson(name, data, options) {
+    const run = () => this.#writeJson(name, data, options);
+    const result = this.#queue.then(run, run);
+    this.#queue = result.then(() => {}, () => {});
+    return result;
+  }
+
+  #queue = Promise.resolve();
+
+  async #writeJson(name, data, { forceArchive = false } = {}) {
     if (!isAllowedFile(name)) throw new Error(`Неизвестный файл: ${name}`);
     await this.ensure();
-    await this.#archive(name);
     const body = JSON.stringify(data, null, 2) + "\n";
+    const previous = await this.#readRaw(name);
+    if (previous === body) return data; // ничего не изменилось
+    if (previous !== null) await this.#archive(name, previous, forceArchive);
     await Filesystem.writeFile({ path: this.path(name), directory: DIR, data: body, encoding: Encoding.UTF8 });
     return data;
   }
 
-  async #archive(name) {
-    let previous;
+  async #readRaw(name) {
     try {
       const res = await Filesystem.readFile({ path: this.path(name), directory: DIR, encoding: Encoding.UTF8 });
-      previous = res.data;
+      return res.data;
     } catch {
-      return; // первого сохранения архивировать нечего
+      return null;
     }
+  }
+
+  async snapshotAll() {
+    for (const name of KNOWN_FILE_NAMES) {
+      const previous = await this.#readRaw(name);
+      if (previous !== null) await this.#archive(name, previous, true);
+    }
+  }
+
+  async #archive(name, previous, force) {
     const dir = `${this.root}/.history/${name}`;
     await ensureDir(dir);
+    const listed = await Filesystem.readdir({ path: dir, directory: DIR }).catch(() => ({ files: [] }));
+    const existing = listed.files.map((f) => (typeof f === "string" ? f : f.name));
+    if (!force && Date.now() - newestHistoryTime(existing) < HISTORY_MIN_INTERVAL_MS) return;
 
     const stamp = new Date().toISOString().replace(/[:.]/g, "-");
     let slot = `${dir}/${stamp}.json`;
@@ -109,8 +134,8 @@ export class MobileVault {
     await Filesystem.writeFile({ path: slot, directory: DIR, data: previous, encoding: Encoding.UTF8 });
 
     const { files } = await Filesystem.readdir({ path: dir, directory: DIR });
-    const names = files.map((f) => f.name).sort();
-    for (const old of names.slice(0, Math.max(0, names.length - HISTORY_LIMIT))) {
+    const names = files.map((f) => (typeof f === "string" ? f : f.name));
+    for (const old of historyToPrune(names)) {
       await Filesystem.deleteFile({ path: `${dir}/${old}`, directory: DIR }).catch(() => {});
     }
   }

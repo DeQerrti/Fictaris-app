@@ -1,6 +1,7 @@
 import { apiPost } from "./api.js";
 import { compressImage } from "./image-compress.js";
 import { iconSvg } from "./icons.js";
+import { safeImagePath } from "./sanitize.js";
 import { i18n } from "./i18n.js";
 
 // ══════════════════════════════════════════════
@@ -18,14 +19,14 @@ import { i18n } from "./i18n.js";
 // ══════════════════════════════════════════════
 
 export function firstImage(entity) {
-  return Array.isArray(entity.images) && entity.images[0] ? entity.images[0] : null;
+  return Array.isArray(entity.images) ? safeImagePath(entity.images[0]) : null;
 }
 
 // fallbackHtml — то, что рисовалось на аватарке раньше (инициалы,
 // иконка типа) — используется, пока изображений нет ни одного.
 export function avatarInnerHtml(entity, fallbackHtml) {
   const src = firstImage(entity);
-  return src ? `<img class="char-avatar-img" src="/${src}" alt="">` : fallbackHtml;
+  return src ? `<img class="char-avatar-img" src="/${encodeURI(src)}" alt="">` : fallbackHtml;
 }
 
 async function uploadOne(file) {

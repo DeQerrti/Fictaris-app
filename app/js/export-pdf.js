@@ -5,7 +5,7 @@ import { loadTemplates, templateFor } from "./templates.js";
 import { mentionsToLinkedHtml } from "./mentions.js";
 import { imageDataUri, safeName, renderFieldsHtml, galleryHtml } from "./entity-export.js";
 import { i18n } from "./i18n.js";
-import { applyInlineMarkupHtml } from "./text-format.js";
+import { applyInlineMarkupHtml, toReaderText } from "./text-format.js";
 
 // ══════════════════════════════════════════════
 //  ЭКСПОРТ МИРА В PDF ("справочник мира")
@@ -223,7 +223,7 @@ function chapterPdfHtml(chapters, title) {
   let body = `<div class="cover"><h1>${escapeHtml(title)}</h1><p>${escapeHtml(new Date().toLocaleDateString())}</p></div>`;
   for (const ch of chapters) {
     body += `<section class="kind"><h1>${escapeHtml(ch.title || i18n("Без названия"))}</h1>`;
-    const paragraphs = (ch.content || "").split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+    const paragraphs = toReaderText(ch.content).split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
     for (const p of paragraphs) body += `<p>${applyInlineMarkupHtml(escapeHtml(p).replace(/\n/g, "<br>"))}</p>`;
     body += `</section>`;
   }

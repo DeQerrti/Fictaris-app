@@ -1,4 +1,4 @@
-import "./sync.js"; // устанавливает автосинхронизацию — см. её же комментарий про перехват fetch
+import { setSyncVault } from "./sync.js"; // заодно устанавливает автосинхронизацию — см. её же комментарий про перехват fetch
 import { apiGet } from "./api.js";
 import { renderManuscript } from "./manuscript.js";
 import { renderCharacters } from "./characters.js";
@@ -169,6 +169,13 @@ document.addEventListener("fictaris:reload-module", () => {
     if (currentModuleName && !hasPendingSaves()) reloadAfterExternalChange();
   }, 700);
 });
+// Данные на диске заменили изнутри приложения — вернули из корзины,
+// забрали синхронизацией (trash.js, sync.js). Отложенные правки к этому
+// моменту уже дописаны, поэтому перечитываем сразу.
+document.addEventListener("fictaris:data-replaced", () => {
+  if (currentModuleName && !hasPendingSaves()) reloadAfterExternalChange();
+  else refreshSidebar();
+});
 // Статистика больше не вкладка (одинокая узкая колонка с цифрами
 // посреди пустого экрана) — модалка поверх текущего места, тем же
 // entity-modal.js, что и карточка персонажа по клику на @упоминание.
@@ -261,6 +268,7 @@ async function boot() {
   // раздел при запуске они не годятся. Скрытый в Настройках раздел —
   // тоже нет.
   vaultId = info.currentVaultId || info.vaultPath || "";
+  setSyncVault(vaultId, Array.isArray(info.vaults) ? info.vaults.length : 1);
   const last = lastModule();
   const usable = (key) => MODULES[key] && !MODAL_ONLY_MODULES.includes(key) && !hidden.includes(key);
   const defaultModule = usable(last)

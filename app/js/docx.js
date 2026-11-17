@@ -1,6 +1,6 @@
 import { buildZip } from "./zip-writer.js";
 import { i18n } from "./i18n.js";
-import { parseInlineSegments } from "./text-format.js";
+import { parseInlineSegments, toReaderText } from "./text-format.js";
 
 function escapeXml(s) {
   return String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
@@ -38,7 +38,7 @@ export function buildManuscriptDocx(chapters) {
   const body = chapters
     .map((ch) => {
       const heading = paragraph(ch.title || i18n("Без названия"), { heading: true });
-      const lines = (ch.content || "").split("\n").map((line) => paragraph(line));
+      const lines = toReaderText(ch.content).split("\n").map((line) => paragraph(line));
       return heading + lines.join("");
     })
     .join('<w:p><w:r><w:br w:type="page"/></w:r></w:p>');

@@ -1,3 +1,5 @@
+import { sanitizeVaultData } from "./sanitize.js";
+
 // Файлы, которые не удалось прочитать (испорченный JSON и т.п.), — путь
 // API → текст ошибки. Пока файл в этом списке, запись в него запрещена:
 // раньше ответ {error} уходил в код раздела как данные, раздел подставлял
@@ -29,7 +31,8 @@ export async function apiGet(path) {
     throw new Error(message);
   }
   brokenFiles.delete(key);
-  return data;
+  const file = /^\/api\/([a-z-]+)$/.exec(key);
+  return file ? sanitizeVaultData(file[1], data) : data;
 }
 
 // После записи — событие: сайдбар (sidebar-overview.js) пересчитывает

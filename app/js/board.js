@@ -513,7 +513,7 @@ function cardContextItems(card) {
     {
       label: i18n("Переместить в колонку"),
       items: board.columns.map((c) => ({
-        label: escapeHtml(c.title || i18n("Без названия")),
+        label: c.title || i18n("Без названия"),
         checked: col?.id === c.id,
         action: () => moveCard(card.id, c.id, (board.cardOrder[c.id] || []).length),
       })),

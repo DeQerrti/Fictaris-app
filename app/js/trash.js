@@ -133,10 +133,15 @@ function buildRow(entry, trash, onRemoved) {
   restoreBtn.className = "btn";
   restoreBtn.textContent = i18n("Вернуть");
   restoreBtn.addEventListener("click", async () => {
+    // Сначала дописать отложенные правки открытого раздела, потом вернуть
+    // запись на диск и перечитать раздел: иначе следующая правка записала
+    // бы старую копию из памяти — без возвращённого.
+    await window.__flushPendingSaves?.();
     await restoreEntry(entry);
     removeFrom(trash, entry);
     await apiPost("/api/trash", trash);
     document.dispatchEvent(new CustomEvent("fictaris:trash-changed"));
+    document.dispatchEvent(new CustomEvent("fictaris:data-replaced"));
     row.remove();
     onRemoved(trash.length);
   });

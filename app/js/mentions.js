@@ -1,4 +1,5 @@
 import { escapeHtml } from "./chips.js";
+import { safeColor } from "./sanitize.js";
 import { openContextMenu } from "./context-menu.js";
 import { i18n } from "./i18n.js";
 
@@ -57,7 +58,7 @@ export function mentionsToHtml(text, characters) {
   while ((m = regex.exec(text))) {
     html += escapeHtml(text.slice(last, m.index));
     const { char, display } = resolveMatch(m, characters);
-    html += `<span class="mention" data-char-id="${char.id}" style="color:${char.color || "var(--accent)"}">${escapeHtml(display)}</span>`;
+    html += `<span class="mention" data-char-id="${escapeHtml(char.id)}" style="color:${safeColor(char.color, "var(--accent)")}">${escapeHtml(display)}</span>`;
     last = m.index + m[0].length;
   }
   html += escapeHtml(text.slice(last));

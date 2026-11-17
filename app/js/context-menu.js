@@ -15,6 +15,7 @@
 // ══════════════════════════════════════════════
 
 import { iconSvg } from "./icons.js";
+import { safeColor } from "./sanitize.js";
 
 let menuEl = null;
 
@@ -51,10 +52,13 @@ function buildList(items) {
     if (item.checked) row.classList.add("checked");
     if (item.disabled) row.classList.add("disabled");
     row.innerHTML =
-      (item.swatch ? `<span class="context-menu-swatch" style="background:${item.swatch}"></span>` : "") +
+      (safeColor(item.swatch) ? `<span class="context-menu-swatch" style="background:${safeColor(item.swatch)}"></span>` : "") +
       (item.icon ? `<span class="context-menu-icon">${iconSvg(item.icon, 14)}</span>` : "") +
-      `<span class="context-menu-label">${item.label}</span>` +
+      `<span class="context-menu-label"></span>` +
       (item.items ? `<span class="context-menu-arrow">›</span>` : "");
+    // Подпись — текстом: сюда приходят имена персонажей, названия папок и
+    // карточек прямо из данных проекта.
+    row.querySelector(".context-menu-label").textContent = item.label ?? "";
     // Любая строка этого же списка — не только те, у которых есть своё
     // подменю — при наведении закрывает чужие открытые подменю. Раньше
     // это делали только строки с items, и то неправильно: подменю —

@@ -10,9 +10,21 @@
 
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import { isAllowedFile, historyDate } from "../core/files.js";
+import { isAllowedFile, historyDate, historyToPrune, newestHistoryTime, HISTORY_MIN_INTERVAL_MS, KNOWN_FILE_NAMES } from "../core/files.js";
 
-const HISTORY_LIMIT = 50;
+// Антивирус, OneDrive, Dropbox ненадолго держат файл открытым — rename
+// поверх него на Windows падает с EPERM/EBUSY/EACCES. Несколько попыток с
+// паузой (как graceful-fs) вместо ошибки сохранения на ровном месте.
+async function renameWithRetry(from, to) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await fs.rename(from, to);
+    } catch (e) {
+      if (attempt >= 10 || !["EPERM", "EBUSY", "EACCES"].includes(e.code)) throw e;
+      await new Promise((resolve) => setTimeout(resolve, 100 + attempt * 100));
+    }
+  }
+}
 const GUIDE_FILE = "CLAUDE.md";
 const GUIDE_MARK = /^<!-- fictaris-guide v\d+/;
 let writeCounter = 0;
@@ -68,33 +80,58 @@ export class Vault {
     }
   }
 
-  async writeJson(name, data) {
+  // forceArchive — восстановление версии, резервной копии, импорт: прошлое
+  // состояние сохраняется в .history всегда, даже если копия была только что.
+  async writeJson(name, data, { forceArchive = false } = {}) {
     await this.ensure();
     const target = this.file(name);
-    await this.#archive(name, target);
-
     const body = JSON.stringify(data, null, 2) + "\n";
+
+    let previous = null;
+    try {
+      previous = await fs.readFile(target, "utf8");
+    } catch {
+      // файла ещё нет — первое сохранение, архивировать нечего
+    }
+    // Ничего не изменилось — не пишем и не плодим одинаковые версии.
+    if (previous === body) return data;
+    if (previous !== null) await this.#archive(name, previous, forceArchive);
+
     const tmp = `${target}.${process.pid}.${Date.now().toString(36)}${(writeCounter++).toString(36)}.tmp`;
+    // known ставим до rename, чтобы вотчер не принял нашу же запись за
+    // чужую, а при неудаче возвращаем прежнее значение — иначе следующее
+    // событие по файлу выглядело бы «своим» и правка пропала бы молча.
+    const knownBefore = this.known.get(name);
     try {
       await fs.writeFile(tmp, body, "utf8");
       this.known.set(name, body);
-      await fs.rename(tmp, target);
+      await renameWithRetry(tmp, target);
     } catch (e) {
+      if (knownBefore === undefined) this.known.delete(name);
+      else this.known.set(name, knownBefore);
       await fs.rm(tmp, { force: true });
       throw e;
     }
     return data;
   }
 
-  async #archive(name, target) {
-    let previous;
-    try {
-      previous = await fs.readFile(target);
-    } catch {
-      return; // первого сохранения архивировать нечего
+  async snapshotAll() {
+    for (const name of KNOWN_FILE_NAMES) {
+      let previous;
+      try {
+        previous = await fs.readFile(this.file(name), "utf8");
+      } catch {
+        continue;
+      }
+      await this.#archive(name, previous, true);
     }
+  }
+
+  async #archive(name, previous, force) {
     const dir = path.join(this.root, ".history", name);
     await fs.mkdir(dir, { recursive: true });
+    const existing = await fs.readdir(dir).catch(() => []);
+    if (!force && Date.now() - newestHistoryTime(existing) < HISTORY_MIN_INTERVAL_MS) return;
 
     const stamp = new Date().toISOString().replace(/[:.]/g, "-");
     let slot = path.join(dir, `${stamp}.json`);
@@ -108,8 +145,7 @@ export class Vault {
       }
     }
 
-    const kept = (await fs.readdir(dir)).sort();
-    for (const old of kept.slice(0, Math.max(0, kept.length - HISTORY_LIMIT))) {
+    for (const old of historyToPrune(await fs.readdir(dir))) {
       await fs.rm(path.join(dir, old), { force: true });
     }
   }

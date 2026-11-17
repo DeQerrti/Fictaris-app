@@ -1,6 +1,7 @@
 import { apiGet, apiPost, uid } from "./api.js";
 import { debounceSave } from "./save-badge.js";
 import { escapeHtml, buildEmptyState } from "./chips.js";
+import { safeImagePath } from "./sanitize.js";
 import { pushTrash } from "./trash.js";
 import { LOCATION_TYPES, locationTypeInfo, factionTypeInfo, iconSvg } from "./icons.js";
 import { loadTagsMap, buildTagsField, parseTags } from "./tags.js";
@@ -390,7 +391,7 @@ function buildOverview() {
 // Основа карты: загруженная картинка, нарисованная (map-draw.js) или
 // рисунок поверх картинки. У одного рисунка размер задаёт aspect-ratio.
 function mapBaseHtml(map) {
-  const img = map.imageRelPath ? `<img src="/${map.imageRelPath}" alt="">` : "";
+  const img = map.imageRelPath ? `<img src="/${encodeURI(safeImagePath(map.imageRelPath) || "")}" alt="">` : "";
   const drawing = map.drawing ? `<div class="loc-drawing">${drawingSvg(map.drawing, { withSea: !map.imageRelPath, factions })}</div>` : "";
   return img + drawing;
 }

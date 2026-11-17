@@ -60,7 +60,7 @@ function resolveInside(root, urlPath) {
   return full;
 }
 
-async function fileResponse(filePath) {
+async function fileResponse(filePath, extraHeaders = {}) {
   let data;
   try {
     data = await fs.readFile(filePath);
@@ -68,8 +68,29 @@ async function fileResponse(filePath) {
     return null;
   }
   const type = MIME[path.extname(filePath).toLowerCase()] || "application/octet-stream";
-  return new Response(data, { status: 200, headers: { "Content-Type": type } });
+  return new Response(data, { status: 200, headers: { "Content-Type": type, ...extraHeaders } });
 }
+
+// Content-Security-Policy главной страницы. Скрипты — только свои файлы:
+// строка из данных проекта, попавшая в HTML (onerror=…, <script>,
+// javascript:-ссылка), не выполнится, даже если где-то пропущено
+// экранирование. Стили inline разрешены — разделы задают цвета и размеры
+// атрибутом style. Заголовком, а не <meta> в index.html: на телефоне
+// Capacitor встраивает свой мост inline-скриптом, и та же политика там
+// сломала бы приложение.
+const APP_CSP = [
+  "default-src 'self'",
+  "script-src 'self'",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "font-src 'self' data: https://fonts.gstatic.com",
+  "img-src 'self' data: blob:",
+  "connect-src 'self' https://api.github.com",
+  "frame-src 'self' blob:",
+  "object-src 'none'",
+  "base-uri 'none'",
+  "form-action 'none'",
+].join("; ");
+const HTML_HEADERS = { "Content-Security-Policy": APP_CSP };
 
 // Вызывается после app.whenReady(). getVault — та же функция-геттер, что
 // уходит в appRoutes()/ipcMain-обработчик — на момент запроса хранилище
@@ -111,10 +132,10 @@ export function registerAppProtocol({ appDir, getVault }) {
     // ── Страницы и скрипты приложения (с откатом на index.html) ──
     const clean = pathname === "/" ? "/index.html" : pathname;
     const direct = resolveInside(appDir, clean);
-    const res = direct && (await fileResponse(direct));
+    const res = direct && (await fileResponse(direct, direct.endsWith(".html") ? HTML_HEADERS : {}));
     if (res) return res;
 
-    const fallback = await fileResponse(path.join(appDir, "index.html"));
+    const fallback = await fileResponse(path.join(appDir, "index.html"), HTML_HEADERS);
     return fallback || new Response("Не найдено", { status: 404 });
   });
 }

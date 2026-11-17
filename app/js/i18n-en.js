@@ -921,7 +921,6 @@ export const EN_DICT = {
     "Completely replaces current data with the file's contents. Save an export before importing if unsure – this can't be undone.",
   "Импортировать…": "Import…",
   "Файл повреждён или это не JSON.": "The file is corrupted or isn't JSON.",
-  "Заменить все текущие данные содержимым файла?": "Replace all current data with this file's contents?",
   "Да, заменить": "Yes, replace",
   "Отмена": "Cancel",
 
@@ -1416,5 +1415,7 @@ export const EN_DICT = {
   "{shown} из {total} карточек": "{shown} of {total} card|{shown} of {total} cards",
   "Файл не читается, правки в нём не сохраняются, чтобы не затереть данные: {error} Верни прошлую версию: Настройки → Этот мир → Данные → История версий.": "A file can't be read, so edits to it are not saved to avoid overwriting your data: {error} Restore an earlier version: Settings → This world → Data → Version history.",
   "Понятно": "Got it",
+  "Это не файл экспорта проекта Fictaris – в нём нет ни персонажей, ни глав, ни других разделов.": "This is not a Fictaris project export – it has no characters, chapters or other sections.",
+  "Заменить все текущие данные содержимым файла? Нынешние останутся в истории версий.": "Replace all current data with the file's contents? The current data will stay in the version history.",
   "Не удалось открыть раздел: {error}": "Could not open this section: {error}",
 };

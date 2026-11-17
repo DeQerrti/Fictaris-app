@@ -17,7 +17,7 @@ import {
   createRepo,
   runSync,
   resolveConflict,
-  AUTOSYNC_CONFLICTS_KEY,
+  hasAutosyncConflicts,
 } from "./sync.js";
 
 // ══════════════════════════════════════════════
@@ -676,7 +676,7 @@ function buildSyncConnected(section, config) {
   // Конфликт, найденный автосинхронизацией в фоне, мог случиться, пока
   // человек не смотрел на этот раздел вовсе — открыв его, сразу
   // досчитываем ещё раз, а не заставляем сперва самому нажать кнопку.
-  if (localStorage.getItem(AUTOSYNC_CONFLICTS_KEY) === "1") {
+  if (hasAutosyncConflicts()) {
     startSync(config, nowBtn, status, progress, conflictsBox);
   }
 

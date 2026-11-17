@@ -46,6 +46,21 @@ const BACKUP_FILES = [
   "knowledge.json",
 ];
 
+// site-settings.json смешивает два рода настроек. Вид приложения (тема,
+// акцент, язык, клавиши, подписи) — предпочтение устройства и в копию не
+// идёт. А шаблоны анкет, календарь мира, статусы глав и словарь тегов —
+// часть мира: без них на втором устройстве не видно полей анкет и
+// календаря. Они едут в копии и синхронизации отдельным «файлом»
+// world-settings.json и при восстановлении вливаются в site-settings.json.
+const WORLD_SETTINGS_FILE = "world-settings.json";
+const WORLD_SETTINGS_KEYS = ["templates", "calendar", "chapterStatuses", "customTags", "customCategories", "hiddenTags"];
+
+function pickWorldSettings(settings) {
+  const out = {};
+  for (const key of WORLD_SETTINGS_KEYS) if (settings && key in settings) out[key] = settings[key];
+  return out;
+}
+
 async function exportBackup({ vault }) {
   const files = {};
   for (const name of BACKUP_FILES) {
@@ -68,6 +83,8 @@ async function exportBackup({ vault }) {
         : []
     );
   }
+
+  files[WORLD_SETTINGS_FILE] = pickWorldSettings(await vault.readJson("site-settings.json", {}));
 
   // По одной и с перехватом: копия без одной картинки несравнимо лучше,
   // чем отсутствие копии вообще (тот же приём, что у TasteID).
@@ -100,7 +117,18 @@ async function restoreBackup({ vault, body }) {
     // попадает нарочно: это предпочтение конкретного устройства, а не
     // часть мира, и синхронизация не должна перекрашивать чужой экран.
     const names = Object.keys(files).filter((name) => isAllowedFile(name) && name !== "site-settings.json");
-    for (const name of names) await vault.writeJson(name, files[name]);
+    for (const name of names) await vault.writeJson(name, files[name], { forceArchive: true });
+
+    const world = files[WORLD_SETTINGS_FILE];
+    if (world && typeof world === "object" && !Array.isArray(world)) {
+      const current = await vault.readJson("site-settings.json", {});
+      const next = { ...current };
+      for (const key of WORLD_SETTINGS_KEYS) {
+        if (key in world) next[key] = world[key];
+        else delete next[key];
+      }
+      await vault.writeJson("site-settings.json", next, { forceArchive: true });
+    }
   }
 
   let restoredImages = 0;
@@ -267,7 +295,13 @@ export const ROUTES = {
   "POST /api/history/restore": async ({ vault, body }) => {
     if (!body.file || !body.id) throw new ApiError("Не указан файл или версия");
     const data = await vault.versionAt(body.file, body.id);
-    return vault.writeJson(body.file, data);
+    return vault.writeJson(body.file, data, { forceArchive: true });
+  },
+  // Копия всех файлов в .history прямо сейчас — перед импортом проекта и
+  // «Заполнить примером» (data-panel.js), которые заменяют всё разом.
+  "POST /api/history/snapshot": async ({ vault }) => {
+    await vault.snapshotAll();
+    return { ok: true };
   },
   "POST /api/history/delete": async ({ vault, body }) => {
     if (!body.file || !body.id) throw new ApiError("Не указан файл или версия");

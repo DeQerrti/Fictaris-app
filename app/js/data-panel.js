@@ -20,6 +20,36 @@ const EMPTY_PLOT = { nodes: [], edges: [] };
 const EMPTY_CANVAS = { order: [], canvases: {} };
 const EMPTY_KNOWLEDGE = { facts: [] };
 
+// Настройки, которые принадлежат миру, а не устройству, — тот же список,
+// что WORLD_SETTINGS_KEYS в core/api.js (резервная копия и синхронизация).
+const WORLD_SETTINGS_KEYS = ["templates", "calendar", "chapterStatuses", "customTags", "customCategories", "hiddenTags"];
+
+async function fetchWorldSettings() {
+  const settings = await apiGet("/api/site-settings");
+  const out = {};
+  for (const key of WORLD_SETTINGS_KEYS) if (settings && key in settings) out[key] = settings[key];
+  return out;
+}
+
+async function applyWorldSettings(world) {
+  if (!world || typeof world !== "object" || Array.isArray(world)) return;
+  const settings = await apiGet("/api/site-settings");
+  const next = { ...settings };
+  for (const key of WORLD_SETTINGS_KEYS) {
+    if (key in world) next[key] = world[key];
+    else delete next[key];
+  }
+  await apiPost("/api/site-settings", next);
+}
+
+// Похоже ли на экспорт проекта: объект хотя бы с одним разделом мира.
+// Раньше любой JSON (не тот файл) молча превращался в пустой проект.
+function looksLikeProjectExport(bundle) {
+  if (!bundle || typeof bundle !== "object" || Array.isArray(bundle)) return false;
+  return ["characters", "locations", "factions", "timeline", "relationships"].some((k) => Array.isArray(bundle[k])) ||
+    Array.isArray(bundle.manuscript?.chapters);
+}
+
 async function fetchAll() {
   const [characters, locations, relationships, factions, timeline, board, map, manuscript, plot, knowledge, canvas] = await Promise.all([
     apiGet("/api/characters"),
@@ -42,6 +72,9 @@ async function fetchAll() {
 // файлов. Карта переносит только структуру (метки, названия под-карт) —
 // сами картинки лежат файлами в maps/ и в JSON-экспорт не попадают.
 async function applyAll(bundle) {
+  // Всё, что сейчас в проекте, — в историю версий до замены: откатиться
+  // можно из Настройки → Данные → История версий.
+  await apiPost("/api/history/snapshot", {});
   await Promise.all([
     apiPost("/api/characters", Array.isArray(bundle.characters) ? bundle.characters : []),
     apiPost("/api/locations", Array.isArray(bundle.locations) ? bundle.locations : []),
@@ -394,7 +427,8 @@ function buildExportSection() {
 
 async function exportProjectJson() {
   const data = await fetchAll();
-  const bundle = { schemaVersion: SCHEMA_VERSION, exportedAt: new Date().toISOString(), ...data };
+  const worldSettings = await fetchWorldSettings();
+  const bundle = { schemaVersion: SCHEMA_VERSION, exportedAt: new Date().toISOString(), ...data, worldSettings };
   const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -486,8 +520,13 @@ function buildImportSection() {
       alert(i18n("Файл повреждён или это не JSON."));
       return;
     }
-    showConfirmBar(confirmBar, i18n("Заменить все текущие данные содержимым файла?"), async () => {
+    if (!looksLikeProjectExport(bundle)) {
+      alert(i18n("Это не файл экспорта проекта Fictaris – в нём нет ни персонажей, ни глав, ни других разделов."));
+      return;
+    }
+    showConfirmBar(confirmBar, i18n("Заменить все текущие данные содержимым файла? Нынешние останутся в истории версий."), async () => {
       await applyAll(bundle);
+      await applyWorldSettings(bundle.worldSettings);
       location.reload();
     });
   });
