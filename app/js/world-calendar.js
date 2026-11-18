@@ -226,8 +226,17 @@ function buildHeader(opts, draw) {
   return bar;
 }
 
-function weekHeader(calendar) {
-  return weekdaysOf(calendar).map((w) => `<div class="wcal-wd">${escapeText(w)}</div>`).join("");
+// short — сетка года: в узкой клетке длинное название («Звездник»)
+// обрезалось многоточием до «Зве…» у всех дней разом. Две первые буквы
+// различимы, полное название — во всплывающей подсказке.
+function weekHeader(calendar, short = false) {
+  return weekdaysOf(calendar)
+    .map((w) => {
+      const name = String(w || "");
+      const label = short && name.length > 3 ? name.slice(0, 2) : name;
+      return `<div class="wcal-wd" title="${escapeText(name)}">${escapeText(label)}</div>`;
+    })
+    .join("");
 }
 
 function escapeText(s) {
@@ -245,11 +254,17 @@ function buildYear(opts, marks, draw) {
     const inMonth = (marks.month.get(`${shownYear}|${mi}`) || []).length;
     card.innerHTML = `<div class="wcal-month-head"><span class="wcal-month-name"></span><span class="wcal-month-sub"></span></div>`;
     card.querySelector(".wcal-month-name").textContent = month.name;
-    card.querySelector(".wcal-month-sub").textContent = inMonth ? i18n("+{n} без дня", { n: inMonth }) : i18nPlural(month.days, ["{n} день", "{n} дня", "{n} дней"]);
+    const sub = card.querySelector(".wcal-month-sub");
+    sub.textContent = inMonth ? i18n("+{n} без дня", { n: inMonth }) : i18nPlural(month.days, ["{n} день", "{n} дня", "{n} дней"]);
+    if (inMonth) sub.title = i18n("События этого месяца без точного числа");
+    // Имя кнопки для экранного диктора — месяц и подпись, а не все ~30
+    // чисел сетки подряд; сама сетка от диктора скрыта.
+    card.setAttribute("aria-label", `${month.name}, ${sub.textContent}`);
     const days = document.createElement("div");
     days.className = "wcal-mini";
+    days.setAttribute("aria-hidden", "true");
     days.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
-    let html = weekHeader(calendar);
+    let html = weekHeader(calendar, true);
     const offset = weekdayOf(calendar, shownYear, mi, 1);
     for (let i = 0; i < offset; i++) html += `<span></span>`;
     for (let d = 1; d <= month.days; d++) {

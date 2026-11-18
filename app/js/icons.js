@@ -181,5 +181,6 @@ export function factionTypeInfo(type) {
 
 export function iconSvg(name, size = 20) {
   const path = PATHS[name] || PATHS.pin;
-  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`;
+  // aria-hidden: значок — украшение, имя кнопке даёт её подпись или title.
+  return `<svg aria-hidden="true" focusable="false" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`;
 }

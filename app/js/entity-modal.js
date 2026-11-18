@@ -1,6 +1,7 @@
 import { i18n } from "./i18n.js";
 import { recordRecent } from "./recent-nav.js";
 import { postCounter } from "./api.js";
+import { makeDialog } from "./a11y.js";
 
 // ══════════════════════════════════════════════
 //  МОДАЛКА КАРТОЧКИ
@@ -23,6 +24,7 @@ export function initEntityModal(modules) {
 let modalEl = null;
 let onCloseCb = null;
 let postsAtOpen = 0;
+let releaseDialog = null;
 let current = null; // { render, body, focusId } — для refreshEntityModal
 
 function onEscape(e) {
@@ -32,6 +34,8 @@ function onEscape(e) {
 export function closeEntityModal() {
   const wasOpen = !!modalEl;
   modalEl?.remove();
+  releaseDialog?.();
+  releaseDialog = null;
   modalEl = null;
   current = null;
   document.removeEventListener("keydown", onEscape);
@@ -84,6 +88,7 @@ export async function openEntityModal(moduleName, focusId, options = {}) {
   document.body.appendChild(backdrop);
   modalEl = backdrop;
   document.addEventListener("keydown", onEscape);
+  releaseDialog = makeDialog(panel, moduleName === "settings" ? i18n("Настройки") : moduleName === "stats" ? i18n("Статистика") : i18n("Карточка"));
 
   current = { render, body, focusId };
   // Карточка, открытая поверх экрана, — тоже «недавнее» (сайдбар).

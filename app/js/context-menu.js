@@ -18,13 +18,17 @@ import { iconSvg } from "./icons.js";
 import { safeColor } from "./sanitize.js";
 
 let menuEl = null;
+let opener = null; // куда вернуть фокус после закрытия (клавиатура)
 
 // Экспортирован — вызывающая сторона попапа (openPopover) может закрыть
 // его сама после своего действия (board.js: переименование/удаление
 // доски внутри выпадающего списка не ждёт клика мимо, чтобы закрыться).
 export function closeMenu() {
+  const hadFocus = menuEl?.contains(document.activeElement);
   menuEl?.remove();
   menuEl = null;
+  if (hadFocus && opener?.isConnected) opener.focus();
+  opener = null;
   document.removeEventListener("mousedown", onOutside, true);
   document.removeEventListener("keydown", onEscape, true);
 }
@@ -40,6 +44,7 @@ function onEscape(e) {
 function buildList(items) {
   const list = document.createElement("div");
   list.className = "context-menu-list";
+  list.setAttribute("role", "menu");
   for (const item of items) {
     if (item.separator) {
       const sep = document.createElement("div");
@@ -49,6 +54,11 @@ function buildList(items) {
     }
     const row = document.createElement("div");
     row.className = "context-menu-item" + (item.danger ? " danger" : "");
+    row.setAttribute("role", item.checked !== undefined ? "menuitemradio" : "menuitem");
+    row.tabIndex = -1;
+    if (item.checked !== undefined) row.setAttribute("aria-checked", item.checked ? "true" : "false");
+    if (item.disabled) row.setAttribute("aria-disabled", "true");
+    if (item.items) row.setAttribute("aria-haspopup", "menu");
     if (item.checked) row.classList.add("checked");
     if (item.disabled) row.classList.add("disabled");
     row.innerHTML =
@@ -95,6 +105,54 @@ function buildList(items) {
   return list;
 }
 
+// ── Клавиатура ──
+// Стрелки вверх/вниз — по пунктам, вправо/Enter — в подменю, влево — назад,
+// Enter/пробел — выбрать, Esc — закрыть и вернуть фокус туда, откуда меню
+// открыли. Без этого меню (и всё, что есть только в нём, например
+// «Переместить в колонку» на Доске) было доступно только мышью.
+function rowsOf(list) {
+  return [...list.querySelectorAll(":scope > .context-menu-item")].filter((r) => !r.classList.contains("disabled"));
+}
+
+function openSubmenu(row) {
+  row.dispatchEvent(new MouseEvent("mouseenter"));
+  const sub = row.querySelector(":scope > .context-menu-submenu");
+  if (sub) rowsOf(sub)[0]?.focus();
+}
+
+function onMenuKey(e) {
+  const row = e.target.closest?.(".context-menu-item");
+  if (!row || !menuEl?.contains(row)) return;
+  const list = row.parentElement;
+  const rows = rowsOf(list);
+  const i = rows.indexOf(row);
+  const move = (n) => { e.preventDefault(); rows[(i + n + rows.length) % rows.length]?.focus(); };
+  if (e.key === "ArrowDown") move(1);
+  else if (e.key === "ArrowUp") move(-1);
+  else if (e.key === "Home") { e.preventDefault(); rows[0]?.focus(); }
+  else if (e.key === "End") { e.preventDefault(); rows[rows.length - 1]?.focus(); }
+  else if (e.key === "ArrowRight" && row.getAttribute("aria-haspopup")) { e.preventDefault(); openSubmenu(row); }
+  else if (e.key === "ArrowLeft" && list.classList.contains("context-menu-submenu")) {
+    e.preventDefault();
+    const parentRow = list.parentElement;
+    list.remove();
+    parentRow.focus();
+  } else if (e.key === "Enter" || e.key === " ") {
+    e.preventDefault();
+    if (row.getAttribute("aria-haspopup")) openSubmenu(row);
+    else row.click();
+  }
+}
+
+function focusFirst() {
+  setTimeout(() => {
+    if (!menuEl) return;
+    const first = menuEl.querySelector(".context-menu-item:not(.disabled)") ||
+      menuEl.querySelector("input, select, textarea, button, [tabindex]:not([tabindex='-1'])");
+    first?.focus();
+  }, 0);
+}
+
 function place(x, y) {
   const rect = menuEl.getBoundingClientRect();
   const left = Math.min(x, window.innerWidth - rect.width - 8);
@@ -109,12 +167,18 @@ function place(x, y) {
 }
 
 export function openContextMenu(x, y, items) {
+  const from = document.activeElement;
   closeMenu();
+  opener = from instanceof HTMLElement && from !== document.body ? from : null;
   menuEl = document.createElement("div");
   menuEl.className = "context-menu";
   menuEl.appendChild(buildList(items));
+  menuEl.addEventListener("keydown", onMenuKey);
   document.body.appendChild(menuEl);
   place(x, y);
+  // С клавиатуры (или по Shift+F10) — сразу на первый пункт; мышью —
+  // тоже не мешает: фокус просто стоит на пункте.
+  focusFirst();
 }
 
 // Тот же плавающий контейнер и то же закрытие по клику вовне/Escape,
@@ -124,10 +188,15 @@ export function openContextMenu(x, y, items) {
 // пунктов меню недостаточно. extraClass — свой класс поверх .context-menu
 // для содержимого, которому нужна не стандартная ширина/отступы списка.
 export function openPopover(x, y, contentEl, extraClass = "") {
+  const from = document.activeElement;
   closeMenu();
+  opener = from instanceof HTMLElement && from !== document.body ? from : null;
   menuEl = document.createElement("div");
+  menuEl.setAttribute("role", "dialog");
   menuEl.className = extraClass ? `context-menu ${extraClass}` : "context-menu";
   menuEl.appendChild(contentEl);
+  menuEl.addEventListener("keydown", onMenuKey);
   document.body.appendChild(menuEl);
   place(x, y);
+  focusFirst();
 }

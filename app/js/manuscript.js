@@ -1171,8 +1171,25 @@ function buildChapterList() {
 // слова главы, время чтения и сегодняшний прогресс.
 const READ_WPM = 200;
 
+// Номер главы — по порядку в списке слева (папки и вложенные папки сперва,
+// как в buildFolderTree, потом главы без папки), а не по порядку в файле:
+// иначе над «Главой 2» стояло «Глава 3 из 10».
+function chaptersInListOrder() {
+  const out = [];
+  const walk = (parentId) => {
+    for (const folder of bookFolders().filter((f) => folderParent(f) === parentId)) {
+      walk(folder.id);
+      out.push(...manuscript.chapters.filter((c) => c.folderId === folder.id));
+    }
+  };
+  walk(null);
+  const seen = new Set(out);
+  out.push(...bookChapters().filter((c) => !seen.has(c)));
+  return out;
+}
+
 function chapterNumber(ch) {
-  return bookChapters().indexOf(ch) + 1;
+  return chaptersInListOrder().indexOf(ch) + 1;
 }
 
 function buildEditorToolbar(chapter) {

@@ -157,9 +157,11 @@ function setBadge(id, n, text, btnId, title) {
 }
 
 function renderCounts(data) {
-  const { active, inBook } = booksOf(data.manuscript);
+  // «Рукопись» — все главы мира; по книгам числа стоят строками ниже.
+  // Раньше здесь было число глав открытой книги, и «Рукопись 10» стояло
+  // над «Книга А 10, Книга Б 3».
   const counts = {
-    manuscript: inBook(active).length,
+    manuscript: (data.manuscript.chapters || []).length,
     board: Object.keys(data.board.cards || {}).length,
     characters: data.characters.length,
     locations: data.locations.length,

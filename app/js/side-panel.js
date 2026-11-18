@@ -1,4 +1,5 @@
 import { i18n } from "./i18n.js";
+import { makeDialog } from "./a11y.js";
 
 // ══════════════════════════════════════════════
 //  БОКОВАЯ ПАНЕЛЬ
@@ -14,9 +15,10 @@ let openEl = null;
 
 export function closeSidePanel() {
   if (!openEl) return;
-  const { el, onClose } = openEl;
+  const { el, onClose, release } = openEl;
   openEl = null;
   el.remove();
+  release?.();
   document.removeEventListener("keydown", onKey, true);
   onClose?.();
 }
@@ -54,6 +56,7 @@ export async function openSidePanel({ title, subtitle, build, reload = true, wid
 
   openEl = {
     el: backdrop,
+    release: makeDialog(panel, title),
     onClose: reload ? () => document.dispatchEvent(new CustomEvent("fictaris:reload-module")) : null,
   };
   document.addEventListener("keydown", onKey, true);

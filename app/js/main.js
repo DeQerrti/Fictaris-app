@@ -30,6 +30,7 @@ import { initExternalChanges } from "./external-changes.js";
 import { recordRecent } from "./recent-nav.js";
 import { hasPendingSaves } from "./save-badge.js";
 import { buildEmptyState } from "./chips.js";
+import { initA11y } from "./a11y.js";
 import { loadCalendar } from "./calendar.js";
 import { initSidebarOverview, refreshSidebar, openPanel } from "./sidebar-overview.js";
 
@@ -197,6 +198,7 @@ initSearch((module, focusId) => {
   return openModule(module, focusId);
 });
 initShortcuts((module) => openModule(module));
+initA11y();
 
 initEntityModal(MODULES);
 

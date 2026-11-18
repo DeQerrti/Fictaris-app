@@ -419,7 +419,7 @@ function buildChronicle(items) {
     const tocItem = document.createElement("button");
     tocItem.className = "chronicle-toc-item";
     tocItem.innerHTML = `<b>${escapeHtml(g.year === null ? i18n("Без даты") : yearLabel(g.year))}</b><small>${escapeHtml(i18nPlural(g.items.length, ["{n} событие", "{n} события", "{n} событий"]))}</small>`;
-    tocItem.addEventListener("click", () => head.scrollIntoView({ behavior: "smooth", block: "start" }));
+    tocItem.addEventListener("click", () => head.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" }));
     toc.appendChild(tocItem);
 
     for (const ev of g.items) {

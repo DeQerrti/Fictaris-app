@@ -30,8 +30,8 @@ import {
 
 const MODE_KEY = "fictaris_factions_mode";
 const RELATION_STATUSES = [
-  ["allies", "Союзники", "var(--color-8)"],
-  ["enemies", "Враждуют", "var(--color-3)"],
+  ["allies", "Союзники", "var(--status-good)"],
+  ["enemies", "Враждуют", "var(--status-bad)"],
   ["neutral", "Нейтрально", "var(--text-faint)"],
 ];
 const CUSTOM_STATUS = "__custom__";
