@@ -75,7 +75,32 @@ export function parseInlineSegments(rawText) {
 // каждый формат сам.
 export function toReaderText(text) {
   return String(text || "")
+    .replace(/\[\[(?:place|faction):[\w-]+\|([^\]\n]*)\]\]/g, "$1")
     .replace(/ ?\[\[note:[^\]\n]*\]\]/g, "")
     .replace(/@\[([^|\]\n]+)\|([^\]\n]+)\]/g, "$2")
     .replace(/(^|[^\p{L}\p{N}_@])@(?=\p{L})/gu, "$1");
+}
+
+// ── Ссылки на места и фракции в тексте главы ──
+// [[place:<id места>|как в тексте]], [[faction:<id фракции>|как в тексте]]
+// — по id, а не по названию: переименование места ссылку не ломает, а
+// слово в тексте (падеж) остаётся тем, что написал автор. Персонажи —
+// по-прежнему @Имя / @[Имя|форма] (mentions.js).
+export const ENTITY_LINK_RE = /\[\[(place|faction):([\w-]+)\|([^\]\n]*)\]\]/g;
+
+export function linkedEntityIds(text, kind) {
+  const ids = new Set();
+  for (const m of String(text || "").matchAll(ENTITY_LINK_RE)) if (m[1] === kind) ids.add(m[2]);
+  return ids;
+}
+
+// Место или фракцию удалили — ссылка становится обычным словом.
+export function unlinkEntity(text, kind, id) {
+  let count = 0;
+  const out = String(text || "").replace(ENTITY_LINK_RE, (m, k, i, shown) => {
+    if (k !== kind || i !== id) return m;
+    count++;
+    return shown;
+  });
+  return { text: out, count };
 }

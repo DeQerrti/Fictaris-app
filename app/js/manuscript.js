@@ -2,13 +2,14 @@ import { apiGet, apiPost, uid } from "./api.js";
 import { debounceSave } from "./save-badge.js";
 import { attachMentionAutocomplete, attachMentionHoverPreview, buildMentionContextMenuItems, findMentionedIds } from "./mentions.js";
 import { attachStickyPopover } from "./stickies.js";
-import { createRichEditor, attachRichAutocomplete, buildMentionPanel } from "./rich-editor.js";
+import { createRichEditor, attachRichAutocomplete, buildMentionPanel, buildLinkPicker, entityColor } from "./rich-editor.js";
+import { linkedEntityIds } from "./text-format.js";
 import { buildManuscriptDocx } from "./docx.js";
 import { exportChaptersPdf } from "./export-pdf.js";
 import { openContextMenu, openPopover, closeMenu } from "./context-menu.js";
 import { loadStatuses, buildStatusDot, buildStatusManagePanel } from "./chapter-status.js";
 import { pushTrash } from "./trash.js";
-import { iconSvg, locationTypeInfo } from "./icons.js";
+import { iconSvg, locationTypeInfo, factionTypeInfo } from "./icons.js";
 import { toReaderText } from "./text-format.js";
 import { recordToday, loadWritingLog, computeStats } from "./writing-goal.js";
 import { wordCount } from "./stats.js";
@@ -39,6 +40,7 @@ let editorFontSize = DEFAULT_FONT_SIZE;
 let manuscript = { chapters: [], activeChapterId: null };
 let characters = [];
 let locations = [];
+let factions = [];
 let focusMode = false;
 let container = null;
 let currentTextarea = null; // поле открытой главы в режиме «Разметка» — на него действуют кнопки панели инструментов
@@ -244,29 +246,86 @@ function mentionForms(name) {
   return [...forms].filter(Boolean).slice(0, 12);
 }
 
+// Формы ссылки на место или фракцию — название и слова, которыми на неё
+// уже ссылались в рукописи («в Ивняке», «Ивняку»).
+function linkForms(kind, id, name) {
+  const forms = new Set([name]);
+  const esc = id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp(`\\[\\[${kind}:${esc}\\|([^\\]\\n]+)\\]\\]`, "gu");
+  for (const ch of manuscript.chapters) for (const m of (ch.content || "").matchAll(re)) forms.add(m[1]);
+  return [...forms].filter(Boolean).slice(0, 12);
+}
+
+const ENTITY_KIND = { place: "location", faction: "faction" };
+
 function openMentionPanel(span, editor) {
-  const character = characters.find((c) => c.id === span.dataset.charId) || characters.find((c) => c.name === span.dataset.name);
   const r = span.getBoundingClientRect();
-  const panel = buildMentionPanel(span, {
-    character,
-    forms: mentionForms(span.dataset.name),
+  const done = {
     onChange: () => editor.changed(),
-    onOpen: () => {
-      closeMenu();
-      if (character) document.dispatchEvent(new CustomEvent("fictaris:open-character", { detail: { id: character.id } }));
-    },
     onClose: () => {
       closeMenu();
       editor.focus();
     },
-  });
+  };
+  let panel;
+  if (span.classList.contains("re-link")) {
+    const kind = span.dataset.kind;
+    const entity = (kind === "place" ? locations : factions).find((x) => x.id === span.dataset.id);
+    const typeLabel = entity ? (kind === "place" ? locationTypeInfo(entity.type)[1] : factionTypeInfo(entity.type)[1]) : i18n("Удалено из мира");
+    panel = buildMentionPanel(span, {
+      ...done,
+      title: entity?.name || span.textContent,
+      subtitle: `${kind === "place" ? i18n("Место") : i18n("Фракция")} · ${i18n(typeLabel)}`,
+      color: entityColor(kind, entity),
+      forms: linkForms(kind, span.dataset.id, entity?.name || span.textContent),
+      openLabel: kind === "place" ? i18n("Открыть место") : i18n("Открыть фракцию"),
+      onOpen: entity
+        ? () => {
+            closeMenu();
+            document.dispatchEvent(new CustomEvent("fictaris:open-entity", { detail: { type: ENTITY_KIND[kind], id: entity.id } }));
+          }
+        : null,
+    });
+  } else {
+    const character = characters.find((c) => c.id === span.dataset.charId) || characters.find((c) => c.name === span.dataset.name);
+    panel = buildMentionPanel(span, {
+      ...done,
+      title: character?.name || span.dataset.name,
+      subtitle: character?.role || "",
+      color: character?.color || "#7c7157",
+      forms: mentionForms(span.dataset.name),
+      openLabel: i18n("Открыть досье"),
+      onOpen: character
+        ? () => {
+            closeMenu();
+            document.dispatchEvent(new CustomEvent("fictaris:open-character", { detail: { id: character.id } }));
+          }
+        : null,
+    });
+  }
   openPopover(r.left, r.bottom + 6, panel, "re-mention-popover");
+}
+
+// «Сделать ссылкой…»: выделенное слово → персонаж, место или фракция.
+// Выделение запоминаем до открытия окна поиска — фокус уйдёт в его поле.
+function openLinkPicker(editor, x, y) {
+  const range = editor.savedRange();
+  if (!range || range.collapsed) return;
+  const picker = buildLinkPicker({
+    selected: range.toString().replace(/\s+/g, " ").trim(),
+    sources: { characters, locations, factions },
+    onPick: (target) => {
+      closeMenu();
+      editor.linkRange(range, target);
+    },
+  });
+  openPopover(x, y, picker, "re-mention-popover");
 }
 
 function attachRichContextMenu(editor, chapter) {
   editor.el.addEventListener("contextmenu", (e) => {
     e.preventDefault();
-    const mention = e.target.closest?.(".re-mention");
+    const mention = e.target.closest?.(".re-mention, .re-link");
     const hasSelection = editor.hasSelection();
     const selected = hasSelection ? editor.selectionText() : "";
     const fmt = (label, kind) => ({ label: i18n(label), disabled: !hasSelection, action: () => editor.format(kind) });
@@ -274,9 +333,25 @@ function attachRichContextMenu(editor, chapter) {
       ...(mention
         ? [
             { label: i18n("Как назвать в тексте…"), action: () => openMentionPanel(mention, editor) },
-            { label: i18n("Открыть досье"), action: () => document.dispatchEvent(new CustomEvent("fictaris:open-character", { detail: { id: mention.dataset.charId } })) },
+            {
+              label: mention.classList.contains("re-link") ? (mention.dataset.kind === "place" ? i18n("Открыть место") : i18n("Открыть фракцию")) : i18n("Открыть досье"),
+              action: () =>
+                mention.classList.contains("re-link")
+                  ? document.dispatchEvent(new CustomEvent("fictaris:open-entity", { detail: { type: ENTITY_KIND[mention.dataset.kind], id: mention.dataset.id } }))
+                  : document.dispatchEvent(new CustomEvent("fictaris:open-character", { detail: { id: mention.dataset.charId } })),
+            },
+            {
+              label: i18n("Убрать ссылку"),
+              action: () => {
+                mention.replaceWith(document.createTextNode(mention.textContent));
+                editor.changed();
+              },
+            },
             { separator: true },
           ]
+        : []),
+      ...(hasSelection && !mention
+        ? [{ label: i18n("Сделать ссылкой…"), icon: "link", action: () => openLinkPicker(editor, e.clientX, e.clientY) }, { separator: true }]
         : []),
       {
         label: i18n("Форматирование"),
@@ -528,12 +603,13 @@ function openStatusManagePopover(x, y) {
 export async function renderManuscript(root, focusChapterId) {
   container = root;
   focusMode = false; // модуль всегда открывается в обычном виде, фокус — временное состояние сессии просмотра
-  const [manuscriptData, charactersData, locationsData, siteSettings, statusList] = await Promise.all([
+  const [manuscriptData, charactersData, locationsData, siteSettings, statusList, factionsData] = await Promise.all([
     apiGet("/api/manuscript"),
     apiGet("/api/characters"),
     apiGet("/api/locations").catch(() => []),
     apiGet("/api/site-settings").catch(() => ({})),
     loadStatuses(),
+    apiGet("/api/factions").catch(() => []),
   ]);
   manuscript = manuscriptData;
   manuscript.folders = manuscript.folders || []; // старые проекты сохранялись без папок
@@ -541,6 +617,7 @@ export async function renderManuscript(root, focusChapterId) {
   ensureBooks();
   characters = charactersData;
   locations = Array.isArray(locationsData) ? locationsData : [];
+  factions = Array.isArray(factionsData) ? factionsData : [];
   statuses = statusList;
   const savedSize = Number(siteSettings.editorFontSize);
   editorFontSize =
@@ -781,7 +858,9 @@ function chapterCast(ch) {
 }
 
 function chapterPlaces(ch) {
-  return (ch.locationIds || []).map((id) => locations.find((l) => l.id === id)).filter(Boolean);
+  const linked = linkedEntityIds(ch.content || "", "place");
+  const ids = [...linked, ...(ch.locationIds || []).filter((id) => !linked.has(id))];
+  return ids.map((id) => locations.find((l) => l.id === id)).filter(Boolean);
 }
 
 function avatarHtml(c, size = 24) {
@@ -1521,7 +1600,9 @@ function buildEditor() {
     const editor = createRichEditor({
       text: chapter.content,
       characters,
-      placeholder: i18n("Пиши здесь… «@» – упомянуть персонажа"),
+      locations,
+      factions,
+      placeholder: i18n("Пиши здесь… «@» – ссылка на персонажа, место или фракцию"),
       onChange: (text) => {
         chapter.content = text;
         wc.textContent = wordsLine(chapter);
@@ -1529,7 +1610,7 @@ function buildEditor() {
       },
       onMentionClick: (span) => openMentionPanel(span, editor),
     });
-    richAutocomplete = attachRichAutocomplete(editor, () => characters);
+    richAutocomplete = attachRichAutocomplete(editor, () => ({ characters, locations, factions }));
     attachMentionHoverPreview(editor.el, () => characters);
     attachStickyPopover(editor.el, () => chapter.stickies || []);
     attachRichContextMenu(editor, chapter);

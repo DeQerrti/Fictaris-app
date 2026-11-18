@@ -14,6 +14,7 @@
 
 import { apiGet, apiPost } from "./api.js";
 import { pushTrash } from "./trash.js";
+import { unlinkEntity } from "./text-format.js";
 
 function boardsOf(raw) {
   if (Array.isArray(raw?.boards)) return raw.boards;
@@ -130,6 +131,9 @@ export async function detachLocation(id) {
   changed = false;
   for (const ch of manuscript.chapters || []) {
     if (Array.isArray(ch.locationIds) && ch.locationIds.includes(id)) { ch.locationIds = ch.locationIds.filter((x) => x !== id); changed = true; }
+    // Ссылки в тексте ([[place:id|слово]]) становятся обычным словом.
+    const r = unlinkEntity(ch.content, "place", id);
+    if (r.count) { ch.content = r.text; changed = true; }
   }
   if (changed) writes.push(apiPost("/api/manuscript", manuscript));
 
@@ -145,8 +149,14 @@ export async function detachLocation(id) {
 }
 
 export async function detachFaction(id) {
-  const board = await apiGet("/api/board");
+  const [board, manuscript] = await Promise.all([apiGet("/api/board"), apiGet("/api/manuscript")]);
   let changed = false;
   for (const b of boardsOf(board)) for (const card of Object.values(b.cards || {})) if (card.factionId === id) { card.factionId = null; changed = true; }
   if (changed) await apiPost("/api/board", board);
+  changed = false;
+  for (const ch of manuscript.chapters || []) {
+    const r = unlinkEntity(ch.content, "faction", id);
+    if (r.count) { ch.content = r.text; changed = true; }
+  }
+  if (changed) await apiPost("/api/manuscript", manuscript);
 }

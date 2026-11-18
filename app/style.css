@@ -4697,3 +4697,16 @@ input[type="color"]:focus-visible,
 /* Флажок в Настройках (проверка обновлений при запуске). */
 .settings-check { display: flex; align-items: flex-start; gap: 8px; margin-top: 12px; color: var(--text-dim); font-size: 0.85rem; cursor: pointer; }
 .settings-check input { margin-top: 3px; accent-color: var(--accent); }
+
+/* Ссылки на места и фракции в тексте главы (rich-editor.js): цвет — от
+   типа, пунктир снизу отличает их от упоминаний персонажей. */
+.rich-editor .re-link { cursor: pointer; border-bottom: 1px dashed currentColor; border-radius: 2px; }
+.rich-editor .re-link:hover { background: color-mix(in srgb, currentColor 14%, transparent); }
+.rich-editor .re-link.missing { text-decoration: line-through; opacity: 0.7; }
+
+/* Подсказка «@» и окно «Сделать ссылкой…»: справа — вид (персонаж,
+   место, фракция). */
+.re-target { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.re-target small { color: var(--text-faint); font-size: 0.75rem; }
+.re-link-picker { width: 300px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+.re-link-list { max-height: 260px; overflow: auto; border: 1px solid var(--border); border-radius: 8px; }

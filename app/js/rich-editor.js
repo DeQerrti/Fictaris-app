@@ -14,9 +14,9 @@
 // ══════════════════════════════════════════════
 
 import { escapeHtml } from "./chips.js";
-import { applyInlineMarkupHtml } from "./text-format.js";
+import { applyInlineMarkupHtml, ENTITY_LINK_RE } from "./text-format.js";
 import { buildMentionRegex } from "./mentions.js";
-import { iconSvg } from "./icons.js";
+import { iconSvg, locationTypeInfo, factionTypeInfo } from "./icons.js";
 import { safeColor } from "./sanitize.js";
 import { i18n } from "./i18n.js";
 import { addBeforeFlush } from "./save-badge.js";
@@ -41,6 +41,7 @@ function renderLine(line, ctx) {
       return put(mentionHtml(char, aliasName !== undefined ? form : name, aliasName === undefined));
     });
   }
+  s = s.replace(ENTITY_LINK_RE, (m, kind, id, shown) => put(linkHtml(kind, id, shown, ctx)));
   s = s.replace(/\[\[note:([\w-]+)\]\]/g, (m, id) => put(stickyHtml(id)));
   let html = applyInlineMarkupHtml(escapeHtml(s));
   html = html.replace(/[-]/g, (ch) => tokens[ch.charCodeAt(0) - PH_BASE] ?? "");
@@ -50,6 +51,25 @@ function renderLine(line, ctx) {
 export function mentionHtml(char, form, plain) {
   const color = safeColor(char.color, "var(--accent)");
   return `<span class="mention re-mention" contenteditable="false" data-char-id="${escapeHtml(char.id)}" data-name="${escapeHtml(char.name)}" data-form="${escapeHtml(form)}"${plain ? ' data-plain="1"' : ""} style="color:${color}">${escapeHtml(form)}</span>`;
+}
+
+// Ссылка на место или фракцию: цвет — от типа места/фракции, как в
+// разделах. Удалённое (id не найден) — приглушённо, но ссылка в тексте
+// сохраняется как была.
+export function entityOf(kind, id, ctx) {
+  const list = kind === "place" ? ctx.locations : ctx.factions;
+  return (list || []).find((x) => x.id === id) || null;
+}
+
+export function entityColor(kind, entity) {
+  if (!entity) return "var(--text-faint)";
+  return kind === "place" ? locationTypeInfo(entity.type)[3] : factionTypeInfo(entity.type)[3];
+}
+
+export function linkHtml(kind, id, shown, ctx) {
+  const entity = entityOf(kind, id, ctx);
+  const text = shown || entity?.name || "?";
+  return `<span class="re-link re-link-${kind}${entity ? "" : " missing"}" contenteditable="false" data-kind="${kind}" data-id="${escapeHtml(id)}" data-form="${escapeHtml(text)}" style="color:${entityColor(kind, entity)}">${escapeHtml(text)}</span>`;
 }
 
 function stickyHtml(id) {
@@ -81,7 +101,7 @@ function styleKinds(el) {
     const deco = st.textDecorationLine || st.textDecoration || "";
     if (/underline/.test(deco)) kinds.push("underline");
     if (/line-through/.test(deco)) kinds.push("strike");
-    if (st.backgroundColor && !el.classList.contains("re-mention")) kinds.push("highlight");
+    if (st.backgroundColor && !el.classList.contains("re-mention") && !el.classList.contains("re-link")) kinds.push("highlight");
   }
   return [...new Set(kinds)];
 }
@@ -101,6 +121,11 @@ function inlineText(node, active) {
     return el.dataset.plain === "1" && form === name ? `@${name}` : `@[${name}|${form}]`;
   }
   if (el.classList.contains("re-sticky")) return `[[note:${el.dataset.stickyId}]]`;
+  if (el.classList.contains("re-link")) {
+    // «]» и «|» в слове сломали бы разметку ссылки — заменяем похожими.
+    const shown = (el.textContent || "").replace(/\u00a0/g, " ").trim().replace(/\]/g, ")").replace(/\|/g, "/") || el.dataset.form || "?";
+    return `[[${el.dataset.kind}:${el.dataset.id}|${shown}]]`;
+  }
   if (el.tagName === "BR") return "\n";
   if (el.tagName === "IMG" || el.tagName === "SCRIPT" || el.tagName === "STYLE") return "";
   const own = styleKinds(el).filter((k) => !active.has(k));
@@ -181,7 +206,7 @@ export function insertAtSelection(root, html) {
 // ── Сам редактор ──
 // opts: { text, characters, placeholder, onChange(text), onMentionClick(span), onReady }
 export function createRichEditor(opts) {
-  const ctx = { characters: opts.characters || [], mentionRe: buildMentionRegex(opts.characters || []) };
+  const ctx = { characters: opts.characters || [], locations: opts.locations || [], factions: opts.factions || [], mentionRe: buildMentionRegex(opts.characters || []) };
   const el = document.createElement("div");
   el.className = "chapter-content rich-editor";
   el.contentEditable = "true";
@@ -264,7 +289,7 @@ export function createRichEditor(opts) {
   });
 
   el.addEventListener("click", (e) => {
-    const m = e.target.closest?.(".re-mention");
+    const m = e.target.closest?.(".re-mention, .re-link");
     if (m && el.contains(m)) {
       e.preventDefault();
       opts.onMentionClick?.(m);
@@ -317,8 +342,22 @@ export function createRichEditor(opts) {
     insertSticky(id) {
       insertHtml(stickyHtml(id));
     },
-    insertMention(char, form, plain = true) {
-      insertHtml(`${mentionHtml(char, form, plain)} `);
+    ctx,
+    // Выделенное (или сохранённое заранее, если фокус уходил в окно поиска)
+    // становится ссылкой: само слово остаётся в тексте как было.
+    linkRange(range, target) {
+      const shown = range.toString().replace(/\s+/g, " ").trim();
+      if (!shown) return;
+      el.focus();
+      const sel = getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+      insertAtSelection(el, targetHtml(target, shown, ctx));
+      changed();
+    },
+    savedRange() {
+      const sel = getSelection();
+      return sel.rangeCount && el.contains(sel.anchorNode) ? sel.getRangeAt(0).cloneRange() : null;
     },
     selectionText() {
       const sel = getSelection();
@@ -333,18 +372,79 @@ export function createRichEditor(opts) {
       return !!sel.rangeCount && !sel.isCollapsed && el.contains(sel.anchorNode);
     },
     changed,
-    setCharacters(list) {
-      ctx.characters = list;
-      ctx.mentionRe = buildMentionRegex(list);
+    setSources({ characters, locations, factions }) {
+      if (characters) {
+        ctx.characters = characters;
+        ctx.mentionRe = buildMentionRegex(characters);
+      }
+      if (locations) ctx.locations = locations;
+      if (factions) ctx.factions = factions;
     },
   };
 }
 
-// ── «@» — подсказка персонажей у курсора ──
-// Набрал «@» и начало имени — список рядом с курсором; стрелки, Enter или
-// Tab — вставить цветное упоминание, Esc — закрыть. Работает и по
-// второму слову имени («@Вир» найдёт «Астра Вирен»).
-export function attachRichAutocomplete(editor, getCharacters) {
+// ── Что можно упомянуть: персонажи, места, фракции ──
+// Единый список для «@» и для «Сделать ссылкой…». kind: "character" |
+// "place" | "faction".
+const KIND_LABEL = { character: "Персонаж", place: "Место", faction: "Фракция" };
+
+export function linkTargets({ characters = [], locations = [], factions = [] }) {
+  return [
+    ...characters.filter((c) => c.name).map((c) => ({ kind: "character", id: c.id, name: c.name, color: safeColor(c.color, "#7c7157"), entity: c })),
+    ...locations.filter((l) => l.name).map((l) => ({ kind: "place", id: l.id, name: l.name, color: locationTypeInfo(l.type)[3], entity: l })),
+    ...factions.filter((f) => f.name).map((f) => ({ kind: "faction", id: f.id, name: f.name, color: factionTypeInfo(f.type)[3], entity: f })),
+  ];
+}
+
+// Насколько название похоже на набранное или выделенное слово. Учитывает
+// падежи грубо: «Ивняке» → основа «Ивня» найдёт «Ивняк», «Вельде» — «Вельда».
+export function matchScore(name, query) {
+  const n = name.toLowerCase();
+  const q = query.trim().toLowerCase();
+  if (!q) return 1;
+  if (n === q) return 100;
+  if (n.startsWith(q)) return 80;
+  const words = n.split(/[\s-]+/);
+  if (words.some((w) => w.startsWith(q))) return 60;
+  const stem = q.length > 4 ? q.slice(0, q.length - 2) : q.length > 3 ? q.slice(0, q.length - 1) : q;
+  if (words.some((w) => w.startsWith(stem))) return 40;
+  if (n.includes(q)) return 20;
+  return 0;
+}
+
+export function rankTargets(targets, query, limit = 8) {
+  return targets
+    .map((t) => ({ t, s: matchScore(t.name, query) }))
+    .filter((x) => x.s > 0)
+    .sort((a, b) => b.s - a.s || a.t.name.localeCompare(b.t.name))
+    .slice(0, limit)
+    .map((x) => x.t);
+}
+
+// HTML ссылки для выбранного: персонаж — @-упоминание, остальное — [[…]].
+export function targetHtml(target, shown, ctx) {
+  if (target.kind === "character") return mentionHtml(target.entity, shown || target.name, !shown || shown === target.name);
+  return linkHtml(target.kind, target.id, shown || target.name, ctx);
+}
+
+function itemEl(t, active) {
+  const item = document.createElement("div");
+  item.className = "mention-autocomplete-item re-target" + (active ? " active" : "");
+  item.setAttribute("role", "option");
+  item.setAttribute("aria-selected", active ? "true" : "false");
+  item.style.setProperty("--chip-color", t.color);
+  const name = document.createElement("span");
+  name.textContent = t.name;
+  const kind = document.createElement("small");
+  kind.textContent = i18n(KIND_LABEL[t.kind]);
+  item.append(name, kind);
+  return item;
+}
+
+// ── «@» — подсказка у курсора ──
+// Набрал «@» и начало названия — список персонажей, мест и фракций рядом с
+// курсором; стрелки, Enter или Tab — вставить ссылку, Esc — закрыть.
+export function attachRichAutocomplete(editor, getSources) {
   const el = editor.el;
   const list = document.createElement("div");
   list.className = "mention-autocomplete re-autocomplete";
@@ -371,33 +471,28 @@ export function attachRichAutocomplete(editor, getCharacters) {
     return { node, end: sel.anchorOffset, start: sel.anchorOffset - m[1].length - 1, text: m[1] };
   }
 
-  function choose(char) {
-    if (!query || !char) return hide();
+  function choose(t) {
+    if (!query || !t) return hide();
     const r = document.createRange();
     r.setStart(query.node, query.start);
     r.setEnd(query.node, query.end);
     const sel = getSelection();
     sel.removeAllRanges();
     sel.addRange(r);
-    // Пробел после имени — только если за курсором его ещё нет.
+    // Пробел после названия — только если за курсором его ещё нет.
     const nextChar = query.node.nodeValue?.[query.end] ?? "";
     hide();
-    insertAtSelection(el, `${mentionHtml(char, char.name, true)}${/\s/.test(nextChar) ? "" : "\u00a0"}`);
+    insertAtSelection(el, `${targetHtml(t, null, editor.ctx)}${/\s/.test(nextChar) ? "" : " "}`);
     editor.changed();
   }
 
   function paint() {
     list.innerHTML = "";
-    items.forEach((c, i) => {
-      const item = document.createElement("div");
-      item.className = "mention-autocomplete-item" + (i === active ? " active" : "");
-      item.setAttribute("role", "option");
-      item.setAttribute("aria-selected", i === active ? "true" : "false");
-      item.style.setProperty("--chip-color", safeColor(c.color, "#7c7157"));
-      item.textContent = c.name;
+    items.forEach((t, i) => {
+      const item = itemEl(t, i === active);
       item.addEventListener("mousedown", (e) => {
         e.preventDefault();
-        choose(c);
+        choose(t);
       });
       list.appendChild(item);
     });
@@ -406,10 +501,7 @@ export function attachRichAutocomplete(editor, getCharacters) {
   function update() {
     query = currentQuery();
     if (!query) return hide();
-    const q = query.text.trim().toLowerCase();
-    items = getCharacters()
-      .filter((c) => c.name && (!q || c.name.toLowerCase().startsWith(q) || c.name.toLowerCase().split(/\s+/).some((w) => w.startsWith(q))))
-      .slice(0, 8);
+    items = rankTargets(linkTargets(getSources()), query.text, 8);
     if (!items.length) return hide();
     active = 0;
     paint();
@@ -418,7 +510,7 @@ export function attachRichAutocomplete(editor, getCharacters) {
     r.setEnd(query.node, query.end);
     const rect = r.getBoundingClientRect();
     list.style.position = "fixed";
-    list.style.left = `${Math.min(rect.left, window.innerWidth - 240)}px`;
+    list.style.left = `${Math.min(rect.left, window.innerWidth - 260)}px`;
     list.style.top = `${rect.bottom + 4}px`;
     list.style.bottom = "auto";
     list.style.display = "block";
@@ -444,37 +536,102 @@ export function attachRichAutocomplete(editor, getCharacters) {
   return { hide, destroy: () => list.remove() };
 }
 
-// ── Окошко упоминания ──
-// Щелчок по цветному имени: как назвать в тексте (падеж), готовые формы,
-// открыть досье, убрать ссылку. forms — формы этого имени, уже
-// встречавшиеся в рукописи, плюс само имя и его первое слово.
-export function buildMentionPanel(span, { character, forms, onChange, onOpen, onClose }) {
+// ── «Сделать ссылкой…» (правая кнопка на выделенном слове) ──
+// Поиск по персонажам, местам и фракциям; сверху — похожие на выделенное
+// слово с учётом падежа. Выбор — выделенное слово становится ссылкой и
+// остаётся в тексте как было («в Ивняке» → ссылка на «Ивняк»).
+export function buildLinkPicker({ selected, sources, onPick }) {
+  const wrap = document.createElement("div");
+  wrap.className = "re-link-picker";
+  const input = document.createElement("input");
+  input.className = "re-mp-input";
+  input.type = "text";
+  input.placeholder = i18n("Персонаж, место или фракция");
+  input.setAttribute("aria-label", i18n("Сделать ссылкой на…"));
+  const list = document.createElement("div");
+  list.className = "re-link-list";
+  list.setAttribute("role", "listbox");
+  const hint = document.createElement("div");
+  hint.className = "re-mp-role";
+  hint.textContent = i18n("«{word}» станет ссылкой", { word: selected });
+  wrap.append(hint, input, list);
+
+  const all = linkTargets(sources);
+  let items = [];
+  let active = 0;
+  function paint() {
+    list.innerHTML = "";
+    items.forEach((t, i) => {
+      const item = itemEl(t, i === active);
+      item.addEventListener("mousedown", (e) => {
+        e.preventDefault();
+        onPick(t);
+      });
+      list.appendChild(item);
+    });
+    if (!items.length) {
+      const empty = document.createElement("div");
+      empty.className = "re-mp-role";
+      empty.textContent = i18n("Ничего не найдено");
+      list.appendChild(empty);
+    }
+  }
+  function update() {
+    const q = input.value.trim();
+    // Пустой поиск — по выделенному слову (похожие сверху), а если похожих
+    // нет — просто всё по алфавиту.
+    items = q ? rankTargets(all, q, 30) : rankTargets(all, selected, 30);
+    if (!q && !items.length) items = [...all].sort((a, b) => a.name.localeCompare(b.name)).slice(0, 30);
+    active = 0;
+    paint();
+  }
+  input.addEventListener("input", update);
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      if (!items.length) return;
+      active = (active + (e.key === "ArrowDown" ? 1 : -1) + items.length) % items.length;
+      paint();
+      list.children[active]?.scrollIntoView({ block: "nearest" });
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (items[active]) onPick(items[active]);
+    }
+  });
+  update();
+  return wrap;
+}
+
+// ── Окошко ссылки (щелчок по цветному слову) ──
+// Как назвать в тексте (падеж), готовые формы, открыть, убрать ссылку —
+// одинаково для персонажей, мест и фракций.
+export function buildMentionPanel(span, { title, subtitle, color, forms, openLabel, onChange, onOpen, onClose }) {
   const wrap = document.createElement("div");
   wrap.className = "re-mention-panel";
-  const color = safeColor(character?.color, "#7c7157");
-  const initial = (character?.name || "?").trim().slice(0, 1).toUpperCase();
   wrap.innerHTML = `
-    <div class="re-mp-head"><span class="re-mp-av" style="background:${color}"></span><div><div class="re-mp-name"></div><div class="re-mp-role"></div></div></div>
+    <div class="re-mp-head"><span class="re-mp-av"></span><div><div class="re-mp-name"></div><div class="re-mp-role"></div></div></div>
     <label class="re-mp-row"><span class="re-mp-k"></span><input class="re-mp-input" type="text"></label>
     <div class="re-mp-forms" role="group"></div>
     <div class="re-mp-actions"><button class="btn re-mp-open"></button><button class="btn re-mp-unlink"></button></div>`;
-  wrap.querySelector(".re-mp-av").textContent = initial;
-  wrap.querySelector(".re-mp-name").textContent = character?.name || span.dataset.name;
-  wrap.querySelector(".re-mp-role").textContent = character?.role || "";
-  const t = i18n;
-  wrap.querySelector(".re-mp-k").textContent = t("В тексте");
-  wrap.querySelector(".re-mp-open").textContent = t("Открыть досье");
-  wrap.querySelector(".re-mp-unlink").textContent = t("Убрать ссылку");
+  const av = wrap.querySelector(".re-mp-av");
+  av.style.background = color || "#7c7157";
+  av.textContent = (title || "?").trim().slice(0, 1).toUpperCase();
+  wrap.querySelector(".re-mp-name").textContent = title || "";
+  wrap.querySelector(".re-mp-role").textContent = subtitle || "";
+  wrap.querySelector(".re-mp-k").textContent = i18n("В тексте");
+  wrap.querySelector(".re-mp-open").textContent = openLabel || i18n("Открыть досье");
+  wrap.querySelector(".re-mp-unlink").textContent = i18n("Убрать ссылку");
+  if (!onOpen) wrap.querySelector(".re-mp-open").remove();
   const input = wrap.querySelector(".re-mp-input");
   input.value = span.textContent;
-  input.setAttribute("aria-label", t("В тексте"));
+  input.setAttribute("aria-label", i18n("В тексте"));
   const formsEl = wrap.querySelector(".re-mp-forms");
 
   const setForm = (form) => {
-    const value = form.trim() || span.dataset.name;
+    const value = form.trim() || span.dataset.name || span.dataset.form || "?";
     span.textContent = value;
     span.dataset.form = value;
-    if (value !== span.dataset.name) delete span.dataset.plain;
+    if (span.dataset.name && value !== span.dataset.name) delete span.dataset.plain;
     paintForms();
     onChange?.();
   };
@@ -501,7 +658,7 @@ export function buildMentionPanel(span, { character, forms, onChange, onOpen, on
       onClose?.();
     }
   });
-  wrap.querySelector(".re-mp-open").addEventListener("click", () => onOpen?.());
+  wrap.querySelector(".re-mp-open")?.addEventListener("click", () => onOpen?.());
   wrap.querySelector(".re-mp-unlink").addEventListener("click", () => {
     span.replaceWith(document.createTextNode(span.textContent));
     onChange?.();

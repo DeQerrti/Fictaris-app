@@ -3,6 +3,7 @@ import { flattenBoards, cardCharacterIds } from "./board-data.js";
 import { buildEmptyState } from "./chips.js";
 import { knowledgeIssues } from "./knowledge.js";
 import { findMentionedIds } from "./mentions.js";
+import { linkedEntityIds } from "./text-format.js";
 import { i18n, i18nPlural } from "./i18n.js";
 
 // Список проверок из брифа: битые ссылки, «забытые» сущности, дубли на
@@ -97,6 +98,7 @@ export function orphans({ characters, locations, relationships, factions, timeli
   for (const ch of manuscript?.chapters || []) {
     for (const id of [...(ch.characterIds || []), ...(ch.locationIds || [])]) referenced.add(id);
     for (const id of findMentionedIds(ch.content || "", characters)) referenced.add(id);
+    for (const id of linkedEntityIds(ch.content || "", "place")) referenced.add(id);
   }
   for (const card of Object.values(board.cards || {})) {
     for (const id of cardCharacterIds(card)) referenced.add(id);

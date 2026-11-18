@@ -4,6 +4,7 @@
 // иконок ради пяти штук незачем.
 
 const PATHS = {
+  link: '<path d="M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1.5 1.5"/><path d="M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1.5-1.5"/>',
   landmark: '<path d="M4 21h16M6 21V10M10 21V10M14 21V10M18 21V10M4 10l8-6 8 6"/>',
   door: '<rect x="6" y="3" width="12" height="18" rx="1"/><circle cx="14" cy="12" r="1"/>',
   alert: '<path d="M12 3 2 20h20L12 3z"/><path d="M12 10v4"/><circle cx="12" cy="17" r="0.5" fill="currentColor"/>',
