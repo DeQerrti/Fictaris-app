@@ -189,7 +189,22 @@ async function render() {
       await save();
       render();
     });
-    head.append(grip, label, type, del);
+    // Тайное поле не попадает в «Сайт мира для читателей».
+    const secret = document.createElement("button");
+    secret.type = "button";
+    secret.className = "fe-secret" + (field.secret ? " on" : "");
+    secret.innerHTML = iconSvg(field.secret ? "eyeOff" : "eye", 13);
+    secret.title = field.secret
+      ? i18n("Тайное поле – не попадает в сайт для читателей. Щёлкните, чтобы открыть")
+      : i18n("Сделать поле тайным – его не будет в сайте для читателей");
+    secret.setAttribute("aria-pressed", field.secret ? "true" : "false");
+    secret.addEventListener("click", async () => {
+      if (field.secret) delete field.secret;
+      else field.secret = true;
+      await save();
+      render();
+    });
+    head.append(grip, label, type, secret, del);
     card.appendChild(head);
 
     const fill = document.createElement("div");
@@ -324,7 +339,7 @@ function openTemplateMenu(anchor, list, tpl) {
     }
     const fields = parsed.fields
       .filter((f) => f && typeof f.key === "string" && typeof f.label === "string")
-      .map((f) => ({ key: f.key, label: f.label, type: TYPES.some(([v]) => v === f.type) ? f.type : "textarea" }));
+      .map((f) => ({ key: f.key, label: f.label, type: TYPES.some(([v]) => v === f.type) ? f.type : "textarea", ...(f.secret === true ? { secret: true } : {}) }));
     const fresh = { id: `t_${Date.now().toString(36)}`, name: parsed.name || i18n("Новый шаблон"), fields };
     list.push(fresh);
     await save();

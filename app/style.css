@@ -4723,3 +4723,11 @@ input[type="color"]:focus-visible,
 .re-target small { color: var(--text-faint); font-size: 0.75rem; }
 .re-link-picker { width: 300px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
 .re-link-list { max-height: 260px; overflow: auto; border: 1px solid var(--border); border-radius: 8px; }
+
+/* ── Тайны ── */
+.fe-secret { border: none; background: none; color: var(--text-faint); cursor: pointer; padding: 2px 4px; border-radius: 5px; display: inline-flex; opacity: 0.55; }
+.fe-secret:hover { opacity: 1; color: var(--text); }
+.fe-secret.on { opacity: 1; color: var(--accent); }
+.secret-mark { display: inline-flex; vertical-align: -1px; margin-left: 5px; color: var(--accent); }
+.secret-toggle:not(.on) { color: var(--text-faint); }
+.secret-toggle.on { color: var(--accent); border-color: var(--accent); }

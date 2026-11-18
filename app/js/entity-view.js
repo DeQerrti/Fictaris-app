@@ -250,6 +250,28 @@ export function buildNameInput(entity, onInput) {
 }
 
 // Поля шаблона анкеты сеткой; skip — ключи, что уже стоят в шапке/сводке.
+// Кнопка «Тайна» в шапке досье: запись целиком не попадает в «Сайт мира
+// для читателей». entity.secret — true или нет поля.
+export function buildSecretToggle(entity, onChange) {
+  const btn = document.createElement("button");
+  const paint = () => {
+    btn.className = "btn secret-toggle" + (entity.secret ? " on" : "");
+    btn.innerHTML = `${iconSvg(entity.secret ? "eyeOff" : "eye", 14)}<span>${escapeHtml(entity.secret ? i18n("Тайна") : i18n("Не тайна"))}</span>`;
+    btn.title = entity.secret
+      ? i18n("Тайна: этой записи не будет в сайте мира для читателей. Щёлкните, чтобы открыть")
+      : i18n("Сделать тайной – запись не попадёт в сайт мира для читателей");
+    btn.setAttribute("aria-pressed", entity.secret ? "true" : "false");
+  };
+  paint();
+  btn.addEventListener("click", () => {
+    if (entity.secret) delete entity.secret;
+    else entity.secret = true;
+    paint();
+    onChange();
+  });
+  return btn;
+}
+
 export function buildTemplateFields(entity, fields, skip, onChange) {
   const grid = document.createElement("div");
   grid.className = "dossier-fields";
@@ -260,6 +282,13 @@ export function buildTemplateFields(entity, fields, skip, onChange) {
     const lab = document.createElement("span");
     lab.className = "dossier-field-label";
     lab.textContent = f.label;
+    if (f.secret) {
+      const mark = document.createElement("span");
+      mark.className = "secret-mark";
+      mark.innerHTML = iconSvg("eyeOff", 11);
+      mark.title = i18n("Тайное поле – не попадает в сайт для читателей");
+      lab.appendChild(mark);
+    }
     field.appendChild(lab);
     const hint = buildFieldHint(f.type);
     if (hint) field.appendChild(hint);

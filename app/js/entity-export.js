@@ -44,9 +44,11 @@ export function galleryHtml(images, relPaths, cssClass = "gallery") {
 // поля от другого, когда несколько сущностей рисуются в одном
 // документе (PDF) — без него секции с одинаковым заголовком у разных
 // персонажей заняли бы один и тот же #id.
-export function renderFieldsHtml(template, entity, characters, hrefForChar, idPrefix = "") {
+// hideSecret — поля, отмеченные в шаблоне «Тайна», не выводятся (сайт для читателей).
+export function renderFieldsHtml(template, entity, characters, hrefForChar, idPrefix = "", { hideSecret = false } = {}) {
   let html = "";
   for (const f of template?.fields || []) {
+    if (hideSecret && f.secret) continue;
     const value = entity[f.key];
     if (!value) continue;
     if (f.type === "richtext") {

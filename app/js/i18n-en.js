@@ -1450,4 +1450,12 @@ export const EN_DICT = {
   "Корзина разрослась. Записи не удаляются сами – уберите ненужные.": "The trash is getting big. Items are never removed on their own – clear what you don't need.",
   "Удалить {n} записей старше 3 месяцев": "Delete {n} item older than 3 months|Delete {n} items older than 3 months",
   "Точно? Их нельзя будет вернуть": "Sure? They can't be restored",
+  "Сайт мира для читателей": "World site for readers",
+  "Тот же сайт, но без тайн: персонажи, места и фракции с пометкой «Тайна» и поля анкеты, отмеченные как тайные, в него не попадают, а ссылки на них становятся обычным текстом.": "The same site without secrets: characters, places and factions marked “Secret” and secret profile fields are left out, and links to them become plain text.",
+  "Тайное поле – не попадает в сайт для читателей. Щёлкните, чтобы открыть": "Secret field – left out of the site for readers. Click to reveal",
+  "Сделать поле тайным – его не будет в сайте для читателей": "Make the field secret – it won't be in the site for readers",
+  "Тайное поле – не попадает в сайт для читателей": "Secret field – left out of the site for readers",
+  "Не тайна": "Not secret",
+  "Тайна: этой записи не будет в сайте мира для читателей. Щёлкните, чтобы открыть": "Secret: this entry won't be in the world site for readers. Click to reveal",
+  "Сделать тайной – запись не попадёт в сайт мира для читателей": "Make secret – the entry won't be in the world site for readers",
 };

@@ -14,8 +14,7 @@ import { i18n, i18nPlural } from "./i18n.js";
 import {
   readPref, writePref, buildEntityToolbar, buildOverviewSection, buildDossierList, buildDossierSplit,
   updateListRow, sectionHeading, buildNone, buildFact, buildFactText, buildSelect, buildNameInput, buildTemplateFields,
-  buildLinkRow, iconLead, buildEventRow, openEntity, shortName, personAvatarHtml,
-} from "./entity-view.js";
+  buildLinkRow, iconLead, buildEventRow, openEntity, shortName, personAvatarHtml, buildSecretToggle } from "./entity-view.js";
 
 // ══════════════════════════════════════════════
 //  ФРАКЦИИ
@@ -458,6 +457,7 @@ function buildPage(f) {
     if (inModal) closeEntityModal();
     else draw();
   });
+  actions.appendChild(buildSecretToggle(f, () => persist()));
   actions.appendChild(delBtn);
   head.append(tile, titleCol, actions);
   page.appendChild(head);

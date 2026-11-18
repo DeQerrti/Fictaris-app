@@ -85,8 +85,10 @@ section.section { margin-bottom: 32px; }
 section.section h2 { border-bottom: 1px solid #3a3020; padding-bottom: 6px; }
 `;
 
-export async function exportSiteZip() {
-  const [characters, locations, factions, timeline, relationships, charTemplates, locTemplates, factionTemplates, backupRes] =
+// readers — сайт для читателей: записи и поля анкеты, отмеченные «Тайна»,
+// не попадают в архив, а ссылки на тайные записи становятся текстом.
+export async function exportSiteZip({ readers = false } = {}) {
+  const [allCharacters, allLocations, allFactions, timeline, relationships, charTemplates, locTemplates, factionTemplates, backupRes] =
     await Promise.all([
       apiGet("/api/characters"),
       apiGet("/api/locations"),
@@ -100,13 +102,21 @@ export async function exportSiteZip() {
     ]);
   const backup = await backupRes.json();
   const images = backup.images || {};
+  const visible = (list) => (readers ? list.filter((x) => !x.secret) : list);
+  const characters = visible(allCharacters);
+  const locations = visible(allLocations);
+  const factions = visible(allFactions);
+  const shown = new Set(characters.map((c) => c.id));
+  const fieldOpts = { hideSecret: readers };
 
   // Все три подпапки (characters/, locations/, factions/) лежат на одной
   // глубине под корнем архива — с любой из них до любой другой ведёт
   // один и тот же относительный путь "../<папка>/<id>.html".
   const charHref = (id) => (id ? `../characters/${safeName(id)}.html` : null);
   const locHref = (id) => (id ? `../locations/${safeName(id)}.html` : null);
-  const hrefForChar = (c) => (c ? charHref(c.id) : null);
+  // Упоминания разбираются по всем персонажам (иначе «@Имя» тайного
+  // осталось бы с собачкой), ссылка — только на тех, чья страница есть.
+  const hrefForChar = (c) => (c && shown.has(c.id) ? charHref(c.id) : null);
 
   const files = [];
   const siteTitle = i18n("Мир Fictaris");
@@ -118,7 +128,7 @@ export async function exportSiteZip() {
     if (c.role) body += `<p class="subtitle">${escapeHtml(c.role)}</p>`;
     if (avatar) body += `<img class="avatar" src="${avatar}" alt="">`;
     body += galleryHtml(images, (c.images || []).slice(1));
-    body += renderFieldsHtml(templateFor(charTemplates, c.templateId), c, characters, hrefForChar);
+    body += renderFieldsHtml(templateFor(charTemplates, c.templateId), c, allCharacters, hrefForChar, "", fieldOpts);
 
     const relRows = relationships.filter((r) => r.charA === c.id || r.charB === c.id);
     if (relRows.length) {
@@ -147,7 +157,7 @@ export async function exportSiteZip() {
       body += `<div class="field-block"><div class="field-label">${escapeHtml(i18n("Родительская локация"))}</div><p><a href="${safeName(parent.id)}.html">${escapeHtml(parent.name || i18n("Без имени"))}</a></p></div>`;
     }
 
-    body += renderFieldsHtml(templateFor(locTemplates, loc.templateId), loc, characters, hrefForChar);
+    body += renderFieldsHtml(templateFor(locTemplates, loc.templateId), loc, allCharacters, hrefForChar, "", fieldOpts);
 
     const kids = locations.filter((l) => l.parentId === loc.id);
     if (kids.length) {
@@ -170,7 +180,7 @@ export async function exportSiteZip() {
     body += galleryHtml(images, (f.images || []).slice(1));
     if (leader) body += `<div class="field-block"><div class="field-label">${escapeHtml(i18n("Глава фракции"))}</div><p><a href="${charHref(leader.id)}">${escapeHtml(leader.name || i18n("Без имени"))}</a></p></div>`;
     if (hq) body += `<div class="field-block"><div class="field-label">${escapeHtml(i18n("Штаб-квартира"))}</div><p><a href="${locHref(hq.id)}">${escapeHtml(hq.name || i18n("Без имени"))}</a></p></div>`;
-    body += renderFieldsHtml(templateFor(factionTemplates, f.templateId), f, characters, hrefForChar);
+    body += renderFieldsHtml(templateFor(factionTemplates, f.templateId), f, allCharacters, hrefForChar, "", fieldOpts);
 
     files.push({ name: `factions/${safeName(f.id)}.html`, text: pageShell("../", siteTitle, f.name || i18n("Без имени"), body) });
   }
@@ -181,7 +191,7 @@ export async function exportSiteZip() {
     let body = `<h1>${escapeHtml(i18n("Таймлайн"))}</h1>`;
     for (const e of rows) {
       body += `<section class="section"><h2>${escapeHtml(e.title || i18n("Без названия"))}${e.date ? ` <small>(${escapeHtml(e.date)})</small>` : ""}</h2>`;
-      if (e.description) body += `<p>${mentionsToLinkedHtml(e.description, characters, (c) => (c ? `characters/${safeName(c.id)}.html` : null))}</p>`;
+      if (e.description) body += `<p>${mentionsToLinkedHtml(e.description, allCharacters, (c) => (c && shown.has(c.id) ? `characters/${safeName(c.id)}.html` : null))}</p>`;
       const tags = [];
       for (const id of e.characterIds || []) {
         const c = characters.find((ch) => ch.id === id);
@@ -216,5 +226,5 @@ export async function exportSiteZip() {
   files.push({ name: "site.css", text: SITE_CSS });
 
   const zipBytes = buildZip(files);
-  downloadBlob(new Blob([zipBytes], { type: "application/zip" }), `fictaris-site-${new Date().toISOString().slice(0, 10)}.zip`);
+  downloadBlob(new Blob([zipBytes], { type: "application/zip" }), `fictaris-site${readers ? "-readers" : ""}-${new Date().toISOString().slice(0, 10)}.zip`);
 }

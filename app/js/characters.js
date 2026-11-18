@@ -18,8 +18,7 @@ import { i18n, i18nPlural } from "./i18n.js";
 import {
   readPref, writePref, buildSegmented, buildEntityToolbar, buildOverviewSection, buildDossierList, buildDossierSplit,
   updateListRow, sectionHeading, buildNone, buildFact, buildFactText, buildSelect, buildNameInput, buildTemplateFields,
-  buildLinkRow, iconLead, openEntity, shortName, initials, personAvatarHtml,
-} from "./entity-view.js";
+  buildLinkRow, iconLead, openEntity, shortName, initials, personAvatarHtml, buildSecretToggle } from "./entity-view.js";
 import {
   PARENT_KINDS, PARTNER_KINDS, GENDERS, parentKind, setParentKind, forgetParent, partnerKind, setPartnerKind, forgetPartner,
   isDead, relativesOf, familyComponents, surnameHouseName,
@@ -625,6 +624,7 @@ function buildDossier(c) {
     if (inModal) closeEntityModal();
     else draw();
   });
+  actions.appendChild(buildSecretToggle(c, () => persist()));
   actions.appendChild(delBtn);
   head.append(avatar, titleCol, actions);
   page.appendChild(head);
