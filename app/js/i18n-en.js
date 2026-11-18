@@ -447,6 +447,7 @@ export const EN_DICT = {
   "Просмотреть": "Preview",
   "Скрыть": "Hide",
   "(пусто)": "(empty)",
+  "(пустая заметка)": "(empty note)",
 
   // ── Переключатель проектов (project-switcher.js) ──
   "Название проекта": "Project name",

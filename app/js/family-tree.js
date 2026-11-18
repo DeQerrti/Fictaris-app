@@ -88,10 +88,17 @@ function computeDepths(list, byId) {
   }
   for (const c of list) depthOf(c.id, new Set());
 
-  let changed = true;
-  while (changed) {
-    changed = false;
+  // Пара опускается на ряд старшего из двоих — и тогда их дети тоже
+  // должны опуститься, иначе ребёнок оказывался выше родителей. Поэтому
+  // оба правила (дети ниже родителей, пара на одном ряду) крутятся
+  // вместе до устойчивого результата; число проходов ограничено на случай
+  // цикла в данных (тот же приём, что generationRows в graph.js).
+  for (let pass = 0; pass <= list.length; pass++) {
+    let changed = false;
     for (const c of list) {
+      for (const p of c.parentIds || []) {
+        if (byId.has(p) && depth.get(c.id) < depth.get(p) + 1) { depth.set(c.id, depth.get(p) + 1); changed = true; }
+      }
       for (const pid of c.partnerIds || []) {
         if (!byId.has(pid)) continue;
         const max = Math.max(depth.get(c.id), depth.get(pid));
@@ -99,6 +106,7 @@ function computeDepths(list, byId) {
         if (depth.get(pid) !== max) { depth.set(pid, max); changed = true; }
       }
     }
+    if (!changed) break;
   }
   return depth;
 }

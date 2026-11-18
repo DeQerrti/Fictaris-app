@@ -2,7 +2,7 @@ import { apiGet, uid } from "./api.js";
 import { iconSvg } from "./icons.js";
 import { openPopover, closeMenu } from "./context-menu.js";
 import { loadTemplates, templateFor } from "./templates.js";
-import { absoluteDay, formatDate, weekdaysOf, weekdayOf, monthForFraction, parseWorldDate, saveCalendar } from "./calendar.js";
+import { absoluteDay, calendarOrder, formatDate, weekdaysOf, weekdayOf, monthForFraction, parseWorldDate, saveCalendar } from "./calendar.js";
 import { i18n, i18nPlural } from "./i18n.js";
 
 // ══════════════════════════════════════════════
@@ -460,6 +460,6 @@ function fillList(list, items, opts) {
 // Для события, созданного щелчком по дню: те же поля, что пишет
 // карточка события при своём календаре (timeline.js).
 export function eventDateFields(calendar, { year, month, day }) {
-  return { dateYear: year, dateMonth: month, dateDay: day, date: formatDate(calendar, { year, month, day }), order: absoluteDay(calendar, year, month, day) };
+  return { dateYear: year, dateMonth: month, dateDay: day, date: formatDate(calendar, { year, month, day }), order: calendarOrder(calendar, year, month, day) };
 }
 

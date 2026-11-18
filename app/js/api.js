@@ -35,11 +35,19 @@ export async function apiGet(path) {
   return file ? sanitizeVaultData(file[1], data) : data;
 }
 
+// Сколько записей ушло с начала работы страницы — по нему entity-modal.js
+// понимает, правили ли что-то в окне карточки.
+let postCount = 0;
+export function postCounter() {
+  return postCount;
+}
+
 // После записи — событие: сайдбар (sidebar-overview.js) пересчитывает
 // счётчики, не зная, какой модуль что сохранил.
 export async function apiPost(path, body) {
   const broken = brokenFiles.get(apiKey(path));
   if (broken) throw new Error(broken);
+  postCount++;
   const res = await fetch(path, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

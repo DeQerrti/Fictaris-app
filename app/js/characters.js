@@ -11,7 +11,7 @@ import { loadTemplates, saveTemplates, templateFor } from "./templates.js";
 import { chooseTemplate } from "./template-choice.js";
 import { openTemplateEditorModal } from "./template-editor-modal.js";
 import { closeEntityModal } from "./entity-modal.js";
-import { findMentionedIds } from "./mentions.js";
+import { findMentionedIds, replaceMentionName } from "./mentions.js";
 import { chapterLabel } from "./books.js";
 import { i18n, i18nPlural } from "./i18n.js";
 import {
@@ -149,6 +149,31 @@ function blank(templateId) {
     parentIds: [],
     templateId: templateId || templates[0]?.id || "default",
   };
+}
+
+// Имя поменяли — @упоминания в главах и событиях таймлайна переписываем
+// на новое, иначе они перестают узнаваться (mentions.js). Если такое же
+// имя есть ещё у кого-то, не трогаем: непонятно, чьи это упоминания.
+async function renameMentions(c, oldName, newName) {
+  oldName = (oldName || "").trim();
+  newName = (newName || "").trim();
+  if (!oldName || !newName || oldName === newName) return;
+  if (characters.some((x) => x !== c && (x.name || "").trim() === oldName)) return;
+  await window.__flushPendingSaves?.();
+  const others = characters.map((x) => x.name);
+  const [ms, events] = await Promise.all([apiGet("/api/manuscript"), apiGet("/api/timeline")]);
+  let changedMs = false;
+  for (const ch of ms.chapters || []) {
+    const r = replaceMentionName(ch.content, oldName, newName, others);
+    if (r.count) { ch.content = r.text; changedMs = true; }
+  }
+  if (changedMs) await apiPost("/api/manuscript", ms);
+  let changedTl = false;
+  for (const ev of Array.isArray(events) ? events : []) {
+    const r = replaceMentionName(ev.description, oldName, newName, others);
+    if (r.count) { ev.description = r.text; changedTl = true; }
+  }
+  if (changedTl) await apiPost("/api/timeline", events);
 }
 
 export async function renderCharacters(root, focusId) {
@@ -531,10 +556,19 @@ function buildDossier(c) {
     persist();
   };
   const nameField = buildNameInput(c, onName);
+  let nameBefore = c.name || "";
+  nameField.addEventListener("focus", () => { nameBefore = c.name || ""; });
+  nameField.addEventListener("change", () => {
+    renameMentions(c, nameBefore, c.name);
+    nameBefore = c.name || "";
+  });
   nameRow.append(nameField, buildNameGeneratorButton((name) => {
+    const prev = c.name || "";
     nameField.value = name;
     c.name = name;
     onName();
+    renameMentions(c, prev, name);
+    nameBefore = name;
   }));
   titleCol.appendChild(nameRow);
 

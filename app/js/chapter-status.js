@@ -47,7 +47,7 @@ export function buildStatusDot(status) {
     el.className = "status-dot";
     el.style.background = status?.color || "#7c7157";
   }
-  if (status?.label) el.title = status.label;
+  if (status?.label) el.title = i18n(status.label);
   return el;
 }
 

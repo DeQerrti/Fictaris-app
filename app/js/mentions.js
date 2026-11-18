@@ -34,7 +34,29 @@ function buildMentionRegex(characters) {
     .map(escapeRegex);
   if (!names.length) return null;
   const alt = names.join("|");
-  return new RegExp(`@\\[(${alt})\\|([^\\]]+)\\]|@(${alt})(?![A-Za-zА-Яа-яЁё0-9_])`, "g");
+  return new RegExp(`@\\[(${alt})\\|([^\\]]+)\\]|@(${alt})(?![\\p{L}\\p{N}_])`, "gu");
+}
+
+// Персонажа переименовали — упоминания в тексте глав и описаниях событий
+// таймлайна иначе перестают узнаваться (слева от «|» и после @ — точное
+// имя). @Старое → @Новое, @[Старое|форма] → @[Новое|форма]. Упоминание
+// другого персонажа, чьё имя начинается со старого («@Ян» и «@Ян Вирен»),
+// не трогаем. Возвращает, сколько упоминаний заменено.
+export function replaceMentionName(text, oldName, newName, otherNames = []) {
+  if (!text || !oldName || !newName || oldName === newName) return { text, count: 0 };
+  const old = escapeRegex(oldName);
+  let count = 0;
+  let out = text.replace(new RegExp(`@\\[${old}\\|`, "gu"), () => {
+    count++;
+    return `@[${newName}|`;
+  });
+  const longer = otherNames.filter((n) => n && n !== oldName && n.startsWith(oldName));
+  out = out.replace(new RegExp(`@${old}(?![\\p{L}\\p{N}_])`, "gu"), (m, offset, whole) => {
+    if (longer.some((n) => whole.startsWith(n, offset + 1))) return m;
+    count++;
+    return `@${newName}`;
+  });
+  return { text: out, count };
 }
 
 // Персонаж и то, что должно быть видно в тексте, — общая часть для

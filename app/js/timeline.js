@@ -5,7 +5,7 @@ import { locationTypeInfo, iconSvg } from "./icons.js";
 import { attachMentionAutocomplete, attachMentionContextMenu } from "./mentions.js";
 import { pushTrash } from "./trash.js";
 import { buildExportPngButton } from "./png-export.js";
-import { loadCalendar, loadCalendarSettings, saveCalendar, defaultCalendar, absoluteDay, formatDate, yearLength } from "./calendar.js";
+import { loadCalendar, loadCalendarSettings, saveCalendar, defaultCalendar, absoluteDay, calendarOrder, formatDate, yearLength } from "./calendar.js";
 import { buildWorldCalendar, resetWorldCalendarCache, eventDateFields } from "./world-calendar.js";
 import { openPopover } from "./context-menu.js";
 import { openCalendarPanel } from "./world-panels.js";
@@ -24,6 +24,21 @@ const save = debounceSave((list) => apiPost("/api/timeline", list));
 
 function persist() {
   save(events);
+}
+
+// order без числа (событие, добавленное правкой файла) ломал сортировку и
+// «следующий номер» для нового события — берём его из даты или по месту в
+// списке. У событий с точной датой старых версий order был сквозным
+// номером дня — переводим на общую шкалу «год + доля года».
+function normalizeOrders() {
+  events.forEach((e, i) => {
+    if (calendar && Number.isFinite(e.dateYear) && Number.isFinite(e.dateMonth) && Number.isFinite(e.dateDay)) {
+      const order = calendarOrder(calendar, e.dateYear, e.dateMonth, e.dateDay);
+      if (!Number.isFinite(e.order) || Math.abs(e.order - e.dateYear) > 1) e.order = order;
+    }
+    if (!Number.isFinite(e.order)) e.order = Number(e.order);
+    if (!Number.isFinite(e.order)) e.order = orderFromDate(e.date) ?? i;
+  });
 }
 
 function sorted() {
@@ -67,6 +82,8 @@ export async function renderTimeline(root, focusId) {
     apiGet("/api/locations"),
     loadCalendar(),
   ]);
+  if (!Array.isArray(events)) events = [];
+  normalizeOrders();
   if (focusId && events.some((e) => e.id === focusId)) activeId = focusId;
   resetWorldCalendarCache();
   draw();
@@ -684,7 +701,7 @@ function buildCalendarDateField(ev) {
     ev.dateMonth = monthIndex;
     ev.dateDay = day;
     ev.date = formatDate(calendar, { year, month: monthIndex, day });
-    ev.order = absoluteDay(calendar, year, monthIndex, day);
+    ev.order = calendarOrder(calendar, year, monthIndex, day);
     persist();
   }
 

@@ -76,7 +76,10 @@ export function weekdaysOf(calendar) {
 // День недели (0-based) — по сквозному счёту дней от начала летоисчисления.
 export function weekdayOf(calendar, year, monthIndex, day) {
   const n = weekdaysOf(calendar).length;
-  const abs = absoluteDay(calendar, year, monthIndex, day) - 1 + (calendar.weekOffset || 0);
+  // weekOffset — день недели 1-го дня 1-го года (так он подписан в
+  // настройке календаря). Раньше отсчёт шёл от несуществующего года 0, и
+  // дни недели сдвигались, если длина года не делится на длину недели.
+  const abs = absoluteDay(calendar, year, monthIndex, day) - absoluteDay(calendar, 1, 0, 1) + (Number(calendar.weekOffset) || 0);
   return ((abs % n) + n) % n;
 }
 
@@ -118,7 +121,9 @@ export function formatWorldDate(value, calendar = cached) {
 }
 
 export function yearLength(calendar) {
-  return calendar.months.reduce((sum, m) => sum + m.days, 0);
+  // Number: в файле, поправленном руками, days бывает строкой — «30» + «30»
+  // дало бы «3030».
+  return calendar.months.reduce((sum, m) => sum + (Number(m.days) || 0), 0);
 }
 
 // monthIndex — 0-based. Число только для сравнения между собой
@@ -126,8 +131,17 @@ export function yearLength(calendar) {
 // стороннем формате.
 export function absoluteDay(calendar, year, monthIndex, day) {
   let days = 0;
-  for (let i = 0; i < monthIndex; i++) days += calendar.months[i]?.days || 0;
+  for (let i = 0; i < monthIndex; i++) days += Number(calendar.months[i]?.days) || 0;
   return year * yearLength(calendar) + days + day;
+}
+
+// Позиция события на шкале таймлайна (order) для точной даты: год плюс
+// доля года. Та же шкала, что у дат свободным текстом («год 214» → 214),
+// — раньше точная дата давала сквозной номер дня (год × длина года), и
+// событие «1 год» вставало после «год 300».
+export function calendarOrder(calendar, year, monthIndex, day) {
+  const len = yearLength(calendar) || 1;
+  return year + (absoluteDay(calendar, year, monthIndex, day) - absoluteDay(calendar, year, 0, 1)) / len;
 }
 
 export function formatDate(calendar, { year, month, day }) {

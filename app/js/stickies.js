@@ -1,4 +1,5 @@
 import { iconSvg } from "./icons.js";
+import { i18n } from "./i18n.js";
 
 // Инлайн-стикеры `[[note:id]]` — маркер в тексте главы, ссылающийся на
 // заметку из chapter.stickies. Регексп стикера безопасно накладывается
@@ -44,7 +45,7 @@ export function attachStickyPopover(container, getStickies) {
     const sticky = getStickies().find((s) => s.id === el.dataset.stickyId);
     if (!sticky) return;
     const pop = ensurePopover();
-    pop.textContent = sticky.text || "(пустая заметка)";
+    pop.textContent = sticky.text || i18n("(пустая заметка)");
     const rect = el.getBoundingClientRect();
     pop.style.left = `${rect.left}px`;
     pop.style.top = `${rect.bottom + 6}px`;

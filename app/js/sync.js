@@ -203,16 +203,30 @@ function encodePath(path) {
   return path.split("/").map(encodeURIComponent).join("/");
 }
 
-// Contents API отдаёт файл вместе с его sha — sha и есть версия файла
-// для PUT ниже. 404 — файла ещё нет, это не ошибка. GitHub режет
-// base64 на строки по 60 символов — переносы строк из content нужно
-// убрать перед использованием.
-async function getRemoteFile(config, path) {
-  const res = await githubApi(config, `/repos/${config.owner}/${config.repo}/contents/${encodePath(path)}`);
-  if (res.status === 404) return null;
+// Версии всех файлов репозитория одним запросом: путь → sha (sha — это
+// и версия для PUT ниже). Раньше на каждый файл и каждую картинку шёл
+// отдельный запрос за содержимым — при частой автосинхронизации это
+// упиралось в лимит GitHub. Пустой репозиторий (409) — пустой список.
+async function getRemoteTree(config) {
+  const repoRes = await githubApi(config, `/repos/${config.owner}/${config.repo}`);
+  if (!repoRes.ok) throw new SyncError(i18n("Не получилось прочитать файл из репозитория: {path}", { path: config.repo }));
+  const branch = (await repoRes.json()).default_branch || "main";
+  const res = await githubApi(config, `/repos/${config.owner}/${config.repo}/git/trees/${encodeURIComponent(branch)}?recursive=1`);
+  if (res.status === 404 || res.status === 409) return new Map();
+  if (!res.ok) throw new SyncError(i18n("Не получилось прочитать файл из репозитория: {path}", { path: config.repo }));
+  const data = await res.json();
+  return new Map((data.tree || []).filter((t) => t.type === "blob").map((t) => [t.path, t.sha]));
+}
+
+// Содержимое файла по его sha. Blob API, а не Contents API: тот для
+// файлов больше 1 МБ отдаёт пустое содержимое, и рукопись со снимками
+// версий переставала синхронизироваться навсегда. GitHub режет base64 на
+// строки — переносы убираем.
+async function getRemoteBlob(config, sha, path) {
+  const res = await githubApi(config, `/repos/${config.owner}/${config.repo}/git/blobs/${sha}`);
   if (!res.ok) throw new SyncError(i18n("Не получилось прочитать файл из репозитория: {path}", { path }));
   const data = await res.json();
-  return { base64: data.content.replace(/\n/g, ""), sha: data.sha };
+  return (data.content || "").replace(/\n/g, "");
 }
 
 async function putRemoteFile(config, path, base64, sha) {
@@ -237,9 +251,19 @@ async function contentHash(base64) {
 }
 
 // ── Один файл: решить, что с ним делать, и сделать ─
-async function syncOne(config, path, localBase64, entry) {
+// localBase64 === null — файла здесь нет, он есть только в репозитории
+// (картинка, добавленная на другом устройстве): забираем.
+async function syncOne(config, path, localBase64, entry, remoteSha) {
+  const remote = remoteSha ? { sha: remoteSha, _b64: undefined } : null;
+  const loadRemote = async () => {
+    remote._b64 ??= await getRemoteBlob(config, remote.sha, path);
+    return remote._b64;
+  };
+  if (localBase64 === null) {
+    if (!remote) return { action: "none" };
+    return { action: "pull", base64: await loadRemote(), sha: remote.sha };
+  }
   const localHash = await contentHash(localBase64);
-  const remote = await getRemoteFile(config, path);
 
   const localChanged = !entry || entry.hash !== localHash;
   const remoteChanged = !entry || !remote || entry.sha !== remote.sha;
@@ -257,10 +281,10 @@ async function syncOne(config, path, localBase64, entry) {
     // Содержимое совпадает — так выглядит любая синхронизация без entry
     // (переустановили приложение, завели второе устройство из скопированной
     // папки): байт в байт одинаковые файлы, разрешать нечего.
-    if ((await contentHash(remote.base64)) === localHash) {
+    if ((await contentHash(await loadRemote())) === localHash) {
       return { action: "none", hash: localHash, sha: remote.sha };
     }
-    return { action: "conflict", localBase64, remote, localHash };
+    return { action: "conflict", localBase64, remote: { base64: remote._b64, sha: remote.sha }, localHash };
   }
 
   if (localChanged) {
@@ -268,7 +292,7 @@ async function syncOne(config, path, localBase64, entry) {
     return { action: "push", hash: localHash, sha };
   }
 
-  return { action: "pull", base64: remote.base64, sha: remote.sha };
+  return { action: "pull", base64: await loadRemote(), sha: remote.sha };
 }
 
 // ── Полная синхронизация ────────────────────────
@@ -287,16 +311,23 @@ export async function runSync(config, onProgress) {
     })),
     ...Object.entries(backup.images).map(([path, base64]) => ({ kind: "images", path, base64 })),
   ];
+  const remoteTree = await getRemoteTree(config);
+  // Картинки, которые есть только в репозитории (добавили на другом
+  // устройстве), раньше не забирались никогда: список шёл от локальных.
+  const localImages = new Set(Object.keys(backup.images));
+  for (const path of remoteTree.keys()) {
+    if (/^maps\/[\w.-]+\.(jpe?g|png|webp)$/i.test(path) && !localImages.has(path)) items.push({ kind: "images", path, base64: null });
+  }
 
   let done = 0;
   for (const item of items) {
     onProgress?.(++done, items.length, item.path);
     const entry = state[item.kind][item.path];
-    const outcome = await syncOne(config, item.path, item.base64, entry);
+    const outcome = await syncOne(config, item.path, item.base64, entry, remoteTree.get(item.path) || null);
 
     if (outcome.action === "none") {
       result.skipped++;
-      state[item.kind][item.path] = { hash: outcome.hash, sha: outcome.sha };
+      if (outcome.hash) state[item.kind][item.path] = { hash: outcome.hash, sha: outcome.sha };
     } else if (outcome.action === "push") {
       result.pushed++;
       state[item.kind][item.path] = { hash: outcome.hash, sha: outcome.sha };

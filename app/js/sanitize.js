@@ -111,6 +111,11 @@ function settingsData(s) {
   if (!s || typeof s !== "object") return s;
   if (Array.isArray(s.chapterStatuses)) s.chapterStatuses.forEach((x) => fixColor(x, "color"));
   if (Array.isArray(s.calendar?.holidays)) s.calendar.holidays.forEach((x) => fixColor(x, "color"));
+  // Дни в месяце — число от 1: строка «30» из ручной правки ломала счёт
+  // дней в году, 0 и отрицательные — сетку месяца.
+  if (Array.isArray(s.calendar?.months)) {
+    for (const m of s.calendar.months) if (m && typeof m === "object") m.days = Math.max(1, Math.round(num(m.days, 30)));
+  }
   if ("accent" in s && s.accent !== null) s.accent = safeColor(s.accent);
   return s;
 }

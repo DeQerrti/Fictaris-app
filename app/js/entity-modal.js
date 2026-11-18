@@ -1,5 +1,6 @@
 import { i18n } from "./i18n.js";
 import { recordRecent } from "./recent-nav.js";
+import { postCounter } from "./api.js";
 
 // ══════════════════════════════════════════════
 //  МОДАЛКА КАРТОЧКИ
@@ -21,6 +22,7 @@ export function initEntityModal(modules) {
 
 let modalEl = null;
 let onCloseCb = null;
+let postsAtOpen = 0;
 let current = null; // { render, body, focusId } — для refreshEntityModal
 
 function onEscape(e) {
@@ -28,6 +30,7 @@ function onEscape(e) {
 }
 
 export function closeEntityModal() {
+  const wasOpen = !!modalEl;
   modalEl?.remove();
   modalEl = null;
   current = null;
@@ -35,6 +38,15 @@ export function closeEntityModal() {
   const cb = onCloseCb;
   onCloseCb = null;
   cb?.();
+  if (!wasOpen) return;
+  // В окне что-то правили — раздел под ним держит в памяти старую копию
+  // данных (например, «Отношения» — связи, которые удалили в досье) и
+  // следующей своей правкой записал бы её поверх. Дописываем отложенные
+  // правки окна и перечитываем раздел (main.js, fictaris:data-replaced).
+  const since = postsAtOpen;
+  Promise.resolve(window.__flushPendingSaves?.()).then(() => {
+    if (postCounter() !== since) document.dispatchEvent(new CustomEvent("fictaris:data-replaced"));
+  });
 }
 
 // options.onClose — зовётся один раз при закрытии модалки (крестик,
@@ -46,6 +58,7 @@ export async function openEntityModal(moduleName, focusId, options = {}) {
   if (!render) return;
   closeEntityModal();
   onCloseCb = options.onClose || null;
+  postsAtOpen = postCounter();
 
   const backdrop = document.createElement("div");
   backdrop.className = "entity-modal-backdrop";

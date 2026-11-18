@@ -58,11 +58,24 @@ export async function saveDailyGoal(dailyGoal) {
   return log;
 }
 
-// Вызывается из manuscript.js при каждом сохранении рукописи — считает
-// суммарную длину заново и кладёт снимок под сегодняшнюю дату. Дешёвая
-// операция (несколько .split в самой длинной рукописи), можно звать
-// на каждый autosave не задумываясь.
-export async function recordToday(manuscript) {
+// Вызывается из manuscript.js при каждой правке рукописи — кладёт
+// суммарную длину под сегодняшнюю дату. Раньше это шло на каждое нажатие
+// клавиши: чтение writing-log.json с диска и подсчёт слов во всех книгах
+// сразу. Теперь — один раз после паузы в наборе.
+const TODAY_DELAY = 2000;
+let todayTimer = null;
+let todayManuscript = null;
+
+export function recordToday(manuscript) {
+  todayManuscript = manuscript;
+  clearTimeout(todayTimer);
+  todayTimer = setTimeout(flushToday, TODAY_DELAY);
+}
+
+async function flushToday() {
+  const manuscript = todayManuscript;
+  todayManuscript = null;
+  if (!manuscript) return;
   const total = (manuscript.chapters || []).reduce((sum, c) => sum + wordCount(c.content), 0);
   const log = await loadWritingLog();
   log.days[todayKey()] = total;

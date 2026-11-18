@@ -10,6 +10,7 @@ import { pushTrash } from "./trash.js";
 import { iconSvg, locationTypeInfo } from "./icons.js";
 import { applyInlineMarkupHtml, toReaderText } from "./text-format.js";
 import { recordToday, loadWritingLog, computeStats } from "./writing-goal.js";
+import { wordCount } from "./stats.js";
 import { openEntityModal } from "./entity-modal.js";
 import { i18n, i18nPlural } from "./i18n.js";
 import { escapeHtml, buildEmptyState } from "./chips.js";
@@ -128,10 +129,6 @@ function nextStickyId(chapter) {
   return `n${n}`;
 }
 
-function wordCount(text) {
-  const m = (text || "").trim().match(/\S+/g);
-  return m ? m.length : 0;
-}
 
 function safeFileName(title) {
   return (title || i18n("Без названия")).replace(/[\\/:*?"<>|]/g, "").trim() || "chapter";
@@ -1856,6 +1853,11 @@ function buildSnapshots(chapter) {
     restoreBtn.textContent = i18n("Восстановить");
     restoreBtn.addEventListener("click", () => {
       if (restoreBtn.dataset.confirm === "1") {
+        // Нынешний текст — сначала в снимки: иначе «Восстановить» по
+        // ошибке безвозвратно теряло всё, написанное после снимка.
+        if ((chapter.content || "") !== (snap.content || "") && !(chapter.snapshots || []).some((s) => s.content === chapter.content)) {
+          chapter.snapshots = [{ id: uid(), content: chapter.content, savedAt: new Date().toISOString() }, ...(chapter.snapshots || [])].slice(0, SNAPSHOT_LIMIT);
+        }
         chapter.content = snap.content;
         persist();
         draw();

@@ -6,6 +6,7 @@ import { exportWorldPdf } from "./export-pdf.js";
 import { exportSiteZip } from "./export-site.js";
 import { i18n } from "./i18n.js";
 import { chapterLabel } from "./books.js";
+import { toReaderText } from "./text-format.js";
 import { readRecent } from "./recent-nav.js";
 import { openTagsPanel, openTemplatesPanel, openCalendarPanel } from "./world-panels.js";
 
@@ -117,6 +118,21 @@ let onNavigate = null; // (module, focusId) => void
 let index = [];
 let indexLoadedAt = 0;
 
+// Кусок текста вокруг найденного — чтобы было видно, где в главе это место.
+function contextSnippet(text, q, radius = 45) {
+  const clean = (text || "").replace(/\s+/g, " ");
+  const at = clean.toLowerCase().indexOf(q);
+  if (at < 0) return null;
+  const start = Math.max(0, at - radius);
+  const end = Math.min(clean.length, at + q.length + radius);
+  return `${start > 0 ? "…" : ""}${clean.slice(start, end).trim()}${end < clean.length ? "…" : ""}`;
+}
+
+// Текст для поиска — без маркеров форматирования (**, *, ~~, ==, <u>).
+function plain(text) {
+  return toReaderText(text).replace(/\*\*|~~|==|<\/?u>|\*/g, "");
+}
+
 function snippet(text, max = 90) {
   const clean = (text || "").replace(/\s+/g, " ").trim();
   return clean.length > max ? `${clean.slice(0, max)}…` : clean;
@@ -137,25 +153,29 @@ async function buildIndex() {
 
   const entries = [];
   for (const c of characters) {
-    entries.push({ module: "characters", id: c.id, title: c.name, subtitle: snippet(c.role), color: c.color || "#7c7157" });
+    // text — по чему ещё искать, кроме заголовка: раньше поиск видел только
+    // первые 90 символов, и фраза из середины главы не находилась.
+    const text = Object.entries(c).filter(([k, v]) => typeof v === "string" && !["id", "color", "templateId", "gender"].includes(k)).map(([, v]) => v).join("\n");
+    entries.push({ module: "characters", id: c.id, title: c.name, subtitle: snippet(c.role), text, color: c.color || "#7c7157" });
   }
   for (const l of locations) {
     const [, , , color] = locationTypeInfo(l.type);
-    entries.push({ module: "locations", id: l.id, title: l.name, subtitle: snippet(l.description), color });
+    entries.push({ module: "locations", id: l.id, title: l.name, subtitle: snippet(l.description), text: [l.description, l.notes, l.tags].join("\n"), color });
   }
   for (const f of factions) {
     const [, , , color] = factionTypeInfo(f.type);
-    entries.push({ module: "factions", id: f.id, title: f.name, subtitle: snippet(f.description), color });
+    entries.push({ module: "factions", id: f.id, title: f.name, subtitle: snippet(f.description), text: [f.description, f.notes, f.tags].join("\n"), color });
   }
   for (const e of timeline) {
-    entries.push({ module: "timeline", id: e.id, title: e.title, subtitle: snippet(e.description || e.date), color: "#6a8fae" });
+    entries.push({ module: "timeline", id: e.id, title: e.title, subtitle: snippet(e.description || e.date), text: plain([e.date, e.description].join("\n")), color: "#6a8fae" });
   }
   for (const c of manuscript.chapters || []) {
     entries.push({
       module: "manuscript",
       id: c.id,
       title: chapterLabel(c, manuscript.books),
-      subtitle: snippet(c.content),
+      subtitle: snippet(plain(c.content)),
+      text: [plain(c.content), c.synopsis, ...(c.notes || []).map((n) => n?.text)].join("\n"),
       color: "#c9944a",
     });
   }
@@ -308,9 +328,15 @@ function renderResults(query) {
     renderRecent();
     return;
   }
-  const contentMatches = index
-    .filter((e) => (e.title || "").toLowerCase().includes(q) || (e.subtitle || "").toLowerCase().includes(q))
-    .slice(0, 20);
+  const contentMatches = [];
+  for (const e of index) {
+    if (contentMatches.length >= 20) break;
+    if ((e.title || "").toLowerCase().includes(q) || (e.subtitle || "").toLowerCase().includes(q)) contentMatches.push(e);
+    else {
+      const where = e.text && contextSnippet(e.text, q);
+      if (where) contentMatches.push({ ...e, subtitle: where });
+    }
+  }
   const commandMatches = commandList()
     .filter((c) => c.label.toLowerCase().includes(q))
     .slice(0, 6);

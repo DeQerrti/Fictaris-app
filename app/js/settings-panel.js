@@ -287,7 +287,7 @@ async function buildZoomSection() {
   section.innerHTML = `<h3>${i18n("Масштаб")}</h3><p>${i18n("Масштаб окна приложения.")}</p>`;
 
   const zoom = await apiGet("/api/app/zoom").catch(() => null);
-  if (zoom) {
+  if (zoom && Number.isFinite(zoom.percent)) {
     const zoomRow = document.createElement("div");
     zoomRow.className = "sync-actions";
     zoomRow.style.marginTop = "12px";

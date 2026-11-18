@@ -75,7 +75,12 @@ export class MobileVault {
       if (e instanceof SyntaxError) {
         throw new Error(`Файл ${name} испорчен (не JSON).`);
       }
-      return fallback; // файла нет — не поломка, а первый запуск
+      // Файла нет — не поломка, а первый запуск. Но если файл есть, а
+      // прочитать его не вышло (ошибка ввода-вывода), пустое значение
+      // по умолчанию при следующем сохранении затёрло бы данные — пусть
+      // лучше раздел не откроется (app/js/api.js не даст в него писать).
+      if (await exists(this.path(name))) throw new Error(`Не удалось прочитать ${name}: ${e?.message || e}`);
+      return fallback;
     }
   }
 

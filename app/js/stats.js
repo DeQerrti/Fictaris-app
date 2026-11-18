@@ -19,9 +19,12 @@ import { i18n, currentLang } from "./i18n.js";
 //  один инструмент воркбилдинга без обзорной панели).
 // ══════════════════════════════════════════════
 
+// Слово — кусок текста без пробелов, в котором есть хотя бы одна буква
+// или цифра: тире «–» в диалогах и одинокие знаки словами не считаются
+// (раньше русская проза с диалогами получала лишние слова).
 export function wordCount(text) {
-  const m = (text || "").trim().match(/\S+/g);
-  return m ? m.length : 0;
+  const m = (text || "").match(/\S+/g);
+  return m ? m.filter((w) => /[\p{L}\p{N}]/u.test(w)).length : 0;
 }
 
 function buildTile(value, label) {
