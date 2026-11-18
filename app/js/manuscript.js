@@ -1,14 +1,15 @@
 import { apiGet, apiPost, uid } from "./api.js";
 import { debounceSave } from "./save-badge.js";
-import { mentionsToHtml, attachMentionAutocomplete, attachMentionHoverPreview, buildMentionContextMenuItems, findMentionedIds } from "./mentions.js";
-import { stickersToHtml, attachStickyPopover } from "./stickies.js";
+import { attachMentionAutocomplete, attachMentionHoverPreview, buildMentionContextMenuItems, findMentionedIds } from "./mentions.js";
+import { attachStickyPopover } from "./stickies.js";
+import { createRichEditor, attachRichAutocomplete, buildMentionPanel } from "./rich-editor.js";
 import { buildManuscriptDocx } from "./docx.js";
 import { exportChaptersPdf } from "./export-pdf.js";
 import { openContextMenu, openPopover, closeMenu } from "./context-menu.js";
 import { loadStatuses, buildStatusDot, buildStatusManagePanel } from "./chapter-status.js";
 import { pushTrash } from "./trash.js";
 import { iconSvg, locationTypeInfo } from "./icons.js";
-import { applyInlineMarkupHtml, toReaderText } from "./text-format.js";
+import { toReaderText } from "./text-format.js";
 import { recordToday, loadWritingLog, computeStats } from "./writing-goal.js";
 import { wordCount } from "./stats.js";
 import { openEntityModal } from "./entity-modal.js";
@@ -38,10 +39,11 @@ let editorFontSize = DEFAULT_FONT_SIZE;
 let manuscript = { chapters: [], activeChapterId: null };
 let characters = [];
 let locations = [];
-let viewMode = false;
 let focusMode = false;
 let container = null;
-let currentTextarea = null; // поле открытой главы — на него действуют кнопки панели инструментов
+let currentTextarea = null; // поле открытой главы в режиме «Разметка» — на него действуют кнопки панели инструментов
+let currentRich = null; // редактор открытой главы в обычном режиме (rich-editor.js)
+let richAutocomplete = null;
 
 // Режим вкладки («Текст» / «Обзор») и открыта ли панель главы — выбор
 // этого устройства, не мира: localStorage, а не manuscript.json.
@@ -62,6 +64,10 @@ function writePrefs(patch) {
 }
 let mode = readPrefs().mode === "overview" ? "overview" : "text";
 let inspectorOpen = readPrefs().inspector !== false;
+// «Разметка» — прежнее текстовое поле с маркерами (@[Имя|форма], **…**,
+// [[note:…]]) на случай, если их нужно поправить руками. По умолчанию —
+// редактор «как в книге». Выбор устройства, как и режим вкладки.
+let rawMode = readPrefs().raw === true;
 const save = debounceSave((data) => apiPost("/api/manuscript", data));
 
 function persist() {
@@ -204,6 +210,104 @@ function insertSticky(textarea, chapter) {
   draw();
   const area = container?.querySelector(`.sticky-editor-textarea[data-sticky-id="${sticky.id}"]`);
   area?.focus();
+}
+
+function insertStickyAny(chapter) {
+  if (currentRich) {
+    const sticky = { id: nextStickyId(chapter), text: "" };
+    chapter.stickies = [...(chapter.stickies || []), sticky];
+    currentRich.insertSticky(sticky.id);
+    chapter.content = currentRich.getText();
+    inspectorOpen = true;
+    focusMode = false;
+    persist();
+    draw();
+    container?.querySelector(`.sticky-editor-textarea[data-sticky-id="${sticky.id}"]`)?.focus();
+  } else if (currentTextarea) insertSticky(currentTextarea, chapter);
+}
+
+// Кнопки форматирования и меню — в редакторе «как в книге» оформление
+// применяется к выделению, в «Разметке» выделение оборачивается маркерами.
+const FORMAT_KIND = { "**": "bold", "*": "italic", "<u>": "underline", "~~": "strike", "==": "highlight" };
+function applyFormat(before, after) {
+  if (currentRich) currentRich.format(FORMAT_KIND[before]);
+  else if (currentTextarea) wrapSelection(currentTextarea, before, after);
+}
+
+// Формы имени для окошка упоминания: само имя, первое слово и все формы,
+// которые уже встречались в рукописи (@[Имя|Наде] → «Наде»).
+function mentionForms(name) {
+  const forms = new Set([name, name.split(/\s+/)[0]]);
+  const esc = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp(`@\\[${esc}\\|([^\\]\\n]+)\\]`, "gu");
+  for (const ch of manuscript.chapters) for (const m of (ch.content || "").matchAll(re)) forms.add(m[1]);
+  return [...forms].filter(Boolean).slice(0, 12);
+}
+
+function openMentionPanel(span, editor) {
+  const character = characters.find((c) => c.id === span.dataset.charId) || characters.find((c) => c.name === span.dataset.name);
+  const r = span.getBoundingClientRect();
+  const panel = buildMentionPanel(span, {
+    character,
+    forms: mentionForms(span.dataset.name),
+    onChange: () => editor.changed(),
+    onOpen: () => {
+      closeMenu();
+      if (character) document.dispatchEvent(new CustomEvent("fictaris:open-character", { detail: { id: character.id } }));
+    },
+    onClose: () => {
+      closeMenu();
+      editor.focus();
+    },
+  });
+  openPopover(r.left, r.bottom + 6, panel, "re-mention-popover");
+}
+
+function attachRichContextMenu(editor, chapter) {
+  editor.el.addEventListener("contextmenu", (e) => {
+    e.preventDefault();
+    const mention = e.target.closest?.(".re-mention");
+    const hasSelection = editor.hasSelection();
+    const selected = hasSelection ? editor.selectionText() : "";
+    const fmt = (label, kind) => ({ label: i18n(label), disabled: !hasSelection, action: () => editor.format(kind) });
+    openContextMenu(e.clientX, e.clientY, [
+      ...(mention
+        ? [
+            { label: i18n("Как назвать в тексте…"), action: () => openMentionPanel(mention, editor) },
+            { label: i18n("Открыть досье"), action: () => document.dispatchEvent(new CustomEvent("fictaris:open-character", { detail: { id: mention.dataset.charId } })) },
+            { separator: true },
+          ]
+        : []),
+      {
+        label: i18n("Форматирование"),
+        items: [fmt("Жирный", "bold"), fmt("Курсив", "italic"), fmt("Подчёркнутый", "underline"), fmt("Зачёркнутый", "strike"), fmt("Выделение цветом", "highlight")],
+      },
+      { separator: true },
+      { label: i18n("Вставить стикер-заметку"), action: () => insertStickyAny(chapter) },
+      { label: i18n("Отметить как известный факт…"), icon: "lightbulb", action: () => openMarkFactPopover(e.clientX, e.clientY, chapter, selected) },
+      { separator: true },
+      {
+        label: i18n("Размер шрифта: {n}px", { n: editorFontSize }),
+        items: FONT_SIZE_PRESETS.map((size) => ({ label: `${size}px`, checked: size === editorFontSize, action: () => setFontSize(size) })),
+      },
+      { separator: true },
+      { label: i18n("Вырезать"), disabled: !hasSelection, action: () => document.execCommand("cut") },
+      { label: i18n("Копировать"), disabled: !hasSelection, action: () => document.execCommand("copy") },
+      {
+        label: i18n("Вставить"),
+        action: async () => {
+          try {
+            const text = await navigator.clipboard.readText();
+            editor.insertText(text);
+          } catch {
+            document.execCommand("paste");
+          }
+        },
+      },
+      { separator: true },
+      { label: hasSelection ? i18n("Слов выделено: {n}", { n: wordCount(selected) }) : i18n("Слов в главе: {n}", { n: wordCount(chapter.content) }), disabled: true },
+    ]);
+  });
 }
 
 // Оборачивает выделение маркерами (**жирный**/*курсив*) — так же, как
@@ -364,11 +468,10 @@ function attachEditorContextMenu(textarea, chapter) {
         // курсив, зачёркнутый, выделение) плюс подчёркивание — у
         // Markdown/Obsidian для него нет своего значка, но в Word и
         // Google Docs оно есть на том же правом клике, и как раз о нём
-        // отдельно спросили. В режиме "Просмотр" (viewMode ниже,
-        // text-format.js) все пять и правда становятся жирным/
-        // курсивом/и т.д., а не остаются условными маркерами как текст —
-        // и то же самое, тем же общим модулем, работает и в экспорте
-        // (export-pdf.js/docx.js).
+        // отдельно спросили. Это меню режима «Разметка»: маркеры
+        // (**/*/<u>/~~/==) в обычном редакторе (rich-editor.js) и в
+        // экспорте (export-pdf.js/docx.js) становятся настоящим
+        // оформлением.
         items: [
           { label: i18n("Жирный"), disabled: !hasSelection, action: () => wrapSelection(textarea, "**", "**") },
           { label: i18n("Курсив"), disabled: !hasSelection, action: () => wrapSelection(textarea, "*", "*") },
@@ -1211,18 +1314,16 @@ function buildEditorToolbar(chapter) {
     btn.className = "segmented-btn ms-fmt-btn";
     btn.innerHTML = `<span style="${style}">${escapeHtml(i18n(label))}</span>`;
     btn.title = i18n(title);
-    btn.disabled = viewMode;
     btn.addEventListener("mousedown", (e) => e.preventDefault()); // не забирать фокус и выделение у текста
-    btn.addEventListener("click", () => currentTextarea && wrapSelection(currentTextarea, before, after));
+    btn.addEventListener("click", () => applyFormat(before, after));
     fmt.appendChild(btn);
   }
   const mark = document.createElement("button");
   mark.className = "segmented-btn ms-fmt-btn";
   mark.innerHTML = `<span class="ms-fmt-mark">ab</span>`;
   mark.title = i18n("Выделение цветом");
-  mark.disabled = viewMode;
   mark.addEventListener("mousedown", (e) => e.preventDefault());
-  mark.addEventListener("click", () => currentTextarea && wrapSelection(currentTextarea, "==", "=="));
+  mark.addEventListener("click", () => applyFormat("==", "=="));
   fmt.appendChild(mark);
   bar.appendChild(fmt);
 
@@ -1232,16 +1333,18 @@ function buildEditorToolbar(chapter) {
   stickyBtn.className = "segmented-btn";
   stickyBtn.innerHTML = `${iconSvg("note", 14)}<span class="tb-label">${escapeHtml(i18n("Стикер"))}</span>`;
   stickyBtn.title = i18n("Вставить стикер-заметку");
-  stickyBtn.disabled = viewMode;
   stickyBtn.addEventListener("mousedown", (e) => e.preventDefault());
-  stickyBtn.addEventListener("click", () => currentTextarea && insertSticky(currentTextarea, chapter));
+  stickyBtn.addEventListener("click", () => insertStickyAny(chapter));
   const atBtn = document.createElement("button");
   atBtn.className = "segmented-btn";
   atBtn.innerHTML = `<span>@</span><span class="tb-label">${escapeHtml(i18n("Персонаж"))}</span>`;
   atBtn.title = i18n("Упомянуть персонажа – начни вводить имя");
-  atBtn.disabled = viewMode;
   atBtn.addEventListener("mousedown", (e) => e.preventDefault());
   atBtn.addEventListener("click", () => {
+    if (currentRich) {
+      currentRich.insertText("@");
+      return;
+    }
     const ta = currentTextarea;
     if (!ta) return;
     const pos = ta.selectionStart;
@@ -1258,10 +1361,17 @@ function buildEditorToolbar(chapter) {
   bar.appendChild(spacer);
 
   const viewBtn = document.createElement("button");
-  viewBtn.className = "btn";
-  viewBtn.innerHTML = `${iconSvg(viewMode ? "pencil" : "eye", 14)}<span class="tb-label">${escapeHtml(viewMode ? i18n("Правка") : i18n("Просмотр"))}</span>`;
-  viewBtn.title = viewMode ? i18n("Правка") : i18n("Просмотр");
-  viewBtn.addEventListener("click", () => { viewMode = !viewMode; draw(); });
+  viewBtn.className = "btn" + (rawMode ? " active" : "");
+  viewBtn.setAttribute("aria-pressed", rawMode ? "true" : "false");
+  viewBtn.innerHTML = `${iconSvg(rawMode ? "eye" : "pencil", 14)}<span class="tb-label">${escapeHtml(i18n("Разметка"))}</span>`;
+  viewBtn.title = rawMode
+    ? i18n("Вернуться к оформленному тексту")
+    : i18n("Показать служебную разметку: @[Имя|форма], **жирный**, [[note:…]] – чтобы поправить её руками");
+  viewBtn.addEventListener("click", () => {
+    rawMode = !rawMode;
+    writePrefs({ raw: rawMode });
+    draw();
+  });
 
   const focusBtn = document.createElement("button");
   focusBtn.className = "btn icon-btn" + (focusMode ? " active" : "");
@@ -1323,6 +1433,9 @@ function buildEditor() {
   const pane = document.createElement("div");
   pane.className = "editor-pane";
   currentTextarea = null;
+  currentRich = null;
+  richAutocomplete?.destroy();
+  richAutocomplete = null;
 
   const chapter = manuscript.chapters.find((c) => c.id === manuscript.activeChapterId && c.bookId === manuscript.activeBookId);
   if (!chapter) {
@@ -1391,18 +1504,24 @@ function buildEditor() {
     today.innerHTML = `${escapeHtml(i18n("Сегодня {n} из {goal}", { n: todayWords, goal }))}<span class="ms-bar"><span style="width:${Math.min(100, (todayWords / goal) * 100).toFixed(1)}%"></span></span>`;
   }).catch(() => {});
 
-  if (viewMode) {
-    const view = document.createElement("div");
-    view.className = "chapter-content chapter-content-view";
-    const formatted = applyInlineMarkupHtml(mentionsToHtml(chapter.content, characters));
-    view.innerHTML = stickersToHtml(formatted, chapter.stickies || []) || `<span class="empty-state">${i18n("Глава пуста.")}</span>`;
-    view.addEventListener("click", (e) => {
-      const charId = e.target.dataset?.charId;
-      if (charId) document.dispatchEvent(new CustomEvent("fictaris:open-character", { detail: { id: charId } }));
+  if (!rawMode) {
+    const editor = createRichEditor({
+      text: chapter.content,
+      characters,
+      placeholder: i18n("Пиши здесь… «@» – упомянуть персонажа"),
+      onChange: (text) => {
+        chapter.content = text;
+        wc.textContent = wordsLine(chapter);
+        persist();
+      },
+      onMentionClick: (span) => openMentionPanel(span, editor),
     });
-    attachMentionHoverPreview(view, () => characters);
-    attachStickyPopover(view, () => chapter.stickies || []);
-    page.appendChild(view);
+    richAutocomplete = attachRichAutocomplete(editor, () => characters);
+    attachMentionHoverPreview(editor.el, () => characters);
+    attachStickyPopover(editor.el, () => chapter.stickies || []);
+    attachRichContextMenu(editor, chapter);
+    page.appendChild(editor.el);
+    currentRich = editor;
   } else {
     const wrap = document.createElement("div");
     wrap.className = "editor-textarea-wrap";

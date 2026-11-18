@@ -2689,7 +2689,7 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
   color: var(--text-faint);
 }
 
-.chapter-content-view { font-size: var(--editor-font-size, 17px); }
+.rich-editor { font-size: var(--editor-font-size, 17px); }
 
 .author-notes {
   border-top: 1px solid var(--border);
@@ -3475,20 +3475,34 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
 
 .mention:hover { text-decoration: underline; }
 
-.chapter-content-view {
+/* Редактор главы «как в книге» (rich-editor.js): пишут прямо в
+   оформленном тексте. Абзац — строка .re-p, упоминание — цветное слово
+   (.re-mention), стикер — значок. */
+.rich-editor {
+  position: relative;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
   min-height: 50vh;
   cursor: text;
+  caret-color: var(--accent);
+  outline: none;
 }
+.rich-editor .re-p { margin: 0; }
+.rich-editor.is-empty::before {
+  content: attr(data-placeholder);
+  position: absolute;
+  left: 0;
+  top: 0;
+  color: var(--placeholder);
+  pointer-events: none;
+}
+.rich-editor .re-mention { border-radius: 3px; padding: 0 1px; }
+.rich-editor .re-mention:hover { background: color-mix(in srgb, currentColor 14%, transparent); text-decoration: none; }
+.rich-editor .re-sticky { margin: 0 1px; }
 
-/* Форматирование из ПКМ редактора (manuscript.js, wrapSelection) — в
-   режиме "Правка" это просто условные маркеры в тексте (**/~~/==/<u>),
-   в "Просмотре" applyInlineMarkup превращает их в настоящие теги.
-   <strong>/<em>/<s>/<u> уже выглядят как надо без правок — только
-   <mark> нужен свой фон: браузерный жёлтый маркер не вписывается в
-   тёмную тему, color-mix с --accent — вписывается в любую (и «Пергамент»
-   тоже, без своей отдельной переменной под альфа-канал). */
-.chapter-content-view mark {
+/* <mark> — выделение цветом: браузерный жёлтый маркер не вписывается в
+   тёмную тему, color-mix с --accent — вписывается в любую. */
+.rich-editor mark {
   background: color-mix(in srgb, var(--accent) 35%, transparent);
   color: inherit;
   border-radius: 2px;
@@ -4658,3 +4672,22 @@ input[type="color"]:focus-visible,
     scroll-behavior: auto !important;
   }
 }
+
+/* Окошко упоминания в редакторе главы: как назвать в тексте, готовые
+   формы имени, досье (rich-editor.js, buildMentionPanel). */
+.re-mention-popover { padding: 0; }
+.re-mention-panel { width: 300px; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+.re-mp-head { display: flex; align-items: center; gap: 10px; }
+.re-mp-av { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-weight: 700; flex-shrink: 0; }
+.re-mp-name { font-weight: 600; color: var(--text); }
+.re-mp-role { font-size: 0.78rem; color: var(--text-faint); }
+.re-mp-row { display: flex; align-items: center; gap: 8px; color: var(--text-dim); font-size: 0.85rem; }
+.re-mp-input { flex: 1; min-width: 0; background: var(--panel-alt); border: 1px solid var(--border); border-radius: 6px; color: var(--text); padding: 5px 8px; font: 1rem var(--font-book); }
+.re-mp-input:focus { outline: none; border-color: var(--accent); }
+.re-mp-forms { display: flex; flex-wrap: wrap; gap: 4px; }
+.re-mp-form { border: 1px solid var(--border); background: none; border-radius: 999px; padding: 2px 9px; font: 0.8rem var(--font-ui); color: var(--text-dim); cursor: pointer; }
+.re-mp-form:hover { color: var(--text); border-color: var(--text-faint); }
+.re-mp-form.on { border-color: var(--accent); color: var(--accent); }
+.re-mp-actions { display: flex; gap: 6px; }
+.mention-autocomplete-item.active { background: var(--panel-alt); color: var(--text); }
+.re-autocomplete { z-index: 120; }

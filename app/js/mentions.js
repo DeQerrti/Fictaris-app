@@ -26,7 +26,7 @@ function escapeRegex(s) {
 // (?!...), поэтому её нельзя просто "или" склеить наивно: движок
 // сперва пробует форму с [ ], и только не найдя "[" сразу после "@" —
 // обычную. Поэтому альтернативы идут именно в этом порядке.
-function buildMentionRegex(characters) {
+export function buildMentionRegex(characters) {
   const names = characters
     .map((c) => c.name)
     .filter(Boolean)
