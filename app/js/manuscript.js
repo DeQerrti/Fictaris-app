@@ -5,8 +5,10 @@ import { attachStickyPopover } from "./stickies.js";
 import { createRichEditor, attachRichAutocomplete, buildMentionPanel, buildLinkPicker, entityColor } from "./rich-editor.js";
 import { linkedEntityIds } from "./text-format.js";
 import { buildManuscriptDocx } from "./docx.js";
+import { buildEpub } from "./epub.js";
 import { exportChaptersPdf } from "./export-pdf.js";
 import { openContextMenu, openPopover, closeMenu } from "./context-menu.js";
+import { attachSpellAwareContextMenu } from "./spell-menu.js";
 import { loadStatuses, buildStatusDot, buildStatusManagePanel } from "./chapter-status.js";
 import { pushTrash } from "./trash.js";
 import { iconSvg, locationTypeInfo, factionTypeInfo } from "./icons.js";
@@ -14,7 +16,7 @@ import { toReaderText } from "./text-format.js";
 import { recordToday, loadWritingLog, computeStats } from "./writing-goal.js";
 import { wordCount } from "./stats.js";
 import { openEntityModal } from "./entity-modal.js";
-import { i18n, i18nPlural } from "./i18n.js";
+import { i18n, i18nPlural, currentLang } from "./i18n.js";
 import { escapeHtml, buildEmptyState } from "./chips.js";
 import { avatarInnerHtml } from "./avatars.js";
 
@@ -323,13 +325,12 @@ function openLinkPicker(editor, x, y) {
 }
 
 function attachRichContextMenu(editor, chapter) {
-  editor.el.addEventListener("contextmenu", (e) => {
-    e.preventDefault();
+  attachSpellAwareContextMenu(editor.el, (e) => {
     const mention = e.target.closest?.(".re-mention, .re-link");
     const hasSelection = editor.hasSelection();
     const selected = hasSelection ? editor.selectionText() : "";
     const fmt = (label, kind) => ({ label: i18n(label), disabled: !hasSelection, action: () => editor.format(kind) });
-    openContextMenu(e.clientX, e.clientY, [
+    return [
       ...(mention
         ? [
             { label: i18n("Как назвать в тексте…"), action: () => openMentionPanel(mention, editor) },
@@ -351,7 +352,7 @@ function attachRichContextMenu(editor, chapter) {
           ]
         : []),
       ...(hasSelection && !mention
-        ? [{ label: i18n("Сделать ссылкой…"), icon: "link", action: () => openLinkPicker(editor, e.clientX, e.clientY) }, { separator: true }]
+        ? [{ label: i18n("Сделать ссылкой…"), icon: "link", action: () => openLinkPicker(editor, e.x, e.y) }, { separator: true }]
         : []),
       {
         label: i18n("Форматирование"),
@@ -359,7 +360,7 @@ function attachRichContextMenu(editor, chapter) {
       },
       { separator: true },
       { label: i18n("Вставить стикер-заметку"), action: () => insertStickyAny(chapter) },
-      { label: i18n("Отметить как известный факт…"), icon: "lightbulb", action: () => openMarkFactPopover(e.clientX, e.clientY, chapter, selected) },
+      { label: i18n("Отметить как известный факт…"), icon: "lightbulb", action: () => openMarkFactPopover(e.x, e.y, chapter, selected) },
       { separator: true },
       {
         label: i18n("Размер шрифта: {n}px", { n: editorFontSize }),
@@ -381,7 +382,7 @@ function attachRichContextMenu(editor, chapter) {
       },
       { separator: true },
       { label: hasSelection ? i18n("Слов выделено: {n}", { n: wordCount(selected) }) : i18n("Слов в главе: {n}", { n: wordCount(chapter.content) }), disabled: true },
-    ]);
+    ];
   });
 }
 
@@ -525,8 +526,7 @@ async function openMarkFactPopover(x, y, chapter, selectedText) {
 // и счётчик слов у самого выделения (полезнее, чем общий по главе,
 // который и так виден в шапке редактора).
 function attachEditorContextMenu(textarea, chapter) {
-  textarea.addEventListener("contextmenu", (e) => {
-    e.preventDefault();
+  attachSpellAwareContextMenu(textarea, (e) => {
     const hasSelection = textarea.selectionStart !== textarea.selectionEnd;
     const selectedWords = hasSelection ? wordCount(textarea.value.slice(textarea.selectionStart, textarea.selectionEnd)) : 0;
     // Пункты "Добавить упоминание"/"Изменить отображаемый текст…" —
@@ -535,7 +535,7 @@ function attachEditorContextMenu(textarea, chapter) {
     // contextmenu-обработчик (этот самый), второй независимый просто
     // закрыл бы меню первого через свой же openContextMenu.
     const mentionItems = buildMentionContextMenuItems(textarea, characters);
-    openContextMenu(e.clientX, e.clientY, [
+    return [
       ...(mentionItems.length ? [...mentionItems, { separator: true }] : []),
       {
         label: i18n("Форматирование"),
@@ -562,7 +562,7 @@ function attachEditorContextMenu(textarea, chapter) {
         icon: "lightbulb",
         action: () => {
           const selected = hasSelection ? textarea.value.slice(textarea.selectionStart, textarea.selectionEnd) : "";
-          openMarkFactPopover(e.clientX, e.clientY, chapter, selected);
+          openMarkFactPopover(e.x, e.y, chapter, selected);
         },
       },
       { separator: true },
@@ -581,7 +581,7 @@ function attachEditorContextMenu(textarea, chapter) {
       { label: i18n("Выделить всё"), action: () => textarea.select() },
       { separator: true },
       { label: hasSelection ? i18n("Слов выделено: {n}", { n: selectedWords }) : i18n("Слов в главе: {n}", { n: wordCount(chapter.content) }), disabled: true },
-    ]);
+    ];
   });
 }
 
@@ -727,6 +727,59 @@ function askText(x, y, { title, value = "", placeholder = "", type = "text" }, o
   setTimeout(() => { input.focus(); input.select(); }, 0);
 }
 
+// Книга по частям для EPUB: каждая папка верхнего уровня — часть (её
+// главы и главы вложенных папок — в том же порядке, что в списке слева),
+// главы без папки — после частей, как и в списке.
+function bookParts() {
+  const folders = bookFolders();
+  const chapters = bookChapters();
+  const known = new Set(folders.map((f) => f.id));
+  const subtree = (parentId) => {
+    const out = [];
+    for (const f of folders.filter((x) => folderParent(x) === parentId)) {
+      out.push(...subtree(f.id));
+      out.push(...chapters.filter((c) => c.folderId === f.id));
+    }
+    return out;
+  };
+  const parts = folders
+    .filter((f) => !folderParent(f))
+    .map((f) => ({ title: f.name || i18n("Без названия"), chapters: [...subtree(f.id), ...chapters.filter((c) => c.folderId === f.id)] }))
+    .filter((p) => p.chapters.length);
+  const loose = chapters.filter((c) => !c.folderId || !known.has(c.folderId));
+  if (loose.length) parts.push({ title: null, chapters: loose });
+  return parts;
+}
+
+const EPUB_AUTHOR_KEY = "fictaris_epub_author";
+
+// EPUB спрашивает только автора — для титульной страницы и сведений о
+// книге в читалке; запоминается на этом устройстве.
+function exportEpubAction(x, y) {
+  const book = activeBook();
+  let saved = "";
+  try {
+    saved = localStorage.getItem(EPUB_AUTHOR_KEY) || "";
+  } catch {
+    // приватное окно — просто не запомним
+  }
+  askText(x, y, { title: i18n("Автор – для титульной страницы и сведений о книге"), value: saved, placeholder: i18n("Имя или псевдоним") }, (author) => {
+    try {
+      localStorage.setItem(EPUB_AUTHOR_KEY, author);
+    } catch {
+      // не запомним — не страшно
+    }
+    const bytes = buildEpub({
+      title: book?.title || i18n("Без названия"),
+      author,
+      lang: currentLang(),
+      parts: bookParts(),
+      labels: { contents: i18n("Содержание"), untitled: i18n("Без названия") },
+    });
+    downloadBlob(new Blob([bytes], { type: "application/epub+zip" }), `${safeFileName(book?.title)}.epub`);
+  });
+}
+
 function bookMenuItems(x, y) {
   const book = activeBook();
   const chapters = bookChapters();
@@ -768,6 +821,7 @@ function bookMenuItems(x, y) {
     { label: i18n("Экспорт книги в .md"), action: () => exportMarkdown(chapters, `${safeFileName(book.title)}.md`) },
     { label: i18n("Экспорт книги в .pdf"), action: () => exportPdfAction(chapters, book.title) },
     { label: i18n("Экспорт книги в .docx"), action: () => exportDocx(chapters, `${safeFileName(book.title)}.docx`) },
+    { label: i18n("Экспорт книги в .epub…"), action: () => exportEpubAction(x, y) },
     { separator: true },
     {
       label: i18n("Удалить книгу"),

@@ -6,7 +6,7 @@
 
 ## Features
 
-- **Manuscript.** Several books in one world, parts and folders, chapter statuses, word goals per book and per day. Each chapter has a synopsis, who and where is in it, notes, inline stickies and version snapshots. The Overview mode shows the book as cards by part. Export to `.md`, `.docx` and PDF.
+- **Manuscript.** Several books in one world, parts and folders, chapter statuses, word goals per book and per day. Each chapter has a synopsis, who and where is in it, notes, inline stickies and version snapshots. The Overview mode shows the book as cards by part. Export to `.md`, `.docx`, PDF and EPUB.
 - **Characters.** A cast view grouped by importance, house or faction, and a dossier with a custom form, family, relationships and every place the character appears in the story.
 - **Family tree** with marriages, engagements, divorces, adopted and uncertain parentage. Focus mode tells who is whose aunt, stepbrother or father-in-law.
 - **Relationships** – a map of how characters feel about each other, from enmity to closeness.

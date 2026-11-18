@@ -353,6 +353,16 @@ function appRoutes() {
       return { ok: true };
     },
 
+    // Подсказки орфографии из меню редактора (app/js/spell-menu.js).
+    "POST /api/app/replace-misspelling": async ({ body }) => {
+      if (win && typeof body.text === "string") win.webContents.replaceMisspelling(body.text);
+      return { ok: true };
+    },
+    "POST /api/app/add-to-dictionary": async ({ body }) => {
+      if (win && typeof body.word === "string" && body.word.trim()) win.webContents.session.addWordToSpellCheckerDictionary(body.word.trim());
+      return { ok: true };
+    },
+
     "POST /api/app/open-vault-folder": async () => {
       if (vault) await shell.openPath(vault.root);
       return { ok: true };
@@ -595,7 +605,15 @@ async function bumpZoom(deltaPercent) {
 // в сессии — включён по умолчанию), затем Отменить/Повторить,
 // Вырезать/Копировать/Вставить/Выделить всё для полей ввода, и просто
 // «Копировать», если это не поле ввода, но есть выделенный текст.
-function buildContextMenu(webContents, params) {
+async function buildContextMenu(webContents, params) {
+  // Редактор главы рисует своё меню (app/js/spell-menu.js) — отдаём ему
+  // подсказки орфографии, а своё меню тогда не показываем.
+  const spell = { misspelledWord: params.misspelledWord || "", suggestions: params.dictionarySuggestions || [] };
+  const handled = await webContents
+    .executeJavaScript(`window.__editorContextMenu ? window.__editorContextMenu(${JSON.stringify(spell)}) : false`)
+    .catch(() => false);
+  if (handled) return;
+
   const menu = new Menu();
 
   if (params.misspelledWord) {
