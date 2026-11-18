@@ -19,6 +19,7 @@ import { registerAppScheme, registerAppProtocol, appUrl, APP_SCHEME, APP_HOST } 
 import { ROUTES, ApiError } from "../core/api.js";
 import { findUpdate, openDownload } from "./update.js";
 import { titleBarOptions, titleBarCss, overlayColors } from "./chrome.js";
+import { initLog, logError, logTail, logFilePath } from "./log.js";
 // Именно так, а не `import { autoUpdater } from "electron-updater"` — см.
 // тот же приём и тот же комментарий в electron/main.js у TasteID:
 // electron-updater — модуль CommonJS, и в упакованном app.asar именованный
@@ -157,7 +158,7 @@ async function useVault(root) {
 async function renderHtmlToPdf(html) {
   const pdfWin = new BrowserWindow({
     show: false,
-    webPreferences: { sandbox: true, contextIsolation: true },
+    webPreferences: { sandbox: true, contextIsolation: true, javascript: false },
   });
   try {
     await pdfWin.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
@@ -260,6 +261,12 @@ function appRoutes() {
       return { ok: true };
     },
 
+    "GET /api/app/update-prefs": async () => ({ check: config.updateCheck !== false }),
+    "POST /api/app/update-prefs": async ({ body }) => {
+      await saveConfig({ updateCheck: body.check !== false });
+      return { check: config.updateCheck !== false };
+    },
+
     "POST /api/app/update-dismiss": async ({ body }) => {
       await saveConfig({ dismissedUpdate: body.version });
       pendingUpdateInfo = null;
@@ -325,6 +332,24 @@ function appRoutes() {
       if (body.id === config.currentVaultId) throw new Error("Сначала переключись на другой проект.");
       if (!vaults.some((v) => v.id === body.id)) throw new Error("Хранилище не найдено");
       await saveConfig({ vaults: vaults.filter((v) => v.id !== body.id) });
+      return { ok: true };
+    },
+
+    // Ошибка на странице (app/js/error-report.js) — в журнал.
+    "POST /api/app/log": async ({ body }) => {
+      await logError("page", body.message, body.stack);
+      return { ok: true };
+    },
+    // Сведения для отчёта об ошибке: версия, система, хвост журнала.
+    "GET /api/app/report": async () => ({
+      version: app.getVersion(),
+      platform: `${process.platform} ${process.arch} ${process.getSystemVersion?.() || ""}`.trim(),
+      electron: process.versions.electron,
+      log: await logTail(60),
+    }),
+    "POST /api/app/open-log-folder": async () => {
+      const f = logFilePath();
+      if (f) shell.showItemInFolder(f);
       return { ok: true };
     },
 
@@ -514,6 +539,7 @@ async function checkForUpdatesManual() {
 
 function checkForUpdates() {
   if (!app.isPackaged) return; // при запуске из исходников (npm start) не мешаем
+  if (config.updateCheck === false) return; // выключено в Настройках — в сеть при запуске не ходим
   if (process.platform === "darwin") {
     checkForUpdatesMac();
     return;
@@ -616,7 +642,12 @@ function buildMenu() {
         submenu: [
           { role: "quit", label: "Выход" },
           { label: "Обновить", accelerator: "F5", click: () => reloadKeepingEdits() },
-          { label: "Инструменты разработчика", accelerator: "F12", click: () => win?.webContents.toggleDevTools() },
+          // В собранной версии — только если явно попросили переменной
+          // окружения FICTARIS_DEVTOOLS=1 (для разбора ошибки): обычному
+          // человеку случайное F12 ни к чему.
+          ...(!app.isPackaged || process.env.FICTARIS_DEVTOOLS === "1"
+            ? [{ label: "Инструменты разработчика", accelerator: "F12", click: () => win?.webContents.toggleDevTools() }]
+            : []),
         ],
       },
       {
@@ -695,6 +726,14 @@ function createWindow() {
   };
   win.webContents.on("will-navigate", blockNavigation);
   win.webContents.on("will-redirect", blockNavigation);
+  // Страница упала (нехватка памяти, сбой) — пишем в журнал и
+  // перезагружаем её, а не оставляем пустое окно. Данные на диске целы:
+  // всё сохранённое лежит в файлах проекта.
+  win.webContents.on("render-process-gone", (_e, details) => {
+    logError("renderer", `Страница завершилась: ${details.reason} (код ${details.exitCode})`);
+    if (details.reason !== "clean-exit" && win && !win.isDestroyed()) setTimeout(() => win?.reload(), 500);
+  });
+  win.webContents.on("unresponsive", () => logError("renderer", "Страница не отвечает"));
 
   // Полосу для перетаскивания вставляем на каждую загрузку страницы (и
   // главного экрана, и /welcome) — dom-ready, а не did-finish-load: тот
@@ -764,7 +803,12 @@ app.on("second-instance", () => {
   win.focus();
 });
 
+// Необработанные ошибки главного процесса — в журнал, а не в никуда.
+process.on("uncaughtException", (e) => logError("main", e?.message || e, e?.stack));
+process.on("unhandledRejection", (e) => logError("main", e?.message || e, e?.stack));
+
 app.whenReady().then(async () => {
+  initLog(app.getPath("logs"));
   config = await readConfig();
   await migrateVaults();
 

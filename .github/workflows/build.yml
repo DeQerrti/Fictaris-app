@@ -40,6 +40,9 @@ jobs:
           for f in $(find core electron app/js mobile/src -name '*.js'); do
             node --check "$f" || exit 1
           done
+      # Логика без отрисовки: история версий, запись на диск, синхронизация,
+      # упоминания, календарь, проверка данных (tests/).
+      - run: npm test
 
   build:
     name: Установщики

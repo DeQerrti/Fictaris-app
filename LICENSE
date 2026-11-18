@@ -32,8 +32,8 @@ the source code beyond reading it.
 The application includes third-party components under their own
 licenses (Electron and Chromium, Capacitor, html2canvas-pro – MIT and
 others); their license notices are included with the respective
-components. Fonts are loaded from Google Fonts under the SIL Open Font
-License.
+components. The bundled fonts (Inter, Newsreader, Caveat) are licensed
+under the SIL Open Font License 1.1, see app/fonts/OFL.txt.
 
 5. NO WARRANTY
 

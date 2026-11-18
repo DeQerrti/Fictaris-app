@@ -31,6 +31,8 @@ import { recordRecent } from "./recent-nav.js";
 import { hasPendingSaves } from "./save-badge.js";
 import { buildEmptyState } from "./chips.js";
 import { initA11y } from "./a11y.js";
+import { initErrorReport } from "./error-report.js";
+initErrorReport();
 import { loadCalendar } from "./calendar.js";
 import { initSidebarOverview, refreshSidebar, openPanel } from "./sidebar-overview.js";
 

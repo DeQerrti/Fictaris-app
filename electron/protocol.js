@@ -63,6 +63,7 @@ function resolveInside(root, urlPath) {
 async function fileResponse(filePath, extraHeaders = {}) {
   let data;
   try {
+    if ((await fs.lstat(filePath)).isSymbolicLink()) return null; // см. Vault.readImage
     data = await fs.readFile(filePath);
   } catch {
     return null;
@@ -81,8 +82,8 @@ async function fileResponse(filePath, extraHeaders = {}) {
 const APP_CSP = [
   "default-src 'self'",
   "script-src 'self'",
-  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-  "font-src 'self' data: https://fonts.gstatic.com",
+  "style-src 'self' 'unsafe-inline'",
+  "font-src 'self' data:",
   "img-src 'self' data: blob:",
   "connect-src 'self' https://api.github.com",
   "frame-src 'self' blob:",

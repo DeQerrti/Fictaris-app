@@ -88,7 +88,22 @@ export function debounceSave(fn, delay = 600) {
 // переключением проекта. Иначе фраза, набранная за последние полсекунды
 // до закрытия, терялась. Придержанное конфликтом (external-changes.js)
 // тоже пишется: версия с диска при этом остаётся в .history.
+// Кто держит несобранные правки у себя (редактор длинной главы собирает
+// текст после паузы, rich-editor.js) — отдаёт их перед срочной записью.
+const beforeFlush = new Set();
+export function addBeforeFlush(fn) {
+  beforeFlush.add(fn);
+  return () => beforeFlush.delete(fn);
+}
+
 export async function flushPendingSaves() {
+  for (const fn of [...beforeFlush]) {
+    try {
+      fn();
+    } catch {
+      // чужая ошибка не должна мешать записи остального
+    }
+  }
   const runs = [...pendingTimers.values()];
   for (const t of pendingTimers.keys()) clearTimeout(t);
   pendingTimers.clear();

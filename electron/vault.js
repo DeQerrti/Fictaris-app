@@ -250,7 +250,11 @@ export class Vault {
   }
 
   async readImage(relPath) {
-    const buf = await fs.readFile(this.#imagePath(relPath));
+    const target = this.#imagePath(relPath);
+    // Символическая ссылка в maps/ (подложенная папка проекта) могла бы
+    // увести в резервную копию и синхронизацию любой файл диска.
+    if ((await fs.lstat(target)).isSymbolicLink()) throw new Error(`Ссылка вместо картинки: ${relPath}`);
+    const buf = await fs.readFile(target);
     return buf.toString("base64");
   }
 

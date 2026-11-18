@@ -530,6 +530,23 @@ function buildCard(card, colId) {
   const el = document.createElement("div");
   el.className = "board-card";
   el.draggable = true;
+  el.dataset.cardId = card.id;
+  // Перестановка с клавиатуры (перетаскивание есть только мышью):
+  // Alt+↑/↓ — выше/ниже в колонке, Alt+←/→ — в соседнюю колонку.
+  el.setAttribute("aria-keyshortcuts", "Alt+ArrowUp Alt+ArrowDown Alt+ArrowLeft Alt+ArrowRight");
+  el.addEventListener("keydown", (e) => {
+    if (!e.altKey || !e.key.startsWith("Arrow")) return;
+    e.preventDefault();
+    const order = board.cardOrder[colId] || [];
+    const i = order.indexOf(card.id);
+    const colIndex = board.columns.findIndex((c) => c.id === colId);
+    if (e.key === "ArrowUp" && i > 0) moveCard(card.id, colId, i - 1);
+    else if (e.key === "ArrowDown" && i < order.length - 1) moveCard(card.id, colId, i + 1);
+    else if (e.key === "ArrowLeft" && colIndex > 0) moveCard(card.id, board.columns[colIndex - 1].id, 0);
+    else if (e.key === "ArrowRight" && colIndex < board.columns.length - 1) moveCard(card.id, board.columns[colIndex + 1].id, 0);
+    else return;
+    setTimeout(() => container?.querySelector(`.board-card[data-card-id="${card.id}"]`)?.focus(), 0);
+  });
   const stripe = stripeColor(card);
   const type = typeInfo(card);
   const who = cardCharacterIds(card).map(charById).filter(Boolean);

@@ -19,6 +19,7 @@ import { buildMentionRegex } from "./mentions.js";
 import { iconSvg } from "./icons.js";
 import { safeColor } from "./sanitize.js";
 import { i18n } from "./i18n.js";
+import { addBeforeFlush } from "./save-badge.js";
 
 const PH_BASE = 0xe000; // символы из области частного использования — временные заглушки
 
@@ -203,7 +204,31 @@ export function createRichEditor(opts) {
     lastText = text;
     opts.onChange?.(text);
   };
-  el.addEventListener("input", changed);
+  // Длинная глава: сборка всего текста на каждое нажатие заметно
+  // тормозит (≈16 мс на 35 тыс. слов) — собираем после короткой паузы.
+  // Перед срочной записью (закрытие окна, F5, смена проекта) несобранное
+  // отдаётся через addBeforeFlush.
+  const LONG = 40000;
+  let pending = null;
+  const flushNow = () => {
+    if (!pending) return;
+    clearTimeout(pending);
+    pending = null;
+    changed();
+  };
+  const unregister = addBeforeFlush(() => {
+    if (!el.isConnected) {
+      unregister();
+      return;
+    }
+    flushNow();
+  });
+  el.addEventListener("input", () => {
+    if (el.textContent.length < LONG) return changed();
+    clearTimeout(pending);
+    pending = setTimeout(flushNow, 250);
+  });
+  el.addEventListener("blur", flushNow);
 
   // Вставка — только простым текстом: чужое оформление (шрифты, цвета,
   // таблицы из Word или браузера) в главу не тянем. Маркеры в

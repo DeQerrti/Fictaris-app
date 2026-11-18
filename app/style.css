@@ -1,4 +1,6 @@
-@import url("https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=Inter:wght@400;500;600&family=Caveat:wght@500;700&display=swap");
+/* Шрифты лежат внутри приложения (app/fonts, лицензия OFL) — раньше они
+   грузились с Google Fonts при каждом запуске, а без интернета вид менялся. */
+@import url("/fonts/fonts.css");
 
 :root {
   /* Два семейства на всё приложение: Inter — интерфейс (цифры дат и
@@ -4691,3 +4693,7 @@ input[type="color"]:focus-visible,
 .re-mp-actions { display: flex; gap: 6px; }
 .mention-autocomplete-item.active { background: var(--panel-alt); color: var(--text); }
 .re-autocomplete { z-index: 120; }
+
+/* Флажок в Настройках (проверка обновлений при запуске). */
+.settings-check { display: flex; align-items: flex-start; gap: 8px; margin-top: 12px; color: var(--text-dim); font-size: 0.85rem; cursor: pointer; }
+.settings-check input { margin-top: 3px; accent-color: var(--accent); }

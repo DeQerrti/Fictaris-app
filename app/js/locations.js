@@ -3,6 +3,7 @@ import { debounceSave } from "./save-badge.js";
 import { escapeHtml, buildEmptyState } from "./chips.js";
 import { safeImagePath } from "./sanitize.js";
 import { pushTrash } from "./trash.js";
+import { detachLocation } from "./cascade.js";
 import { LOCATION_TYPES, locationTypeInfo, factionTypeInfo, iconSvg } from "./icons.js";
 import { loadTagsMap, buildTagsField, parseTags } from "./tags.js";
 import { buildNameGeneratorButton } from "./name-generator.js";
@@ -534,6 +535,7 @@ function buildPage(loc) {
     for (const l of locations) if (l.parentId === loc.id) l.parentId = null;
     activeId = null;
     persist();
+    await detachLocation(loc.id);
     if (inModal) closeEntityModal();
     else draw();
   });

@@ -3,6 +3,7 @@ import { debounceSave } from "./save-badge.js";
 import { escapeHtml, characterSelect, buildEmptyState } from "./chips.js";
 import { FACTION_TYPES, factionTypeInfo, locationTypeInfo, iconSvg } from "./icons.js";
 import { pushTrash } from "./trash.js";
+import { detachFaction } from "./cascade.js";
 import { loadTagsMap, buildTagsField, parseTags } from "./tags.js";
 import { avatarInnerHtml, buildAvatarsField } from "./avatars.js";
 import { loadTemplates, saveTemplates, templateFor } from "./templates.js";
@@ -430,6 +431,7 @@ function buildPage(f) {
   delBtn.addEventListener("click", async () => {
     await pushTrash("faction", f);
     factions = factions.filter((x) => x.id !== f.id);
+    await detachFaction(f.id);
     for (const g of factions) setRelation(g, f, null);
     // Границы фракции на картах остаются, но без привязки к ней.
     let mapChanged = false;

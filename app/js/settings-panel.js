@@ -1,5 +1,6 @@
 import { apiGet, apiPost } from "./api.js";
 import { buildDataSections } from "./data-panel.js";
+import { buildReport } from "./error-report.js";
 import { i18n, currentLang, setLang, i18nPlural } from "./i18n.js";
 import { THEME_PRESETS, CUSTOM_COLOR_TOKENS, saveTheme } from "./theme.js";
 import { escapeHtml } from "./chips.js";
@@ -572,7 +573,8 @@ function buildSyncSetup(section) {
   steps.innerHTML =
     `<li>${i18n("Заведи аккаунт на github.com, если его ещё нет – бесплатно.")}</li>` +
     `<li>${i18n("Создай токен доступа –")} <a href="https://github.com/settings/tokens/new?scopes=repo&description=Fictaris" target="_blank" rel="noopener">${i18n("по этой ссылке")}</a>, ${i18n('галочка «repo» уже отмечена. Внизу страницы – «Generate token».')}</li>` +
-    `<li>${i18n("Скопируй токен (показывается один раз) и вставь сюда.")}</li>`;
+    `<li>${i18n("Скопируй токен (показывается один раз) и вставь сюда.")}</li>` +
+    `<li class="sync-step-note">${i18n("Такой токен даёт доступ ко всем твоим репозиториям и хранится только на этом устройстве. Если репозиторий для Fictaris уже создан, безопаснее токен только к нему:")} <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">${i18n("fine-grained token")}</a> ${i18n("– «Only select repositories» → этот репозиторий, в «Permissions» → «Contents: Read and write».")}</li>`;
 
   const tokenLabel = document.createElement("label");
   tokenLabel.textContent = i18n("Токен доступа");
@@ -839,6 +841,22 @@ function buildUpdateSection(info) {
   });
 
   section.append(btn, restartBtn, status);
+
+  // Проверка при запуске — единственное обращение приложения к сети без
+  // спроса (кроме включённой синхронизации). Выключил — при запуске
+  // Fictaris в сеть не ходит; обновиться можно кнопкой выше.
+  if (!info.mobile) {
+    const label = document.createElement("label");
+    label.className = "settings-check";
+    const box = document.createElement("input");
+    box.type = "checkbox";
+    const text = document.createElement("span");
+    text.textContent = i18n("Проверять обновления при запуске (на Windows и Linux новая версия скачивается сама)");
+    label.append(box, text);
+    apiGet("/api/app/update-prefs").then((p) => { box.checked = p.check !== false; }).catch(() => { box.checked = true; });
+    box.addEventListener("change", () => apiPost("/api/app/update-prefs", { check: box.checked }));
+    section.appendChild(label);
+  }
   return section;
 }
 
@@ -855,5 +873,31 @@ function buildAboutSection(info) {
        <a href="https://github.com/DeQerrti/Fictaris-app/issues" target="_blank" rel="noopener">${i18n("Сообщить о проблеме")}</a>
        <a href="https://github.com/DeQerrti/Fictaris-app/releases" target="_blank" rel="noopener">${i18n("Все версии")}</a></p>
   `;
+  // Что-то сломалось — сведения для отчёта: версия, система и журнал
+  // ошибок (без текста глав и данных проекта). Вставляются в issue.
+  const row = document.createElement("div");
+  row.className = "sync-actions";
+  const copyBtn = document.createElement("button");
+  copyBtn.className = "btn";
+  copyBtn.textContent = i18n("Скопировать сведения для отчёта");
+  copyBtn.addEventListener("click", async () => {
+    const text = await buildReport();
+    try {
+      await navigator.clipboard.writeText(text);
+      copyBtn.textContent = i18n("Скопировано – вставьте в сообщение о проблеме");
+    } catch {
+      copyBtn.textContent = i18n("Не получилось скопировать");
+    }
+    setTimeout(() => (copyBtn.textContent = i18n("Скопировать сведения для отчёта")), 4000);
+  });
+  row.appendChild(copyBtn);
+  if (!info.mobile) {
+    const logBtn = document.createElement("button");
+    logBtn.className = "btn";
+    logBtn.textContent = i18n("Папка журнала");
+    logBtn.addEventListener("click", () => apiPost("/api/app/open-log-folder", {}));
+    row.appendChild(logBtn);
+  }
+  section.appendChild(row);
   return section;
 }

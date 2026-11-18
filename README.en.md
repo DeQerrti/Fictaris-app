@@ -71,8 +71,7 @@ A project is the folder you chose on first launch (`Documents/Fictaris` by defau
 
 Fictaris collects no data and sends your writing nowhere except places you set up yourself. Network requests:
 
-- **Fonts** (Inter, Newsreader, Caveat) load from Google Fonts. Offline, system fonts are used.
-- **Update check** – a request to GitHub for the latest version on launch. On Windows and Linux a new version downloads automatically.
+- **Update check** – a request to GitHub for the latest version on launch. On Windows and Linux a new version downloads automatically. Turn it off in **Settings → App → Updates**.
 - **Sync** (only if you turn it on) – exchanges project files with your GitHub repository. The access token stays on this device and is never stored in the project or in exports.
 
 ## License

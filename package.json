@@ -15,6 +15,7 @@
   "main": "electron/main.js",
   "scripts": {
     "start": "electron .",
+    "test": "node --test --import ./tests/setup.mjs tests/*.test.mjs",
     "build": "electron-builder --publish never",
     "build:win": "electron-builder --win --publish never",
     "build:mac": "electron-builder --mac --publish never",

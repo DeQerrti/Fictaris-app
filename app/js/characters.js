@@ -3,6 +3,7 @@ import { flattenBoards, cardCharacterIds } from "./board-data.js";
 import { debounceSave } from "./save-badge.js";
 import { escapeHtml, characterSelect, buildEmptyState } from "./chips.js";
 import { pushTrash } from "./trash.js";
+import { detachCharacter } from "./cascade.js";
 import { loadTagsMap, buildTagsField, parseTags, stringifyTags } from "./tags.js";
 import { buildNameGeneratorButton } from "./name-generator.js";
 import { avatarInnerHtml, buildAvatarsField } from "./avatars.js";
@@ -600,8 +601,17 @@ function buildDossier(c) {
   delBtn.addEventListener("click", async () => {
     await pushTrash("character", c);
     characters = characters.filter((x) => x.id !== c.id);
+    // Родство и пары остальных — без удалённого (vault-guide: «Что
+    // ссылается на что»), прочие файлы чистит cascade.js.
+    for (const x of characters) {
+      for (const k of ["parentIds", "adoptiveParentIds", "uncertainParentIds", "partnerIds"]) {
+        if (Array.isArray(x[k]) && x[k].includes(c.id)) x[k] = x[k].filter((i) => i !== c.id);
+      }
+      if (x.partnerKinds && c.id in x.partnerKinds) delete x.partnerKinds[c.id];
+    }
     activeId = null;
     persist();
+    await detachCharacter(c, characters.map((x) => x.name));
     if (inModal) closeEntityModal();
     else draw();
   });

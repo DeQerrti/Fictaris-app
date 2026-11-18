@@ -848,6 +848,19 @@ function buildChapterItem(ch, depth) {
   item.dataset.chapterId = ch.id;
   if (depth) item.style.marginLeft = `${depth * 14}px`;
   item.draggable = true;
+  // Alt+↑/↓ — переставить главу внутри её папки (перетаскивание есть
+  // только мышью).
+  item.setAttribute("aria-keyshortcuts", "Alt+ArrowUp Alt+ArrowDown");
+  item.addEventListener("keydown", (e) => {
+    if (!e.altKey || (e.key !== "ArrowUp" && e.key !== "ArrowDown")) return;
+    e.preventDefault();
+    const siblings = manuscript.chapters.filter((c) => c.bookId === ch.bookId && (c.folderId || null) === (ch.folderId || null));
+    const i = siblings.indexOf(ch);
+    if (e.key === "ArrowUp" && i > 0) moveChapterBefore(ch.id, siblings[i - 1]);
+    else if (e.key === "ArrowDown" && i >= 0 && i < siblings.length - 1) moveChapterBefore(siblings[i + 1].id, ch);
+    else return;
+    setTimeout(() => container?.querySelector(`.chapter-item[data-chapter-id="${ch.id}"]`)?.focus(), 0);
+  });
   item.appendChild(buildStatusDot(statusOf(ch)));
   const text = document.createElement("span");
   text.className = "chapter-item-text";
