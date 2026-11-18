@@ -3604,6 +3604,19 @@ button.btn.accent:hover { background: var(--accent-hover); border-color: var(--a
 
 .trash-panel { display: flex; flex-direction: column; }
 
+.trash-warning {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-dim, var(--text));
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+.trash-warning .btn { padding: 4px 10px; font-size: 0.78rem; }
+
 .trash-row {
   display: flex;
   align-items: center;

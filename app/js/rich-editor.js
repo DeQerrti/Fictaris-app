@@ -229,6 +229,123 @@ export function createRichEditor(opts) {
     lastText = text;
     opts.onChange?.(text);
   };
+
+  // ── Отмена и повтор ──
+  // Встроенная отмена браузера не видит того, что вставлено программой
+  // (ссылка, стикер, упоминание, смена падежа) — Ctrl+Z их пропускал.
+  // Поэтому история своя: снимок — текст главы и место курсора. Набор
+  // подряд объединяется в один шаг (пауза больше секунды или другой вид
+  // правки — новый шаг), вставки и оформление — всегда отдельный шаг.
+  const undoStack = [];
+  const redoStack = [];
+  const UNDO_LIMIT = 300;
+  let lastKind = null;
+  let lastAt = 0;
+
+  function caretPos() {
+    const sel = getSelection();
+    if (!sel.rangeCount || !el.contains(sel.anchorNode)) return null;
+    const node = sel.anchorNode.nodeType === Node.TEXT_NODE ? sel.anchorNode.parentElement : sel.anchorNode;
+    const p = node.closest?.(".re-p");
+    if (!p || !el.contains(p)) return null;
+    const r = document.createRange();
+    r.setStart(p, 0);
+    r.setEnd(sel.anchorNode, sel.anchorOffset);
+    return { p: [...el.children].indexOf(p), offset: r.toString().length };
+  }
+
+  function setCaret(pos) {
+    const p = pos ? el.children[Math.min(pos.p, el.children.length - 1)] : el.lastElementChild;
+    if (!p) return;
+    const r = document.createRange();
+    let left = pos ? pos.offset : Infinity;
+    let placed = false;
+    const walker = document.createTreeWalker(p, NodeFilter.SHOW_TEXT);
+    for (let t = walker.nextNode(); t; t = walker.nextNode()) {
+      const locked = t.parentElement.closest('[contenteditable="false"]');
+      if (left <= t.nodeValue.length) {
+        if (locked && el.contains(locked)) r.setStartAfter(locked);
+        else r.setStart(t, left);
+        placed = true;
+        break;
+      }
+      left -= t.nodeValue.length;
+    }
+    if (!placed) {
+      r.selectNodeContents(p);
+      r.collapse(false);
+    }
+    r.collapse(true);
+    const sel = getSelection();
+    sel.removeAllRanges();
+    sel.addRange(r);
+  }
+
+  // kind: "type" / "delete" — набор (объединяется), остальное — отдельный шаг.
+  function recordUndo(kind = "edit") {
+    const now = Date.now();
+    const groupable = (kind === "type" || kind === "delete") && kind === lastKind && now - lastAt < 1000;
+    lastKind = kind;
+    lastAt = now;
+    if (groupable) return;
+    const text = serialize(el);
+    if (undoStack.length && undoStack[undoStack.length - 1].text === text) return;
+    undoStack.push({ text, caret: caretPos() });
+    if (undoStack.length > UNDO_LIMIT) undoStack.shift();
+    redoStack.length = 0;
+  }
+
+  function restore(state) {
+    el.innerHTML = renderText(state.text, ctx);
+    el.focus();
+    setCaret(state.caret);
+    lastKind = null;
+    changed();
+  }
+
+  function undo() {
+    if (pending) flushNow();
+    const current = { text: serialize(el), caret: caretPos() };
+    let state = undoStack.pop();
+    while (state && state.text === current.text) state = undoStack.pop();
+    if (!state) return;
+    redoStack.push(current);
+    restore(state);
+  }
+
+  function redo() {
+    const state = redoStack.pop();
+    if (!state) return;
+    undoStack.push({ text: serialize(el), caret: caretPos() });
+    restore(state);
+  }
+
+  el.addEventListener("beforeinput", (e) => {
+    if (e.inputType === "historyUndo" || e.inputType === "historyRedo") {
+      e.preventDefault();
+      if (e.inputType === "historyUndo") undo();
+      else redo();
+      return;
+    }
+    const kind = e.inputType.startsWith("insertText") || e.inputType === "insertCompositionText"
+      ? "type"
+      : e.inputType.startsWith("delete")
+        ? "delete"
+        : e.inputType;
+    recordUndo(kind);
+  });
+  // Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y — по коду клавиши, в любой раскладке.
+  el.addEventListener("keydown", (e) => {
+    if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+    if (e.code === "KeyZ") {
+      e.preventDefault();
+      if (e.shiftKey) redo();
+      else undo();
+    } else if (e.code === "KeyY") {
+      e.preventDefault();
+      redo();
+    }
+  });
   // Длинная глава: сборка всего текста на каждое нажатие заметно
   // тормозит (≈16 мс на 35 тыс. слов) — собираем после короткой паузы.
   // Перед срочной записью (закрытие окна, F5, смена проекта) несобранное
@@ -262,12 +379,14 @@ export function createRichEditor(opts) {
     const text = e.clipboardData?.getData("text/plain");
     if (text == null) return;
     e.preventDefault();
+    recordUndo("paste");
     document.execCommand("insertText", false, text.replace(/\r\n?/g, "\n"));
   });
   el.addEventListener("drop", (e) => {
     const text = e.dataTransfer?.getData("text/plain");
     if (!text) return;
     e.preventDefault();
+    recordUndo("paste");
     const range = document.caretRangeFromPoint?.(e.clientX, e.clientY);
     if (range) {
       const sel = getSelection();
@@ -298,6 +417,7 @@ export function createRichEditor(opts) {
 
   function format(kind) {
     el.focus();
+    recordUndo("format");
     if (kind === "highlight") {
       const sel = getSelection();
       const node = sel.anchorNode?.parentElement?.closest?.("mark, [style*='background']");
@@ -325,6 +445,7 @@ export function createRichEditor(opts) {
 
   function insertHtml(html) {
     placeCaretAtEndIfOutside();
+    recordUndo("insert");
     insertAtSelection(el, html);
     changed();
   }
@@ -336,6 +457,7 @@ export function createRichEditor(opts) {
     focus: () => el.focus(),
     insertText(text) {
       placeCaretAtEndIfOutside();
+      recordUndo("insert");
       document.execCommand("insertText", false, text);
       changed();
     },
@@ -352,9 +474,15 @@ export function createRichEditor(opts) {
       const sel = getSelection();
       sel.removeAllRanges();
       sel.addRange(range);
+      recordUndo("link");
       insertAtSelection(el, targetHtml(target, shown, ctx));
       changed();
     },
+    // Для правок снаружи редактора (окно ссылки, подсказка «@»): снимок
+    // до изменения — чтобы Ctrl+Z их отменял.
+    recordUndo: () => recordUndo("external"),
+    undo,
+    redo,
     savedRange() {
       const sel = getSelection();
       return sel.rangeCount && el.contains(sel.anchorNode) ? sel.getRangeAt(0).cloneRange() : null;
@@ -482,6 +610,7 @@ export function attachRichAutocomplete(editor, getSources) {
     // Пробел после названия — только если за курсором его ещё нет.
     const nextChar = query.node.nodeValue?.[query.end] ?? "";
     hide();
+    editor.recordUndo();
     insertAtSelection(el, `${targetHtml(t, null, editor.ctx)}${/\s/.test(nextChar) ? "" : " "}`);
     editor.changed();
   }
@@ -605,7 +734,7 @@ export function buildLinkPicker({ selected, sources, onPick }) {
 // ── Окошко ссылки (щелчок по цветному слову) ──
 // Как назвать в тексте (падеж), готовые формы, открыть, убрать ссылку —
 // одинаково для персонажей, мест и фракций.
-export function buildMentionPanel(span, { title, subtitle, color, forms, openLabel, onChange, onOpen, onClose }) {
+export function buildMentionPanel(span, { title, subtitle, color, forms, openLabel, onChange, onOpen, onClose, onBeforeChange }) {
   const wrap = document.createElement("div");
   wrap.className = "re-mention-panel";
   wrap.innerHTML = `
@@ -627,7 +756,13 @@ export function buildMentionPanel(span, { title, subtitle, color, forms, openLab
   input.setAttribute("aria-label", i18n("В тексте"));
   const formsEl = wrap.querySelector(".re-mp-forms");
 
+  let recorded = false;
+  const before = () => {
+    if (!recorded) onBeforeChange?.();
+    recorded = true;
+  };
   const setForm = (form) => {
+    before();
     const value = form.trim() || span.dataset.name || span.dataset.form || "?";
     span.textContent = value;
     span.dataset.form = value;
@@ -660,6 +795,7 @@ export function buildMentionPanel(span, { title, subtitle, color, forms, openLab
   });
   wrap.querySelector(".re-mp-open")?.addEventListener("click", () => onOpen?.());
   wrap.querySelector(".re-mp-unlink").addEventListener("click", () => {
+    before();
     span.replaceWith(document.createTextNode(span.textContent));
     onChange?.();
     onClose?.();

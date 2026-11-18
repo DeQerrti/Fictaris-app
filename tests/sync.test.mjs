@@ -33,6 +33,14 @@ globalThis.fetch = async (url, init = {}) => {
     if (cur && body.sha !== cur.sha) return json({ message: "sha mismatch" }, 409);
     return json({ content: { sha: put(p, body.content) } });
   }
+  if ((m = /\/contents\/(.+)$/.exec(u)) && method === "DELETE") {
+    const p = decodeURIComponent(m[1]);
+    const cur = repo.get(p);
+    if (!cur) return json({ message: "Not Found" }, 404);
+    if (JSON.parse(init.body).sha !== cur.sha) return json({ message: "sha mismatch" }, 409);
+    repo.delete(p);
+    return json({ commit: {} });
+  }
   return json({}, 404);
 };
 
@@ -75,4 +83,32 @@ test("синхронизация: настройки своего проекта
   assert.equal(sync.getSyncConfig(), null);
   sync.setSyncVault("v1", 2);
   assert.equal(sync.getSyncConfig().repo, "a");
+});
+
+test("синхронизация: удаление картинки переносится в обе стороны, правка важнее удаления", async () => {
+  sync.setSyncVault("v3", 3);
+  sync.saveSyncConfig(cfg);
+  repo.clear();
+  backup = { files: {}, images: { "maps/x.png": b64("X"), "maps/y.png": b64("Y"), "maps/z.png": b64("Z") } };
+  await sync.runSync(cfg);
+  assert.ok(repo.has("maps/x.png"));
+
+  // Здесь удалили x — удаляется и в репозитории.
+  delete backup.images["maps/x.png"];
+  // В репозитории удалили y — удаляется здесь.
+  repo.delete("maps/y.png");
+  // В репозитории удалили z, а здесь его изменили — правка остаётся и уходит обратно.
+  backup.images["maps/z.png"] = b64("Z2");
+  let r = await sync.runSync(cfg);
+  assert.equal(repo.has("maps/x.png"), false, "удалено в репозитории");
+  assert.deepEqual(r.deletedImages, ["maps/y.png"]);
+  assert.ok(repo.has("maps/z.png"), "изменённая картинка вернулась в репозиторий");
+  assert.equal(sync.hasPulled(r), true);
+
+  // Повторная синхронизация: ничего не возвращается и не удаляется снова.
+  delete backup.images["maps/y.png"];
+  r = await sync.runSync(cfg);
+  assert.deepEqual(r.deletedImages, []);
+  assert.equal(Object.keys(r.pulledImages).length, 0);
+  assert.equal(repo.has("maps/x.png"), false);
 });

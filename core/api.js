@@ -145,7 +145,20 @@ async function restoreBackup({ vault, body }) {
     }
   }
 
-  return { ok: true, restoredImages };
+  // Картинки, удалённые на другом устройстве (синхронизация, app/js/sync.js).
+  let deletedImages = 0;
+  if (Array.isArray(body.deletedImages)) {
+    for (const relPath of body.deletedImages) {
+      try {
+        await vault.deleteImage(String(relPath));
+        deletedImages++;
+      } catch {
+        // Подставной путь или файла уже нет — пропускаем.
+      }
+    }
+  }
+
+  return { ok: true, restoredImages, deletedImages };
 }
 
 export const ROUTES = {

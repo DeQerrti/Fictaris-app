@@ -2,7 +2,7 @@ import { apiGet, apiPost, uid } from "./api.js";
 import { flattenBoards, cardCharacterIds } from "./board-data.js";
 import { debounceSave } from "./save-badge.js";
 import { escapeHtml, characterSelect, buildEmptyState } from "./chips.js";
-import { pushTrash } from "./trash.js";
+import { pushTrash, addTrashLinks } from "./trash.js";
 import { detachCharacter } from "./cascade.js";
 import { loadTagsMap, buildTagsField, parseTags, stringifyTags } from "./tags.js";
 import { buildNameGeneratorButton } from "./name-generator.js";
@@ -599,7 +599,17 @@ function buildDossier(c) {
   delBtn.className = "btn danger";
   delBtn.innerHTML = `${iconSvg("trash", 14)}<span>${escapeHtml(i18n("Удалить"))}</span>`;
   delBtn.addEventListener("click", async () => {
-    await pushTrash("character", c);
+    // Кто из остальных ссылался на него как на родителя или пару —
+    // запоминается в корзине, чтобы «Вернуть» восстановил и родство.
+    const kin = [];
+    for (const x of characters) {
+      if (x.id === c.id) continue;
+      for (const k of ["parentIds", "adoptiveParentIds", "uncertainParentIds", "partnerIds"]) {
+        if (Array.isArray(x[k]) && x[k].includes(c.id)) kin.push({ id: x.id, key: k, at: x[k].indexOf(c.id) });
+      }
+      if (x.partnerKinds && c.id in x.partnerKinds) kin.push({ id: x.id, key: "partnerKind", value: x.partnerKinds[c.id] });
+    }
+    const trashId = await pushTrash("character", c, { kin });
     characters = characters.filter((x) => x.id !== c.id);
     // Родство и пары остальных — без удалённого (vault-guide: «Что
     // ссылается на что»), прочие файлы чистит cascade.js.
@@ -611,7 +621,7 @@ function buildDossier(c) {
     }
     activeId = null;
     persist();
-    await detachCharacter(c, characters.map((x) => x.name));
+    await addTrashLinks(trashId, await detachCharacter(c, characters.map((x) => x.name)));
     if (inModal) closeEntityModal();
     else draw();
   });

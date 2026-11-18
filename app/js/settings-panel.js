@@ -17,6 +17,7 @@ import {
   repoExists,
   createRepo,
   runSync,
+  hasPulled,
   resolveConflict,
   hasAutosyncConflicts,
 } from "./sync.js";
@@ -695,11 +696,12 @@ async function startSync(config, btn, status, progress, conflictsBox) {
     });
     progress.textContent = "";
 
-    if (Object.keys(result.pulledFiles).length || Object.keys(result.pulledImages).length) {
+    if (hasPulled(result)) {
       await apiPost("/api/restore-backup", {
         format: "fictaris-backup",
         files: result.pulledFiles,
         images: result.pulledImages,
+        deletedImages: result.deletedImages,
       });
     }
 
@@ -714,7 +716,7 @@ async function startSync(config, btn, status, progress, conflictsBox) {
       status.textContent = i18n("Готово: отправлено {pushed}, забрано {pulled}, без изменений {skipped}.", result);
     }
 
-    if (Object.keys(result.pulledFiles).length || Object.keys(result.pulledImages).length) {
+    if (hasPulled(result)) {
       setTimeout(() => location.reload(), 1200);
     }
   } catch (e) {

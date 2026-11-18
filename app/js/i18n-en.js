@@ -566,6 +566,7 @@ export const EN_DICT = {
   "Не получилось создать репозиторий.": "Couldn't create the repository.",
   "Не получилось прочитать файл из репозитория: {path}": "Couldn't read the file from the repository: {path}",
   "Не получилось отправить файл: {path}": "Couldn't upload the file: {path}",
+  "Не получилось удалить файл в репозитории: {path}": "Couldn't delete the file in the repository: {path}",
 
   // ── Сайдбар / навигация (labels.js) ──
   "Рукопись": "Manuscript",
@@ -1446,4 +1447,7 @@ export const EN_DICT = {
   "Это не файл экспорта проекта Fictaris – в нём нет ни персонажей, ни глав, ни других разделов.": "This is not a Fictaris project export – it has no characters, chapters or other sections.",
   "Заменить все текущие данные содержимым файла? Нынешние останутся в истории версий.": "Replace all current data with the file's contents? The current data will stay in the version history.",
   "Не удалось открыть раздел: {error}": "Could not open this section: {error}",
+  "Корзина разрослась. Записи не удаляются сами – уберите ненужные.": "The trash is getting big. Items are never removed on their own – clear what you don't need.",
+  "Удалить {n} записей старше 3 месяцев": "Delete {n} item older than 3 months|Delete {n} items older than 3 months",
+  "Точно? Их нельзя будет вернуть": "Sure? They can't be restored",
 };

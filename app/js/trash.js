@@ -3,8 +3,13 @@ import { migrateBoards } from "./board-data.js";
 import { escapeHtml, buildEmptyState } from "./chips.js";
 import { iconSvg } from "./icons.js";
 import { i18n, i18nPlural } from "./i18n.js";
+import { reattachKin, reattachCharacter, reattachLocation, reattachFaction } from "./cascade.js";
 
-const TRASH_LIMIT = 200;
+// Корзина ничего не выкидывает сама: раньше после 200 записей самые старые
+// молча пропадали навсегда. Теперь при большой корзине панель только
+// предупреждает и предлагает убрать старое по кнопке.
+const TRASH_BIG = 300;
+const OLD_DAYS = 90;
 
 // Соединительная работа, которую бриф прямо называл недоделанной в
 // прошлой попытке: модули вызывали onTrash(type, item) перед удалением,
@@ -12,12 +17,26 @@ const TRASH_LIMIT = 200;
 // это сделано целиком — pushTrash пишет в trash.json сразу (не debounce:
 // удаление — дискретное решение, а не набор текста), а модули просто
 // зовут pushTrash перед тем, как выкинуть элемент из своего массива.
-export async function pushTrash(type, item) {
+//
+// links — какие ссылки на запись убрали из других мест (родня, составы
+// фракций, события, карточки…): «Вернуть» ставит их обратно. Часть ссылок
+// известна только после чистки — их дописывает addTrashLinks.
+export async function pushTrash(type, item, links) {
   const trash = await apiGet("/api/trash");
   const entry = { id: uid(), type, item, deletedAt: new Date().toISOString() };
-  const next = [entry, ...trash].slice(0, TRASH_LIMIT);
-  await apiPost("/api/trash", next);
+  if (links) entry.links = links;
+  await apiPost("/api/trash", [entry, ...trash]);
   document.dispatchEvent(new CustomEvent("fictaris:trash-changed"));
+  return entry.id;
+}
+
+export async function addTrashLinks(entryId, links) {
+  if (!entryId || !links) return;
+  const trash = await apiGet("/api/trash");
+  const entry = trash.find((e) => e.id === entryId);
+  if (!entry) return;
+  entry.links = { ...(entry.links || {}), ...links };
+  await apiPost("/api/trash", trash);
 }
 
 function typeInfo() {
@@ -70,10 +89,68 @@ async function restoreChapter(chapter) {
   await apiPost("/api/manuscript", manuscript);
 }
 
-async function restoreEntry(entry) {
+const KIN_KEYS = ["parentIds", "adoptiveParentIds", "uncertainParentIds", "partnerIds"];
+
+// Персонаж возвращается с роднёй (у других снова есть он в родителях и
+// парах), составами фракций, событиями, главами, карточками, метками и
+// «Кто что знает», а его связи из relationships.json — из корзины вместе
+// с ним. Возвращает записи корзины, которые ушли заодно.
+async function restoreCharacter(entry, trash) {
+  const c = entry.item;
+  const links = entry.links || {};
+  const characters = await apiGet("/api/characters");
+  if (!characters.some((x) => x.id === c.id)) {
+    const ids = new Set(characters.map((x) => x.id));
+    const own = { ...c };
+    // Кого из родни успели удалить после него — тех в его списках уже нет.
+    for (const k of KIN_KEYS) if (Array.isArray(own[k])) own[k] = own[k].filter((i) => ids.has(i));
+    if (own.partnerKinds) own.partnerKinds = Object.fromEntries(Object.entries(own.partnerKinds).filter(([i]) => ids.has(i)));
+    characters.push(own);
+    reattachKin(characters, c.id, links.kin);
+    await apiPost("/api/characters", characters);
+  }
+  await reattachCharacter(c.id, links);
+
+  const extra = [];
+  const relIds = links.relationships || [];
+  if (relIds.length) {
+    const present = new Set(characters.map((x) => x.id));
+    const list = await apiGet("/api/relationships");
+    for (const e of trash) {
+      if (e.type !== "relationship" || !relIds.includes(e.item?.id)) continue;
+      const r = e.item;
+      if (!present.has(r.charA) || !present.has(r.charB)) continue;
+      if (!list.some((x) => x.id === r.id)) list.push(r);
+      extra.push(e);
+    }
+    if (extra.length) await apiPost("/api/relationships", list);
+  }
+  return extra;
+}
+
+async function restoreLocation(entry) {
+  const loc = entry.item;
+  const locations = await apiGet("/api/locations");
+  if (!locations.some((x) => x.id === loc.id)) {
+    const parentOk = locations.some((x) => x.id === loc.parentId);
+    await apiPost("/api/locations", [...locations, { ...loc, parentId: parentOk ? loc.parentId : null }]);
+  }
+  await reattachLocation(loc.id, entry.links);
+}
+
+async function restoreFaction(entry) {
+  await restoreArrayItem("/api/factions", entry.item);
+  await reattachFaction(entry.item.id, entry.links);
+}
+
+export async function restoreEntry(entry, trash) {
   if (entry.type === "board-card") await restoreBoardCard(entry.item);
   else if (entry.type === "chapter") await restoreChapter(entry.item);
+  else if (entry.type === "character") return restoreCharacter(entry, trash);
+  else if (entry.type === "location") await restoreLocation(entry);
+  else if (entry.type === "faction") await restoreFaction(entry);
   else await restoreArrayItem(typeInfo()[entry.type].listPath, entry.item);
+  return [];
 }
 
 // Окно из нижней строки сайдбара (sidebar-overview.js), не вкладка:
@@ -100,6 +177,8 @@ export async function renderTrash(root) {
     return;
   }
 
+  if (trash.length > TRASH_BIG) wrap.appendChild(buildBigWarning(trash, () => renderTrash(root)));
+
   for (const entry of trash) {
     wrap.appendChild(buildRow(entry, trash, (left) => {
       updateMeta(left);
@@ -108,6 +187,38 @@ export async function renderTrash(root) {
   }
 
   root.appendChild(wrap);
+}
+
+// Большая корзина: предупреждение и кнопка «убрать старше 90 дней» —
+// вместо прежнего молчаливого вытеснения.
+function buildBigWarning(trash, rerender) {
+  const box = document.createElement("div");
+  box.className = "trash-warning";
+  const cutoff = Date.now() - OLD_DAYS * 86400000;
+  const old = trash.filter((e) => new Date(e.deletedAt).getTime() < cutoff);
+  const text = document.createElement("span");
+  text.textContent = i18n("Корзина разрослась. Записи не удаляются сами – уберите ненужные.");
+  box.appendChild(text);
+  if (old.length) {
+    const btn = document.createElement("button");
+    btn.className = "btn danger";
+    const label = i18nPlural(old.length, ["Удалить {n} запись старше 3 месяцев", "Удалить {n} записи старше 3 месяцев", "Удалить {n} записей старше 3 месяцев"]);
+    btn.textContent = label;
+    btn.addEventListener("click", async () => {
+      if (btn.dataset.confirm !== "1") {
+        btn.dataset.confirm = "1";
+        btn.textContent = i18n("Точно? Их нельзя будет вернуть");
+        setTimeout(() => { btn.dataset.confirm = ""; btn.textContent = label; }, 3000);
+        return;
+      }
+      const left = trash.filter((e) => !old.includes(e));
+      await apiPost("/api/trash", left);
+      document.dispatchEvent(new CustomEvent("fictaris:trash-changed"));
+      rerender();
+    });
+    box.appendChild(btn);
+  }
+  return box;
 }
 
 function removeFrom(trash, entry) {
@@ -119,6 +230,7 @@ function buildRow(entry, trash, onRemoved) {
   const info = typeInfo()[entry.type];
   const row = document.createElement("div");
   row.className = "trash-row";
+  row.dataset.entryId = entry.id;
 
   const meta = document.createElement("div");
   meta.className = "trash-meta";
@@ -137,8 +249,12 @@ function buildRow(entry, trash, onRemoved) {
     // запись на диск и перечитать раздел: иначе следующая правка записала
     // бы старую копию из памяти — без возвращённого.
     await window.__flushPendingSaves?.();
-    await restoreEntry(entry);
+    const extra = await restoreEntry(entry, trash);
     removeFrom(trash, entry);
+    for (const e of extra) {
+      removeFrom(trash, e);
+      row.parentElement?.querySelector(`[data-entry-id="${e.id}"]`)?.remove();
+    }
     await apiPost("/api/trash", trash);
     document.dispatchEvent(new CustomEvent("fictaris:trash-changed"));
     document.dispatchEvent(new CustomEvent("fictaris:data-replaced"));

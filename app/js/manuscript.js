@@ -263,6 +263,7 @@ const ENTITY_KIND = { place: "location", faction: "faction" };
 function openMentionPanel(span, editor) {
   const r = span.getBoundingClientRect();
   const done = {
+    onBeforeChange: () => editor.recordUndo(),
     onChange: () => editor.changed(),
     onClose: () => {
       closeMenu();
@@ -344,6 +345,7 @@ function attachRichContextMenu(editor, chapter) {
             {
               label: i18n("Убрать ссылку"),
               action: () => {
+                editor.recordUndo();
                 mention.replaceWith(document.createTextNode(mention.textContent));
                 editor.changed();
               },

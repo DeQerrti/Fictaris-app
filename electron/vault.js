@@ -263,4 +263,12 @@ export class Vault {
     await fs.mkdir(path.dirname(target), { recursive: true });
     await fs.writeFile(target, Buffer.from(base64, "base64"));
   }
+
+  // Удалённая на другом устройстве картинка. Копия всё равно остаётся в
+  // истории репозитория синхронизации на GitHub.
+  async deleteImage(relPath) {
+    const target = this.#imagePath(relPath);
+    if ((await fs.lstat(target)).isSymbolicLink()) throw new Error(`Ссылка вместо картинки: ${relPath}`);
+    await fs.rm(target);
+  }
 }

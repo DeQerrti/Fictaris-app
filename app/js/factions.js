@@ -2,7 +2,7 @@ import { apiGet, apiPost, uid } from "./api.js";
 import { debounceSave } from "./save-badge.js";
 import { escapeHtml, characterSelect, buildEmptyState } from "./chips.js";
 import { FACTION_TYPES, factionTypeInfo, locationTypeInfo, iconSvg } from "./icons.js";
-import { pushTrash } from "./trash.js";
+import { pushTrash, addTrashLinks } from "./trash.js";
 import { detachFaction } from "./cascade.js";
 import { loadTagsMap, buildTagsField, parseTags } from "./tags.js";
 import { avatarInnerHtml, buildAvatarsField } from "./avatars.js";
@@ -429,22 +429,30 @@ function buildPage(f) {
   delBtn.className = "btn danger";
   delBtn.innerHTML = `${iconSvg("trash", 14)}<span>${escapeHtml(i18n("Удалить"))}</span>`;
   delBtn.addEventListener("click", async () => {
-    await pushTrash("faction", f);
+    // Отношения других фракций к этой и её границы на картах запоминаются
+    // в корзине — «Вернуть» восстановит и их.
+    const relations = {};
+    for (const g of factions) if (g.id !== f.id && g.relations?.[f.id]) relations[g.id] = g.relations[f.id];
+    const borders = [];
+    const trashId = await pushTrash("faction", f, { relations });
     factions = factions.filter((x) => x.id !== f.id);
-    await detachFaction(f.id);
+    const links = await detachFaction(f.id);
     for (const g of factions) setRelation(g, f, null);
     // Границы фракции на картах остаются, но без привязки к ней.
     let mapChanged = false;
-    for (const m of Object.values(mapData.maps || {})) {
+    for (const [mapId, m] of Object.entries(mapData.maps || {})) {
       for (const shape of m.drawing?.shapes || []) {
         if (shape.factionId === f.id) {
           delete shape.factionId;
-          if (!shape.name) shape.name = f.name;
+          const named = !shape.name;
+          if (named) shape.name = f.name;
+          borders.push({ map: mapId, shape: shape.id, named });
           mapChanged = true;
         }
       }
     }
     if (mapChanged) await apiPost("/api/map", mapData);
+    await addTrashLinks(trashId, { ...links, borders });
     activeId = null;
     persist();
     if (inModal) closeEntityModal();

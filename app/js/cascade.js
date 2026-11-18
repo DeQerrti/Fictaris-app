@@ -9,7 +9,7 @@
 //  (characters.json и т.п.) правит сам раздел: у него своя копия в памяти.
 //
 //  Связи (relationships.json) удалённого персонажа уходят в корзину
-//  отдельными записями — их можно вернуть вместе с персонажем.
+//  отдельными записями — «Вернуть» персонажа возвращает и их.
 // ══════════════════════════════════════════════
 
 import { apiGet, apiPost } from "./api.js";
@@ -40,6 +40,11 @@ export function unlinkMentions(text, name, otherNames = []) {
   return { text: out, count };
 }
 
+// Каждая detach* возвращает links — что именно убрала. Это кладётся в запись
+// корзины, и «Вернуть» (reattach*) возвращает ссылки на место: персонаж
+// снова в составе фракции, в событиях, на карточках, у родни. Не
+// возвращаются только упоминания в тексте, ставшие обычными словами.
+
 // otherNames — имена оставшихся персонажей: если есть тёзка, упоминания
 // в тексте не трогаем (непонятно, чьи они).
 export async function detachCharacter(character, otherNames = []) {
@@ -53,31 +58,48 @@ export async function detachCharacter(character, otherNames = []) {
     apiGet("/api/map"),
     apiGet("/api/knowledge"),
   ]);
+  const links = { relationships: [], factions: [], timeline: [], chapters: [], cards: [], pins: [], knowledge: [] };
   const writes = [];
 
   const gone = relationships.filter((r) => r.charA === id || r.charB === id);
   if (gone.length) {
     for (const r of gone) await pushTrash("relationship", r);
+    links.relationships = gone.map((r) => r.id);
     writes.push(apiPost("/api/relationships", relationships.filter((r) => !gone.includes(r))));
   }
 
   let changed = false;
   for (const f of factions) {
-    if (f.leaderId === id) { f.leaderId = null; changed = true; }
-    if (Array.isArray(f.memberIds) && f.memberIds.includes(id)) { f.memberIds = f.memberIds.filter((x) => x !== id); changed = true; }
+    const leader = f.leaderId === id;
+    const at = Array.isArray(f.memberIds) ? f.memberIds.indexOf(id) : -1;
+    const member = at >= 0;
+    if (leader) f.leaderId = null;
+    if (member) f.memberIds = f.memberIds.filter((x) => x !== id);
+    if (leader || member) {
+      links.factions.push({ id: f.id, leader, member, at });
+      changed = true;
+    }
   }
   if (changed) writes.push(apiPost("/api/factions", factions));
 
   changed = false;
   for (const e of timeline) {
-    if (Array.isArray(e.characterIds) && e.characterIds.includes(id)) { e.characterIds = e.characterIds.filter((x) => x !== id); changed = true; }
+    if (Array.isArray(e.characterIds) && e.characterIds.includes(id)) {
+      links.timeline.push({ id: e.id, at: e.characterIds.indexOf(id) });
+      e.characterIds = e.characterIds.filter((x) => x !== id);
+      changed = true;
+    }
   }
   if (changed) writes.push(apiPost("/api/timeline", timeline));
 
   changed = false;
   const hasNamesake = otherNames.includes(character.name);
   for (const ch of manuscript.chapters || []) {
-    if (Array.isArray(ch.characterIds) && ch.characterIds.includes(id)) { ch.characterIds = ch.characterIds.filter((x) => x !== id); changed = true; }
+    if (Array.isArray(ch.characterIds) && ch.characterIds.includes(id)) {
+      links.chapters.push({ id: ch.id, at: ch.characterIds.indexOf(id) });
+      ch.characterIds = ch.characterIds.filter((x) => x !== id);
+      changed = true;
+    }
     if (!hasNamesake && character.name) {
       const r = unlinkMentions(ch.content, character.name, otherNames);
       if (r.count) { ch.content = r.text; changed = true; }
@@ -88,25 +110,40 @@ export async function detachCharacter(character, otherNames = []) {
   changed = false;
   for (const b of boardsOf(board)) {
     for (const card of Object.values(b.cards || {})) {
-      if (Array.isArray(card.characterIds) && card.characterIds.includes(id)) { card.characterIds = card.characterIds.filter((x) => x !== id); changed = true; }
-      if (card.characterId === id) { card.characterId = null; changed = true; }
+      const at = Array.isArray(card.characterIds) ? card.characterIds.indexOf(id) : -1;
+      const legacy = card.characterId === id;
+      if (at >= 0) card.characterIds = card.characterIds.filter((x) => x !== id);
+      if (legacy) card.characterId = null;
+      if (at >= 0 || legacy) {
+        links.cards.push({ id: card.id, at });
+        changed = true;
+      }
     }
   }
   if (changed) writes.push(apiPost("/api/board", board));
 
   changed = false;
-  for (const m of Object.values(map.maps || {})) {
-    for (const p of m.pins || []) if (p.characterId === id) { p.characterId = null; changed = true; }
+  for (const [mapId, m] of Object.entries(map.maps || {})) {
+    for (const p of m.pins || []) if (p.characterId === id) {
+      p.characterId = null;
+      links.pins.push({ map: mapId, pin: p.id });
+      changed = true;
+    }
   }
   if (changed) writes.push(apiPost("/api/map", map));
 
   changed = false;
   for (const f of knowledge.facts || []) {
-    if (f.entries && id in f.entries) { delete f.entries[id]; changed = true; }
+    if (f.entries && id in f.entries) {
+      links.knowledge.push({ fact: f.id, value: f.entries[id] });
+      delete f.entries[id];
+      changed = true;
+    }
   }
   if (changed) writes.push(apiPost("/api/knowledge", knowledge));
 
   await Promise.all(writes);
+  return links;
 }
 
 export async function detachLocation(id) {
@@ -117,20 +154,33 @@ export async function detachLocation(id) {
     apiGet("/api/board"),
     apiGet("/api/map"),
   ]);
+  const links = { headquarters: [], timeline: [], chapters: [], cards: [], pins: [] };
   const writes = [];
   let changed = false;
-  for (const f of factions) if (f.headquartersId === id) { f.headquartersId = null; changed = true; }
+  for (const f of factions) if (f.headquartersId === id) {
+    f.headquartersId = null;
+    links.headquarters.push(f.id);
+    changed = true;
+  }
   if (changed) writes.push(apiPost("/api/factions", factions));
 
   changed = false;
   for (const e of timeline) {
-    if (Array.isArray(e.locationIds) && e.locationIds.includes(id)) { e.locationIds = e.locationIds.filter((x) => x !== id); changed = true; }
+    if (Array.isArray(e.locationIds) && e.locationIds.includes(id)) {
+      links.timeline.push({ id: e.id, at: e.locationIds.indexOf(id) });
+      e.locationIds = e.locationIds.filter((x) => x !== id);
+      changed = true;
+    }
   }
   if (changed) writes.push(apiPost("/api/timeline", timeline));
 
   changed = false;
   for (const ch of manuscript.chapters || []) {
-    if (Array.isArray(ch.locationIds) && ch.locationIds.includes(id)) { ch.locationIds = ch.locationIds.filter((x) => x !== id); changed = true; }
+    if (Array.isArray(ch.locationIds) && ch.locationIds.includes(id)) {
+      links.chapters.push({ id: ch.id, at: ch.locationIds.indexOf(id) });
+      ch.locationIds = ch.locationIds.filter((x) => x !== id);
+      changed = true;
+    }
     // Ссылки в тексте ([[place:id|слово]]) становятся обычным словом.
     const r = unlinkEntity(ch.content, "place", id);
     if (r.count) { ch.content = r.text; changed = true; }
@@ -138,20 +188,34 @@ export async function detachLocation(id) {
   if (changed) writes.push(apiPost("/api/manuscript", manuscript));
 
   changed = false;
-  for (const b of boardsOf(board)) for (const card of Object.values(b.cards || {})) if (card.locationId === id) { card.locationId = null; changed = true; }
+  for (const b of boardsOf(board)) for (const card of Object.values(b.cards || {})) if (card.locationId === id) {
+    card.locationId = null;
+    links.cards.push(card.id);
+    changed = true;
+  }
   if (changed) writes.push(apiPost("/api/board", board));
 
   changed = false;
-  for (const m of Object.values(map.maps || {})) for (const p of m.pins || []) if (p.locationId === id) { p.locationId = null; changed = true; }
+  for (const [mapId, m] of Object.entries(map.maps || {})) for (const p of m.pins || []) if (p.locationId === id) {
+    p.locationId = null;
+    links.pins.push({ map: mapId, pin: p.id });
+    changed = true;
+  }
   if (changed) writes.push(apiPost("/api/map", map));
 
   await Promise.all(writes);
+  return links;
 }
 
 export async function detachFaction(id) {
   const [board, manuscript] = await Promise.all([apiGet("/api/board"), apiGet("/api/manuscript")]);
+  const links = { cards: [] };
   let changed = false;
-  for (const b of boardsOf(board)) for (const card of Object.values(b.cards || {})) if (card.factionId === id) { card.factionId = null; changed = true; }
+  for (const b of boardsOf(board)) for (const card of Object.values(b.cards || {})) if (card.factionId === id) {
+    card.factionId = null;
+    links.cards.push(card.id);
+    changed = true;
+  }
   if (changed) await apiPost("/api/board", board);
   changed = false;
   for (const ch of manuscript.chapters || []) {
@@ -159,4 +223,179 @@ export async function detachFaction(id) {
     if (r.count) { ch.content = r.text; changed = true; }
   }
   if (changed) await apiPost("/api/manuscript", manuscript);
+  return links;
+}
+
+// ── Возврат из корзины ──
+// at — где id стоял в списке (порядок в списке — порядок в интерфейсе).
+function addId(list, id, at = -1) {
+  if (!Array.isArray(list)) return [id];
+  if (list.includes(id)) return list;
+  const next = [...list];
+  next.splice(at >= 0 && at <= next.length ? at : next.length, 0, id);
+  return next;
+}
+
+// Ссылка из links: { id, at } или просто id.
+const refOf = (r) => (typeof r === "string" ? { id: r, at: -1 } : r);
+
+function cardsById(board) {
+  const map = new Map();
+  for (const b of boardsOf(board)) for (const card of Object.values(b.cards || {})) map.set(card.id, card);
+  return map;
+}
+
+function pinsOf(map, refs) {
+  return refs.map((r) => (map.maps?.[r.map]?.pins || []).find((p) => p.id === r.pin)).filter(Boolean);
+}
+
+// characters — свежий список персонажей (уже с возвращённым): родня
+// правится прямо в нём, записывает его вызывающий (trash.js).
+export function reattachKin(characters, id, kin = []) {
+  for (const k of kin) {
+    const x = characters.find((c) => c.id === k.id);
+    if (!x) continue;
+    if (k.key === "partnerKind") {
+      x.partnerKinds = { ...(x.partnerKinds || {}), [id]: k.value };
+    } else {
+      x[k.key] = addId(x[k.key], id, k.at);
+    }
+  }
+}
+
+export async function reattachCharacter(id, links = {}) {
+  const [factions, timeline, manuscript, board, map, knowledge] = await Promise.all([
+    apiGet("/api/factions"),
+    apiGet("/api/timeline"),
+    apiGet("/api/manuscript"),
+    apiGet("/api/board"),
+    apiGet("/api/map"),
+    apiGet("/api/knowledge"),
+  ]);
+  const writes = [];
+  if (links.factions?.length) {
+    for (const ref of links.factions) {
+      const f = factions.find((x) => x.id === ref.id);
+      if (!f) continue;
+      if (ref.leader && !f.leaderId) f.leaderId = id;
+      if (ref.member) f.memberIds = addId(f.memberIds, id, ref.at);
+    }
+    writes.push(apiPost("/api/factions", factions));
+  }
+  if (links.timeline?.length) {
+    for (const ref of links.timeline.map(refOf)) {
+      const e = timeline.find((x) => x.id === ref.id);
+      if (e) e.characterIds = addId(e.characterIds, id, ref.at);
+    }
+    writes.push(apiPost("/api/timeline", timeline));
+  }
+  if (links.chapters?.length) {
+    for (const ref of links.chapters.map(refOf)) {
+      const ch = (manuscript.chapters || []).find((x) => x.id === ref.id);
+      if (ch) ch.characterIds = addId(ch.characterIds, id, ref.at);
+    }
+    writes.push(apiPost("/api/manuscript", manuscript));
+  }
+  if (links.cards?.length) {
+    const cards = cardsById(board);
+    for (const ref of links.cards.map(refOf)) {
+      const card = cards.get(ref.id);
+      if (card) card.characterIds = addId(card.characterIds, id, ref.at);
+    }
+    writes.push(apiPost("/api/board", board));
+  }
+  if (links.pins?.length) {
+    for (const p of pinsOf(map, links.pins)) if (!p.characterId) p.characterId = id;
+    writes.push(apiPost("/api/map", map));
+  }
+  if (links.knowledge?.length) {
+    for (const ref of links.knowledge) {
+      const f = (knowledge.facts || []).find((x) => x.id === ref.fact);
+      if (f) f.entries = { ...(f.entries || {}), [id]: ref.value };
+    }
+    writes.push(apiPost("/api/knowledge", knowledge));
+  }
+  await Promise.all(writes);
+}
+
+export async function reattachLocation(id, links = {}) {
+  const [locations, factions, timeline, manuscript, board, map] = await Promise.all([
+    apiGet("/api/locations"),
+    apiGet("/api/factions"),
+    apiGet("/api/timeline"),
+    apiGet("/api/manuscript"),
+    apiGet("/api/board"),
+    apiGet("/api/map"),
+  ]);
+  const writes = [];
+  if (links.children?.length) {
+    for (const l of locations) if (links.children.includes(l.id) && !l.parentId) l.parentId = id;
+    writes.push(apiPost("/api/locations", locations));
+  }
+  if (links.headquarters?.length) {
+    for (const f of factions) if (links.headquarters.includes(f.id) && !f.headquartersId) f.headquartersId = id;
+    writes.push(apiPost("/api/factions", factions));
+  }
+  if (links.timeline?.length) {
+    for (const ref of links.timeline.map(refOf)) {
+      const e = timeline.find((x) => x.id === ref.id);
+      if (e) e.locationIds = addId(e.locationIds, id, ref.at);
+    }
+    writes.push(apiPost("/api/timeline", timeline));
+  }
+  if (links.chapters?.length) {
+    for (const ref of links.chapters.map(refOf)) {
+      const ch = (manuscript.chapters || []).find((x) => x.id === ref.id);
+      if (ch) ch.locationIds = addId(ch.locationIds, id, ref.at);
+    }
+    writes.push(apiPost("/api/manuscript", manuscript));
+  }
+  if (links.cards?.length) {
+    const cards = cardsById(board);
+    for (const cid of links.cards) {
+      const card = cards.get(cid);
+      if (card && !card.locationId) card.locationId = id;
+    }
+    writes.push(apiPost("/api/board", board));
+  }
+  if (links.pins?.length) {
+    for (const p of pinsOf(map, links.pins)) if (!p.locationId) p.locationId = id;
+    writes.push(apiPost("/api/map", map));
+  }
+  await Promise.all(writes);
+}
+
+export async function reattachFaction(id, links = {}) {
+  const [factions, board, map] = await Promise.all([apiGet("/api/factions"), apiGet("/api/board"), apiGet("/api/map")]);
+  const writes = [];
+  if (links.relations && Object.keys(links.relations).length) {
+    const self = factions.find((f) => f.id === id);
+    for (const [otherId, status] of Object.entries(links.relations)) {
+      const other = factions.find((f) => f.id === otherId);
+      if (!other || !self) continue;
+      other.relations = { ...(other.relations || {}), [id]: status };
+      self.relations = { ...(self.relations || {}), [otherId]: status };
+    }
+    writes.push(apiPost("/api/factions", factions));
+  }
+  if (links.cards?.length) {
+    const cards = cardsById(board);
+    for (const cid of links.cards) {
+      const card = cards.get(cid);
+      if (card && !card.factionId) card.factionId = id;
+    }
+    writes.push(apiPost("/api/board", board));
+  }
+  if (links.borders?.length) {
+    for (const ref of links.borders) {
+      const shape = (map.maps?.[ref.map]?.drawing?.shapes || []).find((s) => s.id === ref.shape);
+      if (shape && !shape.factionId) {
+        shape.factionId = id;
+        // Подпись, которую поставили при удалении, снова берётся у фракции.
+        if (ref.named) delete shape.name;
+      }
+    }
+    writes.push(apiPost("/api/map", map));
+  }
+  await Promise.all(writes);
 }

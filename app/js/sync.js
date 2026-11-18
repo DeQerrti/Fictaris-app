@@ -241,6 +241,18 @@ async function putRemoteFile(config, path, base64, sha) {
   return (await res.json()).content.sha;
 }
 
+async function deleteRemoteFile(config, path, sha) {
+  const res = await githubApi(config, `/repos/${config.owner}/${config.repo}/contents/${encodePath(path)}`, {
+    method: "DELETE",
+    body: { message: "Синхронизация Fictaris: удаление", sha },
+  });
+  // 404 — файла там уже нет, удалять нечего.
+  if (!res.ok && res.status !== 404) {
+    const data = await res.json().catch(() => ({}));
+    throw new SyncError(data.message || i18n("Не получилось удалить файл в репозитории: {path}", { path }));
+  }
+}
+
 // ── Хеш содержимого ──────────────────────────────
 // Не для защиты, а для короткого и быстрого сравнения «то же самое
 // или нет» — SHA-256 из Web Crypto есть везде, где есть этот код.
@@ -253,17 +265,28 @@ async function contentHash(base64) {
 // ── Один файл: решить, что с ним делать, и сделать ─
 // localBase64 === null — файла здесь нет, он есть только в репозитории
 // (картинка, добавленная на другом устройстве): забираем.
-async function syncOne(config, path, localBase64, entry, remoteSha) {
+//
+// Удаления. Картинка, которая уже была синхронизирована (есть entry), а
+// теперь пропала с одной стороны, при неизменной другой стороне —
+// удалена: удаляем и там. Раньше её просто возвращали обратно, и удалить
+// картинку насовсем было нельзя. Если же другая сторона успела её
+// изменить — правка важнее удаления, картинка возвращается.
+async function syncOne(config, path, localBase64, entry, remoteSha, kind) {
   const remote = remoteSha ? { sha: remoteSha, _b64: undefined } : null;
   const loadRemote = async () => {
     remote._b64 ??= await getRemoteBlob(config, remote.sha, path);
     return remote._b64;
   };
   if (localBase64 === null) {
-    if (!remote) return { action: "none" };
+    if (!remote) return { action: "forget" };
+    if (entry && entry.sha === remote.sha) {
+      await deleteRemoteFile(config, path, remote.sha);
+      return { action: "delete-remote" };
+    }
     return { action: "pull", base64: await loadRemote(), sha: remote.sha };
   }
   const localHash = await contentHash(localBase64);
+  if (kind === "images" && !remote && entry && entry.hash === localHash) return { action: "delete-local" };
 
   const localChanged = !entry || entry.hash !== localHash;
   const remoteChanged = !entry || !remote || entry.sha !== remote.sha;
@@ -296,12 +319,14 @@ async function syncOne(config, path, localBase64, entry, remoteSha) {
 }
 
 // ── Полная синхронизация ────────────────────────
-// Возвращает { pushed, pulled, skipped, conflicts, pulledFiles, pulledImages }.
+// Возвращает { pushed, pulled, skipped, conflicts, pulledFiles, pulledImages, deletedImages }.
+// deletedImages — картинки, удалённые на другом устройстве: их стирает
+// /api/restore-backup (поле deletedImages).
 export async function runSync(config, onProgress) {
   const state = getSyncState();
   const backup = await (await fetch("/api/export-backup")).json();
 
-  const result = { pushed: 0, pulled: 0, skipped: 0, conflicts: [], pulledFiles: {}, pulledImages: {} };
+  const result = { pushed: 0, pulled: 0, skipped: 0, conflicts: [], pulledFiles: {}, pulledImages: {}, deletedImages: [] };
 
   const items = [
     ...Object.entries(backup.files).map(([path, value]) => ({
@@ -318,14 +343,27 @@ export async function runSync(config, onProgress) {
   for (const path of remoteTree.keys()) {
     if (/^maps\/[\w.-]+\.(jpe?g|png|webp)$/i.test(path) && !localImages.has(path)) items.push({ kind: "images", path, base64: null });
   }
+  // Удалена и здесь, и там — просто забыть о ней.
+  for (const path of Object.keys(state.images)) {
+    if (!localImages.has(path) && !remoteTree.has(path)) delete state.images[path];
+  }
 
   let done = 0;
   for (const item of items) {
     onProgress?.(++done, items.length, item.path);
     const entry = state[item.kind][item.path];
-    const outcome = await syncOne(config, item.path, item.base64, entry, remoteTree.get(item.path) || null);
+    const outcome = await syncOne(config, item.path, item.base64, entry, remoteTree.get(item.path) || null, item.kind);
 
-    if (outcome.action === "none") {
+    if (outcome.action === "forget") {
+      delete state[item.kind][item.path];
+    } else if (outcome.action === "delete-remote") {
+      result.pushed++;
+      delete state[item.kind][item.path];
+    } else if (outcome.action === "delete-local") {
+      result.pulled++;
+      delete state[item.kind][item.path];
+      result.deletedImages.push(item.path);
+    } else if (outcome.action === "none") {
       result.skipped++;
       if (outcome.hash) state[item.kind][item.path] = { hash: outcome.hash, sha: outcome.sha };
     } else if (outcome.action === "push") {
@@ -366,12 +404,16 @@ export async function resolveConflict(config, conflict, choice) {
   return conflict.kind === "images" ? conflict.remote.base64 : JSON.parse(base64ToText(conflict.remote.base64));
 }
 
-async function pullPayload(files, images) {
-  if (!Object.keys(files).length && !Object.keys(images).length) return;
+export function hasPulled(result) {
+  return Boolean(Object.keys(result.pulledFiles || {}).length || Object.keys(result.pulledImages || {}).length || result.deletedImages?.length);
+}
+
+async function pullPayload(result) {
+  if (!hasPulled(result)) return;
   await fetch("/api/restore-backup", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ format: "fictaris-backup", files, images }),
+    body: JSON.stringify({ format: "fictaris-backup", files: result.pulledFiles, images: result.pulledImages, deletedImages: result.deletedImages }),
   });
 }
 
@@ -413,10 +455,10 @@ async function runAutoSync() {
     // копией из памяти.
     await window.__flushPendingSaves?.();
     const result = await runSync(config);
-    await pullPayload(result.pulledFiles, result.pulledImages);
+    await pullPayload(result);
     // Забрали что-то с другого устройства — открытый раздел перечитывает
     // данные (main.js), чтобы не писать поверх них то, что в памяти.
-    if (Object.keys(result.pulledFiles || {}).length || Object.keys(result.pulledImages || {}).length) {
+    if (hasPulled(result)) {
       document.dispatchEvent(new CustomEvent("fictaris:data-replaced"));
     }
   } catch {

@@ -2,7 +2,7 @@ import { apiGet, apiPost, uid } from "./api.js";
 import { debounceSave } from "./save-badge.js";
 import { escapeHtml, buildEmptyState } from "./chips.js";
 import { safeImagePath } from "./sanitize.js";
-import { pushTrash } from "./trash.js";
+import { pushTrash, addTrashLinks } from "./trash.js";
 import { detachLocation } from "./cascade.js";
 import { LOCATION_TYPES, locationTypeInfo, factionTypeInfo, iconSvg } from "./icons.js";
 import { loadTagsMap, buildTagsField, parseTags } from "./tags.js";
@@ -528,14 +528,15 @@ function buildPage(loc) {
   delBtn.className = "btn danger";
   delBtn.innerHTML = `${iconSvg("trash", 14)}<span>${escapeHtml(i18n("Удалить"))}</span>`;
   delBtn.addEventListener("click", async () => {
-    await pushTrash("location", loc);
+    const children = locations.filter((l) => l.parentId === loc.id).map((l) => l.id);
+    const trashId = await pushTrash("location", loc, { children });
     locations = locations.filter((x) => x.id !== loc.id);
     // Дети удалённой локации не исчезают вместе с ней — поднимаются на
     // верхний уровень, а не остаются висеть на несуществующем parentId.
     for (const l of locations) if (l.parentId === loc.id) l.parentId = null;
     activeId = null;
     persist();
-    await detachLocation(loc.id);
+    await addTrashLinks(trashId, await detachLocation(loc.id));
     if (inModal) closeEntityModal();
     else draw();
   });

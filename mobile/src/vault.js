@@ -9,11 +9,14 @@
 //  в поведении — тот же приём, что у TasteID (mobile/src/vault.js).
 //
 //  Под ним не node:fs, а файловая система телефона через Capacitor.
-//  Папка — Documents/Fictaris внутри данных приложения. Записи через
-//  временный файл с переименованием здесь нет (Capacitor не обещает
-//  атомарности поверх SAF на Android), зато .history пишется ДО
-//  перезаписи, так что прошлая версия уже лежит рядом, даже если
-//  запись оборвётся на середине.
+//  Папка — Fictaris внутри данных приложения (Directory.Data). Запись —
+//  как на компьютере: сначала во временный «имя.tmp», потом
+//  переименование поверх. Раньше файл писался прямо на место, и если
+//  телефон выключался или система убивала приложение посреди записи,
+//  оставался обрезанный JSON — раздел не открывался. Если сбой придётся
+//  между удалением старого файла и переименованием (Capacitor на Android
+//  делает так), readJson подберёт целый «имя.tmp». .history по-прежнему
+//  пишется до перезаписи.
 // ══════════════════════════════════════════════
 
 import { Filesystem, Directory, Encoding } from "@capacitor/filesystem";
@@ -68,6 +71,10 @@ export class MobileVault {
 
   async readJson(name, fallback) {
     if (!isAllowedFile(name)) throw new Error(`Неизвестный файл: ${name}`);
+    if (!(await exists(this.path(name)))) {
+      const recovered = await this.#recoverTmp(name);
+      if (recovered !== undefined) return recovered;
+    }
     try {
       const { data } = await Filesystem.readFile({ path: this.path(name), directory: DIR, encoding: Encoding.UTF8 });
       return JSON.parse(data);
@@ -103,7 +110,25 @@ export class MobileVault {
     const previous = await this.#readRaw(name);
     if (previous === body) return data; // ничего не изменилось
     if (previous !== null) await this.#archive(name, previous, forceArchive);
-    await Filesystem.writeFile({ path: this.path(name), directory: DIR, data: body, encoding: Encoding.UTF8 });
+    const tmp = this.path(`${name}.tmp`);
+    await Filesystem.writeFile({ path: tmp, directory: DIR, data: body, encoding: Encoding.UTF8 });
+    await Filesystem.rename({ from: tmp, to: this.path(name), directory: DIR, toDirectory: DIR });
+    return data;
+  }
+
+  // Основного файла нет, а «имя.tmp» целый — запись оборвалась на
+  // переименовании. Возвращает данные (и ставит файл на место) или
+  // undefined, если подбирать нечего.
+  async #recoverTmp(name) {
+    const tmp = this.path(`${name}.tmp`);
+    let data;
+    try {
+      const res = await Filesystem.readFile({ path: tmp, directory: DIR, encoding: Encoding.UTF8 });
+      data = JSON.parse(res.data);
+    } catch {
+      return undefined;
+    }
+    await Filesystem.rename({ from: tmp, to: this.path(name), directory: DIR, toDirectory: DIR }).catch(() => {});
     return data;
   }
 
@@ -249,6 +274,11 @@ export class MobileVault {
   async writeImage(relPath, base64) {
     await ensureDir(`${this.root}/maps`);
     await Filesystem.writeFile({ path: `${this.root}/${this.#imagePath(relPath)}`, directory: DIR, data: base64 });
+  }
+
+  async deleteImage(relPath) {
+    if (!/\.(jpe?g|png|webp)$/i.test(relPath)) throw new Error(`Недопустимый путь изображения: ${relPath}`);
+    await Filesystem.deleteFile({ path: `${this.root}/${this.#imagePath(relPath)}`, directory: DIR });
   }
 
   // Удаление проекта на телефоне — настоящее стирание файлов, а не
