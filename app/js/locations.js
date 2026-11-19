@@ -4,6 +4,7 @@ import { escapeHtml, buildEmptyState } from "./chips.js";
 import { safeImagePath } from "./sanitize.js";
 import { pushTrash, addTrashLinks } from "./trash.js";
 import { detachLocation } from "./cascade.js";
+import { routesForLocation, speedsOf, fmtKm, fmtDays } from "./map-routes.js";
 import { LOCATION_TYPES, locationTypeInfo, factionTypeInfo, iconSvg } from "./icons.js";
 import { loadTagsMap, buildTagsField, parseTags } from "./tags.js";
 import { buildNameGeneratorButton } from "./name-generator.js";
@@ -618,6 +619,16 @@ function buildPage(loc) {
   addInside.textContent = i18n("+ Место внутри");
   addInside.addEventListener("click", () => addWithTemplate(loc.templateId, loc.id));
   side.appendChild(addInside);
+
+  // Пути с карт, которые начинаются или кончаются здесь (map-routes.js).
+  const trips = routesForLocation(mapData, loc.id);
+  if (trips.length) {
+    side.appendChild(sectionHeading(i18n("Отсюда добираться")));
+    const speeds = speedsOf(mapData);
+    for (const t of trips.slice(0, 8)) {
+      side.appendChild(buildLinkRow(iconLead(iconSvg("route", 13)), t.other, `${fmtKm(t.km)} · ${speeds.slice(0, 2).map((s) => `${fmtDays(t.km, s.km)} ${s.name.toLowerCase()}`).join(" · ")}`));
+    }
+  }
 
   side.appendChild(sectionHeading(i18n("Главы")));
   for (const ch of info.chapters) {

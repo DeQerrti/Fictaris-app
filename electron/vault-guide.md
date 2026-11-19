@@ -113,6 +113,8 @@
 
 Метка: `id`, `x`, `y` – **проценты** (0–100) от ширины/высоты карты (картинки или холста рисунка), `label`, `note`, `characterId`, `locationId`, `linkedMapId` (переход на вложенную карту из `maps`) – id или `null`. `rootIds` – карты верхнего уровня.
 
+Пути и масштаб: у карты `scale: { km, px }` – `km` километров на `px` пикселей карты (картинки или холста рисунка); `routes: [{ id, name?, fromPinId, toPinId, points: [[x, y], ...], len }]` – сохранённые пути, точки в **процентах** (как метки), `len` – длина в пикселях карты, `fromPinId`/`toPinId` – метки на концах или `null`. В корне `map.json` – `travelSpeeds: [{ name, km }]` (км в день) – скорости передвижения мира, нет поля – стандартные.
+
 ### knowledge.json – кто что знает
 ```
 { "facts": [ { "id", "label", "note", "entries": { "<characterId>": "<chapterId>" | "__start__" } } ] }

@@ -1,4 +1,5 @@
 import { overlayOpen } from "./overlay.js";
+import { speedsOf, pxLength, kmOf, fmtKm, fmtDays, nearestPin, routeColor, routeName, routesSvgInner } from "./map-routes.js";
 import { apiGet, apiPost, uid } from "./api.js";
 import { debounceSave } from "./save-badge.js";
 import { characterSelect, escapeHtml, buildEmptyState } from "./chips.js";
@@ -35,6 +36,11 @@ let editPinId = null; // метка, открытая в окне правки
 let placingLocationId = null; // место из «Не отмечены», которое ставим щелчком
 let query = "";
 let container = null;
+// Линейка: точки в процентах карты; rulerOn — щелчки по карте ставят точки.
+let rulerOn = false;
+let ruler = [];
+let activeRouteId = null;
+let stageSize = null; // размер карты в пикселях — для длины пути (map-routes.js)
 // Масштаб и сдвиг каждой карты — только на время работы, в данных не
 // хранится: { zoom, x, y } в пикселях экрана.
 const views = new Map();
@@ -65,12 +71,13 @@ const LAYERS = [
   ["people", "Персонажи"],
   ["other", "Прочие метки"],
   ["labels", "Подписи"],
+  ["routes", "Пути"],
 ];
 function readLayers() {
   try {
-    return { places: true, people: true, other: true, labels: true, ...JSON.parse(localStorage.getItem(LAYERS_KEY) || "{}") };
+    return { places: true, people: true, other: true, labels: true, routes: true, ...JSON.parse(localStorage.getItem(LAYERS_KEY) || "{}") };
   } catch {
-    return { places: true, people: true, other: true, labels: true };
+    return { places: true, people: true, other: true, labels: true, routes: true };
   }
 }
 let layers = readLayers();
@@ -534,6 +541,31 @@ function buildStage() {
   previewSvg.classList.add("map-drawing-preview");
   if (editing) world.appendChild(previewSvg);
 
+  // Пути и линейка — над рисунком, под метками.
+  const routeSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  routeSvg.classList.add("map-routes");
+  routeSvg.setAttribute("viewBox", "0 0 100 100");
+  routeSvg.setAttribute("preserveAspectRatio", "none");
+  world.appendChild(routeSvg);
+  const rulerDots = document.createElement("div");
+  rulerDots.className = "map-ruler-dots";
+  world.appendChild(rulerDots);
+  const paintRoutes = () => {
+    routeSvg.innerHTML = routesSvgInner(layers.routes && !editing ? cm.routes : [], editing ? [] : ruler, activeRouteId);
+    rulerDots.innerHTML = editing ? "" : ruler.map((p) => `<span class="map-ruler-pt" style="left:${p[0]}%;top:${p[1]}%"></span>`).join("");
+    const last = ruler[ruler.length - 1];
+    if (!editing && last && ruler.length > 1 && stageSize) {
+      const km = kmOf(pxLength(ruler, stageSize.w, stageSize.h), cm.scale);
+      const tag = document.createElement("span");
+      tag.className = "map-ruler-tag";
+      tag.style.left = `${last[0]}%`;
+      tag.style.top = `${last[1]}%`;
+      const speed = speedsOf(map)[0];
+      tag.textContent = km == null ? i18n("задайте масштаб справа") : `${fmtKm(km)} · ${fmtDays(km, speed.km)} ${speed.name.toLowerCase()}`;
+      rulerDots.appendChild(tag);
+    }
+  };
+
   const markers = new Map();
   for (const pin of cm.pins) {
     if (!layers[pinKind(pin)]) continue;
@@ -610,6 +642,9 @@ function buildStage() {
   // нарисуют (до первой фигуры в данных его нет).
   const start = (w, h) => {
     size = { w, h };
+    stageSize = size;
+    paintRoutes();
+    if (rulerOn || ruler.length || activeRouteId) refreshSide();
     if (editing && !cm.drawing) cm.drawing = blankDrawing(w, h);
     const drawing = cm.drawing;
     if (drawing) {
@@ -737,8 +772,15 @@ function buildStage() {
     pointers.delete(e.pointerId);
     if (pointers.size < 2) pinch = null;
     if (pan && !pan.moved && e.type === "pointerup" && !editing) {
-      // Простой щелчок по карте: ставим выбранное место или снимаем выбор.
-      if (placingLocationId) {
+      // Простой щелчок по карте: точка линейки, выбранное место или снять выбор.
+      if (rulerOn) {
+        const p = onImage(e.clientX, e.clientY);
+        if (p) {
+          ruler.push([p.x, p.y]);
+          paintRoutes();
+          refreshSide();
+        }
+      } else if (placingLocationId) {
         const p = onImage(e.clientX, e.clientY);
         if (p) addLocationPin(placingLocationId, p.x, p.y);
       } else if (activePinId) {
@@ -759,6 +801,15 @@ function buildStage() {
   });
   stage.addEventListener("dblclick", (e) => {
     if (!view || editing || e.target.closest(".map-marker, .map-popup, .map-zoom")) return;
+    // Линейка: двойной щелчок заканчивает путь (вторая точка щелчка — лишняя).
+    if (rulerOn) {
+      if (ruler.length > 1) ruler.pop();
+      rulerOn = false;
+      stage.classList.remove("ruler-on");
+      paintRoutes();
+      refreshSide();
+      return;
+    }
     const p = onImage(e.clientX, e.clientY);
     if (p) addPin(p.x, p.y);
   });
@@ -839,6 +890,13 @@ function buildStage() {
     zoomBtn("+", i18n("Увеличить"), () => center(1.25)),
     zoomBtn(iconSvg("focus", 14), i18n("Вписать"), fit),
   );
+  if (!editing) {
+    const rulerBtn = zoomBtn(iconSvg("route", 15), i18n("Линейка (M): щелчки – точки пути, двойной щелчок – конец"), () => toggleRuler());
+    rulerBtn.classList.toggle("active", rulerOn);
+    rulerBtn.classList.add("map-ruler-btn");
+    zoomBar.appendChild(rulerBtn);
+  }
+  if (rulerOn) stage.classList.add("ruler-on");
   stage.appendChild(zoomBar);
 
   const hint = document.createElement("div");
@@ -851,6 +909,7 @@ function buildStage() {
   stage.appendChild(hint);
 
   stageApi = {
+    paintRoutes,
     centerOn(pin) {
       if (!size || !view) return;
       const r = stage.getBoundingClientRect();
@@ -974,6 +1033,8 @@ function buildSide() {
 
   if (cm.drawing?.shapes.length) side.appendChild(buildDrawLayerToggles(() => draw()));
 
+  side.appendChild(buildRouteSide(cm));
+
   let lists = buildSideLists(cm);
   side.appendChild(lists);
 
@@ -1070,6 +1131,183 @@ document.addEventListener("keydown", (e) => {
     }
   } else if (e.key === "Escape") {
     workshop.deselect();
+  }
+});
+
+// ── Линейка и пути ─────────────────────────────
+function toggleRuler(on = !rulerOn) {
+  rulerOn = on;
+  if (on) {
+    ruler = [];
+    activeRouteId = null;
+  }
+  draw();
+}
+
+function refreshSide() {
+  const side = container?.querySelector(".map-side");
+  if (side) side.replaceWith(buildSide());
+}
+
+// Карточка линейки и путей в боковой колонке просмотра.
+function buildRouteSide(cm) {
+  const wrap = document.createElement("div");
+  wrap.className = "map-route-side";
+  const speeds = speedsOf(map);
+  const modes = (km) => speeds.map((s) => `<div class="map-route-mode"><span>${escapeHtml(s.name)} <small>${s.km} ${escapeHtml(i18n("км/день"))}</small></span><b>${escapeHtml(fmtDays(km, s.km))}</b></div>`).join("");
+
+  if (rulerOn || ruler.length) {
+    wrap.appendChild(sectionHeading(i18n("Линейка")));
+    const card = document.createElement("div");
+    card.className = "map-route-card";
+    const len = stageSize ? pxLength(ruler, stageSize.w, stageSize.h) : 0;
+    const km = kmOf(len, cm.scale);
+    const a = ruler.length ? nearestPin(cm.pins, ruler[0]) : null;
+    const b = ruler.length > 1 ? nearestPin(cm.pins, ruler[ruler.length - 1]) : null;
+    card.innerHTML = `<div class="map-route-title"></div>${ruler.length < 2
+      ? `<p class="map-route-hint">${escapeHtml(i18n("Щёлкайте по карте – точки пути. Двойной щелчок – конец."))}</p>`
+      : km == null ? "" : `<div class="map-route-km">${escapeHtml(fmtKm(km))}</div>${modes(km)}`}`;
+    card.querySelector(".map-route-title").textContent = a || b ? `${a?.label || "…"} → ${b?.label || "…"}` : i18n("Новый путь");
+    const actions = document.createElement("div");
+    actions.className = "map-route-actions";
+    if (ruler.length > 1) {
+      const saveBtn = document.createElement("button");
+      saveBtn.className = "btn primary";
+      saveBtn.textContent = i18n("Сохранить как путь");
+      saveBtn.addEventListener("click", () => {
+        cm.routes = cm.routes || [];
+        const r = { id: uid(), points: ruler.map((p) => [Math.round(p[0] * 100) / 100, Math.round(p[1] * 100) / 100]), len: Math.round(len), fromPinId: a?.id || null, toPinId: b?.id || null };
+        cm.routes.push(r);
+        ruler = [];
+        rulerOn = false;
+        activeRouteId = r.id;
+        persist();
+        draw();
+      });
+      actions.appendChild(saveBtn);
+    }
+    const reset = document.createElement("button");
+    reset.className = "btn";
+    reset.textContent = rulerOn ? i18n("Готово") : i18n("Сбросить");
+    reset.addEventListener("click", () => {
+      if (rulerOn && ruler.length > 1) { rulerOn = false; draw(); return; }
+      ruler = [];
+      rulerOn = false;
+      draw();
+    });
+    actions.appendChild(reset);
+    card.appendChild(actions);
+    wrap.appendChild(card);
+  }
+
+  // Масштаб карты
+  const scaleRow = document.createElement("label");
+  scaleRow.className = "map-scale-row";
+  scaleRow.innerHTML = `<span></span><input type="number" min="0" step="any" class="map-scale-input"><span>${escapeHtml(i18n("км"))}</span>`;
+  scaleRow.querySelector("span").textContent = i18n("Ширина карты");
+  const scaleInput = scaleRow.querySelector("input");
+  if (cm.scale?.km && cm.scale?.px && stageSize) scaleInput.value = String(Math.round((cm.scale.km * stageSize.w) / cm.scale.px * 10) / 10);
+  scaleInput.placeholder = i18n("не задана");
+  scaleInput.addEventListener("change", () => {
+    const v = Number(scaleInput.value);
+    if (v > 0 && stageSize) cm.scale = { km: v, px: stageSize.w };
+    else delete cm.scale;
+    persist();
+    stageApi?.paintRoutes();
+    refreshSide();
+  });
+
+  const routes = cm.routes || [];
+  if (routes.length || rulerOn || ruler.length || cm.scale) {
+    if (routes.length) wrap.appendChild(sectionHeading(i18n("Пути на этой карте")));
+    routes.forEach((r, i) => {
+      const km = kmOf(r.len, cm.scale);
+      const row = document.createElement("div");
+      row.className = "map-route-row" + (r.id === activeRouteId ? " active" : "");
+      row.style.setProperty("--route-color", routeColor(i));
+      row.innerHTML = `<i></i><div><b></b><span></span></div><button class="fac-member-remove" title="${escapeHtml(i18n("Удалить путь"))}">${iconSvg("close", 11)}</button>`;
+      row.querySelector("b").textContent = routeName(r, cm.pins);
+      row.querySelector("span").textContent = km == null ? i18n("масштаб не задан") : `${fmtKm(km)} · ${speeds.slice(0, 2).map((s) => `${fmtDays(km, s.km)} ${s.name.toLowerCase()}`).join(" · ")}`;
+      row.addEventListener("click", (e) => {
+        if (e.target.closest("button")) return;
+        activeRouteId = activeRouteId === r.id ? null : r.id;
+        if (!layers.routes) {
+          layers = { ...layers, routes: true };
+          writePref(LAYERS_KEY, JSON.stringify(layers));
+        }
+        draw();
+      });
+      row.querySelector("button").addEventListener("click", () => {
+        cm.routes = routes.filter((x) => x.id !== r.id);
+        if (!cm.routes.length) delete cm.routes;
+        if (activeRouteId === r.id) activeRouteId = null;
+        persist();
+        draw();
+      });
+      wrap.appendChild(row);
+    });
+    wrap.appendChild(scaleRow);
+    wrap.appendChild(buildSpeeds());
+  } else {
+    const hint = document.createElement("button");
+    hint.className = "btn map-ruler-start";
+    hint.innerHTML = `${iconSvg("route", 14)}<span></span>`;
+    hint.querySelector("span").textContent = i18n("Измерить расстояние");
+    hint.title = i18n("Линейка (M)");
+    hint.addEventListener("click", () => toggleRuler(true));
+    wrap.appendChild(hint);
+  }
+  return wrap;
+}
+
+// Скорости передвижения мира: название и км в день.
+function buildSpeeds() {
+  const box = document.createElement("details");
+  box.className = "map-speeds";
+  box.innerHTML = `<summary></summary>`;
+  box.querySelector("summary").textContent = i18n("Скорости передвижения");
+  const list = speedsOf(map).map((s) => ({ ...s }));
+  const commit = () => {
+    map.travelSpeeds = list.filter((s) => s.name.trim() && Number(s.km) > 0).map((s) => ({ name: s.name.trim(), km: Number(s.km) }));
+    persist();
+    stageApi?.paintRoutes();
+  };
+  const paint = () => {
+    box.querySelectorAll(".map-speed").forEach((x) => x.remove());
+    box.querySelector(".map-speed-add")?.remove();
+    list.forEach((s, i) => {
+      const row = document.createElement("div");
+      row.className = "map-speed";
+      row.innerHTML = `<input class="map-speed-name"><input type="number" min="1" class="map-speed-km"><small>${escapeHtml(i18n("км/день"))}</small><button class="fac-member-remove">${iconSvg("close", 11)}</button>`;
+      const [name, km] = row.querySelectorAll("input");
+      name.value = s.name;
+      km.value = s.km;
+      name.addEventListener("change", () => { s.name = name.value; commit(); });
+      km.addEventListener("change", () => { s.km = Number(km.value); commit(); });
+      row.querySelector("button").addEventListener("click", () => { list.splice(i, 1); commit(); paint(); });
+      box.appendChild(row);
+    });
+    const add = document.createElement("button");
+    add.className = "pg-add map-speed-add";
+    add.textContent = i18n("+ Способ – например, «Грифон – 200»");
+    add.addEventListener("click", () => { list.push({ name: i18n("Новый способ"), km: 50 }); commit(); paint(); });
+    box.appendChild(add);
+  };
+  paint();
+  return box;
+}
+
+// M — линейка в просмотре карты.
+document.addEventListener("keydown", (e) => {
+  if (!container?.isConnected || !stack.length || mode === "workshop" || editPinId) return;
+  if (e.target.closest?.("input, textarea, select, [contenteditable]") || overlayOpen()) return;
+  if (e.code === "KeyM" && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    e.preventDefault();
+    toggleRuler();
+  } else if (e.key === "Escape" && (rulerOn || ruler.length)) {
+    rulerOn = false;
+    ruler = [];
+    draw();
   }
 });
 
