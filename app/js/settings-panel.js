@@ -7,7 +7,8 @@ import { escapeHtml } from "./chips.js";
 import { iconSvg } from "./icons.js";
 import { defaultLabels, saveLabels, resetLabels } from "./labels.js";
 import { getHiddenTabs, setTabHidden, getTabOrder, setTabOrder, TAB_SECTIONS } from "./visibility.js";
-import { captureKey, saveShortcut, clearShortcut, navOrder } from "./shortcuts.js";
+import { captureKey, saveShortcut, clearShortcut, navOrder, navKey } from "./shortcuts.js";
+import { loadEntries } from "./sections.js";
 import {
   getSyncConfig,
   saveSyncConfig,
@@ -378,7 +379,7 @@ async function renderSectionsBody(body) {
   const settings = await apiGet("/api/site-settings").catch(() => ({}));
   const custom = settings.keyBindings?.nav || {};
   // Цифры — по тому порядку, что сейчас в сайдбаре (без скрытых).
-  const digits = () => new Map(navOrder().slice(0, 9).map((btn, i) => [btn.dataset.module, String(i + 1)]));
+  const digits = () => new Map(navOrder().slice(0, 9).map((btn, i) => [navKey(btn), String(i + 1)]));
 
   const keyCells = new Map();
   const refreshDigits = () => {
@@ -419,6 +420,29 @@ async function renderSectionsBody(body) {
       container.appendChild(row);
     }
     body.appendChild(container);
+  }
+
+  // Свои разделы мира: клавиша — по ключу «section:<id>». Название,
+  // значок и удаление — в меню «⋯» самого раздела.
+  const own = await loadEntries();
+  if (own.sections.length) {
+    const head = document.createElement("div");
+    head.className = "labels-group-header";
+    head.innerHTML = `<span class="labels-group-name"></span>`;
+    head.firstChild.textContent = i18n("Свои разделы мира");
+    body.appendChild(head);
+    const grid = document.createElement("div");
+    grid.className = "labels-grid";
+    for (const s of own.sections) {
+      const row = document.createElement("div");
+      row.className = "label-row label-row-static";
+      row.innerHTML = `<span class="label-row-drag"></span><span class="label-row-eye">${iconSvg(s.icon || "folder", 15)}</span><span class="label-row-text"></span>`;
+      row.querySelector(".label-row-text").textContent = s.name || i18n("Без названия");
+      row.title = i18n("Название, значок и цвет меняются в самом разделе – кнопка «⋯» в его шапке");
+      row.appendChild(buildKeyCell(`section:${s.id}`, custom, keyCells));
+      grid.appendChild(row);
+    }
+    body.appendChild(grid);
   }
 
   const header = document.createElement("div");

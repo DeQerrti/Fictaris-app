@@ -1629,4 +1629,6 @@ export const EN_DICT = {
   "Это не файл отзыва Fictaris.": "This is not a Fictaris feedback file.",
   "Читатель": "Reader",
   "Это не файл .docx.": "This is not a .docx file.",
+  "Свои разделы мира": "Custom world sections",
+  "Название, значок и цвет меняются в самом разделе – кнопка «⋯» в его шапке": "Name, icon and color are changed in the section itself – the “⋯” button in its header",
 };

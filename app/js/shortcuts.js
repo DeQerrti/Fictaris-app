@@ -38,6 +38,15 @@ export function initShortcuts(onOpenModule) {
 
     for (const [module, binding] of Object.entries(customBindings)) {
       if (matches(e, binding)) {
+        // Свой раздел мира — ключ «section:<id>» (sections.js).
+        if (module.startsWith("section:")) {
+          const id = module.slice(8);
+          if (document.querySelector(`.sb-custom-tile[data-section-id="${CSS.escape(id)}"]`)) {
+            e.preventDefault();
+            onOpenModule("section", id);
+          }
+          return;
+        }
         // Скрытый в Настройках раздел клавишей не открываем. У Проверки,
         // Корзины и Настроек своего пункта в списке нет — для них клавиша
         // работает всегда.
@@ -56,16 +65,23 @@ export function initShortcuts(onOpenModule) {
       const btn = visible[Number(digitMatch[1]) - 1];
       if (btn) {
         e.preventDefault();
-        onOpenModule(btn.dataset.module);
+        if (btn.dataset.sectionId) onOpenModule("section", btn.dataset.sectionId);
+        else onOpenModule(btn.dataset.module);
       }
     }
   });
 }
 
 // Разделы в том порядке, в каком они стоят в сайдбаре, без скрытых —
-// по нему цифры 1—9 (и подписи цифр в Настройках).
+// по нему цифры 1—9 (и подписи цифр в Настройках). Свои разделы мира
+// (плитки после встроенных в «Мире») тоже получают свою цифру.
 export function navOrder() {
-  return Array.from(document.querySelectorAll(".sidebar .nav-item[data-module]:not(.nav-item-hidden)"));
+  return Array.from(document.querySelectorAll(".sidebar .nav-item[data-module]:not(.nav-item-hidden), .sidebar .sb-custom-tile[data-section-id]"));
+}
+
+// Ключ раздела для клавиш: модуль или «section:<id>» для своего раздела.
+export function navKey(btn) {
+  return btn.dataset.sectionId ? `section:${btn.dataset.sectionId}` : btn.dataset.module;
 }
 
 export async function loadShortcuts() {

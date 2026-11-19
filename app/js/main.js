@@ -210,7 +210,7 @@ initSearch((module, focusId) => {
   if (module === "knowledge") return openEntityModal("knowledge", focusId);
   return openModule(module, focusId);
 });
-initShortcuts((module) => openModule(module));
+initShortcuts((module, arg) => openModule(module, arg));
 initA11y();
 
 initEntityModal(MODULES);
