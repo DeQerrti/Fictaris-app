@@ -4927,3 +4927,25 @@ input[type="color"]:focus-visible,
 .map-speed-km { width: 60px; }
 .map-speed small { color: var(--text-faint); white-space: nowrap; }
 .map-ruler-start { margin-top: 12px; display: inline-flex; align-items: center; gap: 6px; }
+
+/* ── Комментарии ── */
+.re-comment { background: color-mix(in srgb, var(--accent) 18%, transparent); border-bottom: 2px solid color-mix(in srgb, var(--accent) 70%, transparent); cursor: pointer; border-radius: 2px; }
+.re-comment.resolved { background: none; border-bottom: 1px dotted var(--border); }
+.re-comment.flash { background: color-mix(in srgb, var(--accent) 45%, transparent); }
+.cm-thread { width: 320px; padding: 8px 10px; display: flex; flex-direction: column; gap: 8px; }
+.cm-quote { font-family: var(--font-book); font-style: italic; color: var(--text-dim); font-size: 0.86rem; border-left: 2px solid var(--accent); padding-left: 8px; }
+.cm-msg-head { display: flex; justify-content: space-between; font-size: 0.74rem; color: var(--text-faint); }
+.cm-msg-head b { color: var(--text); font-weight: 600; }
+.cm-msg-text { font-size: 0.86rem; white-space: pre-wrap; }
+.cm-input { resize: vertical; min-height: 54px; }
+.cm-actions { display: flex; gap: 6px; justify-content: flex-end; }
+.cm-actions .btn { padding: 4px 10px; font-size: 0.78rem; display: inline-flex; align-items: center; }
+.cm-list { display: flex; flex-direction: column; gap: 6px; }
+.cm-row { display: flex; flex-direction: column; gap: 2px; text-align: left; padding: 7px 9px; border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 7px; background: var(--panel); color: var(--text); font: inherit; font-size: 0.8rem; cursor: pointer; }
+.cm-row:hover { background: var(--panel-alt); }
+.cm-row.resolved { border-left-color: var(--border); opacity: 0.6; }
+.cm-row.loose { border-left-style: dashed; }
+.cm-row-head { display: flex; justify-content: space-between; gap: 6px; font-size: 0.72rem; }
+.cm-row-head i { font-style: normal; color: var(--text-faint); }
+.cm-row-text { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.cm-row-quote { font-family: var(--font-book); font-style: italic; color: var(--text-faint); font-size: 0.74rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -43,6 +43,9 @@ function renderLine(line, ctx) {
   }
   s = s.replace(ENTITY_LINK_RE, (m, kind, id, shown) => put(linkHtml(kind, id, shown, ctx)));
   s = s.replace(/\[\[note:([\w-]+)\]\]/g, (m, id) => put(stickyHtml(id)));
+  // Комментарий к фрагменту (comments.js): подсветка вокруг текста.
+  s = s.replace(/\[\[c:([\w-]+)\]\]/g, (m, id) => put(`<span class="re-comment${ctx.resolved?.has(id) ? " resolved" : ""}" data-comment-id="${escapeHtml(id)}">`));
+  s = s.replace(/\[\[\/c\]\]/g, () => put("</span>"));
   let html = applyInlineMarkupHtml(escapeHtml(s));
   html = html.replace(/[-]/g, (ch) => tokens[ch.charCodeAt(0) - PH_BASE] ?? "");
   return html;
@@ -122,6 +125,11 @@ function inlineText(node, active) {
     return el.dataset.plain === "1" && form === name ? `@${name}` : `@[${name}|${form}]`;
   }
   if (el.classList.contains("re-sticky")) return `[[note:${el.dataset.stickyId}]]`;
+  if (el.classList.contains("re-comment")) {
+    let inner = "";
+    for (const child of el.childNodes) inner += inlineText(child, active);
+    return inner ? `[[c:${el.dataset.commentId}]]${inner}[[/c]]` : "";
+  }
   if (el.classList.contains("re-link")) {
     // «]» и «|» в слове сломали бы разметку ссылки — заменяем похожими.
     const shown = (el.textContent || "").replace(/\u00a0/g, " ").trim().replace(/\]/g, ")").replace(/\|/g, "/") || el.dataset.form || "?";
@@ -413,7 +421,10 @@ export function createRichEditor(opts) {
     if (m && el.contains(m)) {
       e.preventDefault();
       opts.onMentionClick?.(m, e);
+      return;
     }
+    const c = e.target.closest?.(".re-comment");
+    if (c && el.contains(c) && getSelection().isCollapsed) opts.onCommentClick?.(c, e);
   });
 
   function format(kind) {
@@ -478,6 +489,36 @@ export function createRichEditor(opts) {
       recordUndo("link");
       insertAtSelection(el, targetHtml(target, shown, ctx));
       changed();
+    },
+    // Комментарий к выделенному (comments.js): выделение в одном абзаце
+    // оборачивается подсветкой. Возвращает выделенный текст или null.
+    wrapComment(id) {
+      const sel = getSelection();
+      if (!sel.rangeCount || sel.isCollapsed) return null;
+      const range = sel.getRangeAt(0);
+      const pOf = (n) => (n.nodeType === Node.TEXT_NODE ? n.parentElement : n)?.closest?.(".re-p");
+      const p = pOf(range.startContainer);
+      if (!p || p !== pOf(range.endContainer) || !el.contains(p)) return null;
+      const quote = range.toString().replace(/\s+/g, " ").trim();
+      if (!quote) return null;
+      recordUndo("comment");
+      const span = document.createElement("span");
+      span.className = "re-comment";
+      span.dataset.commentId = id;
+      span.appendChild(range.extractContents());
+      range.insertNode(span);
+      sel.removeAllRanges();
+      changed();
+      return quote;
+    },
+    // Убрать подсветку комментария (сам текст остаётся).
+    unwrapComment(id) {
+      for (const span of el.querySelectorAll(`.re-comment[data-comment-id="${CSS.escape(id)}"]`)) span.replaceWith(...span.childNodes);
+      changed();
+    },
+    setResolved(ids) {
+      ctx.resolved = ids;
+      for (const span of el.querySelectorAll(".re-comment")) span.classList.toggle("resolved", ids.has(span.dataset.commentId));
     },
     // Для правок снаружи редактора (окно ссылки, подсказка «@»): снимок
     // до изменения — чтобы Ctrl+Z их отменял.

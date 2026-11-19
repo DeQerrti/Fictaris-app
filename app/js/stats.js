@@ -23,7 +23,8 @@ import { i18n, currentLang } from "./i18n.js";
 // или цифра: тире «–» в диалогах и одинокие знаки словами не считаются
 // (раньше русская проза с диалогами получала лишние слова).
 export function wordCount(text) {
-  const m = (text || "").match(/\S+/g);
+  // Метки комментариев ([[c:id]]…[[/c]], comments.js) — не слова.
+  const m = (text || "").replace(/\[\[c:[\w-]+\]\]|\[\[\/c\]\]/g, "").match(/\S+/g);
   return m ? m.filter((w) => /[\p{L}\p{N}]/u.test(w)).length : 0;
 }
 

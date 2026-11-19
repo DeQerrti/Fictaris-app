@@ -16,6 +16,7 @@ import { toReaderText } from "./text-format.js";
 import { loadEntries, entryViews } from "./sections.js";
 import { readingOrder, summaryAt, openChangeForm } from "./progress.js";
 import { buildSprintButton } from "./sprint.js";
+import { newComment, openCommentThread, buildCommentsList, removeCommentMarks, buildReaderCopyHtml, importFeedback, importDocxComments } from "./comments.js";
 import { loadTemplates as loadEntityTemplates, templateFor as entityTemplateFor } from "./templates.js";
 import { recordToday, loadWritingLog, computeStats } from "./writing-goal.js";
 import { wordCount } from "./stats.js";
@@ -275,6 +276,112 @@ function openNear(span) {
   if (detail.id) document.dispatchEvent(new CustomEvent("fictaris:open-split", { detail }));
 }
 
+// ── Комментарии к тексту (comments.js) ──
+function startComment(editor, chapter, x, y) {
+  const c = newComment("");
+  const quote = editor.wrapComment(c.id);
+  if (!quote) {
+    openContextMenu(x, y, [{ label: i18n("Выделите текст в пределах одного абзаца"), disabled: true }]);
+    return;
+  }
+  c.quote = quote;
+  chapter.comments = [...(chapter.comments || []), c];
+  persist();
+  showCommentThread(editor, chapter, c.id, x, y + 8, true);
+}
+
+function showCommentThread(editor, chapter, id, x, y, isNew = false) {
+  openCommentThread(x, y, chapter, id, {
+    isNew,
+    onChange: () => {
+      editor?.setResolved(new Set((chapter.comments || []).filter((c) => c.resolved).map((c) => c.id)));
+      persist();
+      refreshCommentsSection(chapter);
+    },
+    onRemoveMarks: (cid) => {
+      if (editor && currentRich === editor) editor.unwrapComment(cid);
+      else chapter.content = removeCommentMarks(chapter.content, cid);
+      persist();
+      refreshCommentsSection(chapter);
+    },
+  });
+}
+
+function refreshCommentsSection(chapter) {
+  const box = container?.querySelector(".cm-list");
+  if (!box) return;
+  box.replaceWith(buildCommentsList(chapter, { onOpen: (cid, r) => focusComment(chapter, cid, r) }));
+  const head = container.querySelector(".cm-section-title");
+  if (head) head.textContent = commentsTitle(chapter);
+}
+
+function commentsTitle(chapter) {
+  const open = (chapter.comments || []).filter((c) => !c.resolved).length;
+  return open ? i18n("Комментарии ({n})", { n: open }) : i18n("Комментарии");
+}
+
+function focusComment(chapter, id, rect) {
+  const span = container?.querySelector(`.re-comment[data-comment-id="${CSS.escape(id)}"]`);
+  if (span) {
+    span.scrollIntoView({ block: "center", behavior: "smooth" });
+    span.classList.add("flash");
+    setTimeout(() => span.classList.remove("flash"), 1200);
+    const r = span.getBoundingClientRect();
+    setTimeout(() => showCommentThread(currentRich, chapter, id, r.left, r.bottom + 6), 250);
+  } else {
+    showCommentThread(currentRich, chapter, id, rect.left - 320, rect.top);
+  }
+}
+
+// Читательский экземпляр книги — для бета-ридеров.
+function exportReaderCopy(x, y) {
+  const book = activeBook();
+  let saved = "";
+  try {
+    saved = localStorage.getItem(EPUB_AUTHOR_KEY) || "";
+  } catch { /* приватное окно */ }
+  askText(x, y, { title: i18n("Автор – для титульной страницы"), value: saved, placeholder: i18n("Имя или псевдоним") }, (author) => {
+    const html = buildReaderCopyHtml({ title: book?.title || i18n("Без названия"), author, parts: bookParts(), bookId: book?.id });
+    downloadBlob(new Blob([html], { type: "text/html;charset=utf-8" }), `${safeFileName(book?.title)} – ${i18n("для отзывов")}.html`);
+  });
+}
+
+// Импорт отзыва: файл .json из читательского экземпляра или .docx с комментариями Word.
+function importFeedbackAction(x, y) {
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = ".json,.docx,application/json,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+  input.addEventListener("change", async () => {
+    const file = input.files?.[0];
+    if (!file) return;
+    try {
+      await window.__flushPendingSaves?.();
+      let res;
+      if (/\.docx$/i.test(file.name)) {
+        const reader = file.name.replace(/\.docx$/i, "");
+        res = await importDocxComments(new Uint8Array(await file.arrayBuffer()), manuscript.chapters, reader);
+        if (res.none) {
+          openContextMenu(x, y, [{ label: i18n("В этом файле нет комментариев Word."), disabled: true }]);
+          return;
+        }
+      } else {
+        res = importFeedback(JSON.parse(await file.text()), manuscript);
+      }
+      persist();
+      draw();
+      const parts = [
+        i18nPlural(res.anchored, ["{n} замечание встало на место", "{n} замечания встали на места", "{n} замечаний встали на места"]),
+        res.loose ? i18nPlural(res.loose, ["{n} – без места в тексте (текст с тех пор поменялся)", "{n} – без места в тексте (текст с тех пор поменялся)", "{n} – без места в тексте (текст с тех пор поменялся)"]) : "",
+        res.missing ? i18nPlural(res.missing, ["{n} – к удалённой главе, пропущено", "{n} – к удалённым главам, пропущены", "{n} – к удалённым главам, пропущены"]) : "",
+      ].filter(Boolean);
+      openContextMenu(x, y, parts.map((label) => ({ label, disabled: true })));
+    } catch (e) {
+      openContextMenu(x, y, [{ label: e?.message || i18n("Не удалось прочитать файл."), disabled: true }]);
+    }
+  });
+  input.click();
+}
+
 const openSplitTab = (type, id) => document.dispatchEvent(new CustomEvent("fictaris:open-split", { detail: { type, id } }));
 
 function linkEntity(kind, id) {
@@ -386,7 +493,11 @@ function attachRichContextMenu(editor, chapter) {
           ]
         : []),
       ...(hasSelection && !mention
-        ? [{ label: i18n("Сделать ссылкой…"), icon: "link", action: () => openLinkPicker(editor, e.x, e.y) }, { separator: true }]
+        ? [
+            { label: i18n("Сделать ссылкой…"), icon: "link", action: () => openLinkPicker(editor, e.x, e.y) },
+            { label: i18n("Комментарий…"), icon: "note", action: () => startComment(editor, chapter, e.x, e.y) },
+            { separator: true },
+          ]
         : []),
       {
         label: i18n("Форматирование"),
@@ -862,6 +973,9 @@ function bookMenuItems(x, y) {
     { label: i18n("Экспорт книги в .pdf"), action: () => exportPdfAction(chapters, book.title) },
     { label: i18n("Экспорт книги в .docx"), action: () => exportDocx(chapters, `${safeFileName(book.title)}.docx`) },
     { label: i18n("Экспорт книги в .epub…"), action: () => exportEpubAction(x, y) },
+    { separator: true },
+    { label: i18n("Читательский экземпляр для отзывов (.html)…"), action: () => exportReaderCopy(x, y) },
+    { label: i18n("Импорт отзыва (.json или .docx с комментариями)…"), action: () => importFeedbackAction(x, y) },
     { separator: true },
     {
       label: i18n("Удалить книгу"),
@@ -1724,6 +1838,10 @@ function buildEditor() {
       },
       // Ctrl+щелчок — открыть рядом, справа.
       onMentionClick: (span, e) => (e && (e.ctrlKey || e.metaKey) ? openNear(span) : openMentionPanel(span, editor)),
+      onCommentClick: (span) => {
+        const r = span.getBoundingClientRect();
+        showCommentThread(editor, chapter, span.dataset.commentId, r.left, r.bottom + 6);
+      },
     });
     richAutocomplete = attachRichAutocomplete(editor, () => ({ characters, locations, factions, entries }));
     attachMentionHoverPreview(editor.el, () => characters);
@@ -1731,6 +1849,7 @@ function buildEditor() {
     attachRichContextMenu(editor, chapter);
     page.appendChild(editor.el);
     currentRich = editor;
+    editor.setResolved(new Set((chapter.comments || []).filter((c) => c.resolved).map((c) => c.id)));
   } else {
     const wrap = document.createElement("div");
     wrap.className = "editor-textarea-wrap";
@@ -1827,6 +1946,10 @@ function buildInspector(chapter) {
   synopsis.placeholder = i18n("О чём глава – одной-двумя фразами. Это видно на карточке в «Обзоре».");
   synopsis.addEventListener("input", () => { chapter.synopsis = synopsis.value; persist(); });
   panel.appendChild(inspectorSection(i18n("Синопсис"), synopsis));
+
+  const commentsSec = inspectorSection(commentsTitle(chapter), buildCommentsList(chapter, { onOpen: (cid, r) => focusComment(chapter, cid, r) }));
+  commentsSec.querySelector(".ms-section-head span").classList.add("cm-section-title");
+  panel.appendChild(commentsSec);
 
   const castBox = document.createElement("div");
   castBox.className = "ms-cast";

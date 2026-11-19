@@ -77,6 +77,7 @@ export function toReaderText(text) {
   return String(text || "")
     .replace(/\[\[(?:place|faction|entry):[\w-]+\|([^\]\n]*)\]\]/g, "$1")
     .replace(/ ?\[\[note:[^\]\n]*\]\]/g, "")
+    .replace(/\[\[c:[\w-]+\]\]|\[\[\/c\]\]/g, "")
     .replace(/@\[([^|\]\n]+)\|([^\]\n]+)\]/g, "$2")
     .replace(/(^|[^\p{L}\p{N}_@])@(?=\p{L})/gu, "$1");
 }
