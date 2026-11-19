@@ -4789,3 +4789,44 @@ input[type="color"]:focus-visible,
 .pl-line-menu { padding: 6px; min-width: 190px; }
 .pl-line-menu .sec-new-colors { padding: 4px 6px 8px; }
 .context-menu-item.danger { color: var(--status-bad); }
+
+/* ── Изменения по ходу книги ── */
+.pg { margin: 4px 0 18px; }
+.pg-scrub { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel-alt); }
+.pg-scrub-label { font-size: 0.74rem; color: var(--text-dim); white-space: nowrap; }
+.pg-track { flex: 1; position: relative; height: 24px; min-width: 120px; margin: 0 8px; }
+.pg-line { position: absolute; left: 0; right: 0; top: 11px; height: 2px; background: var(--border); }
+.pg-tick { position: absolute; top: 6px; width: 12px; height: 12px; padding: 0; border-radius: 50%; background: var(--panel); border: 2px solid var(--border); transform: translateX(-50%); cursor: pointer; }
+.pg-tick.ch { border-color: var(--accent); }
+.pg-tick.cur { background: var(--accent); border-color: var(--accent); width: 16px; height: 16px; top: 4px; }
+.pg-step { padding: 3px 6px; display: inline-flex; }
+.pg-pick { max-width: 220px; }
+.pg-hint { margin-top: 8px; font-size: 0.78rem; color: var(--text-faint); font-style: italic; }
+.pg-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-top: 10px; }
+.pg-card { border: 1px solid var(--border); border-radius: 10px; background: var(--panel); overflow: hidden; }
+.pg-card-head { padding: 8px 12px; font-size: 0.8rem; font-weight: 600; border-bottom: 1px solid var(--border); }
+.pg-know { display: flex; gap: 8px; align-items: baseline; padding: 6px 12px; font-size: 0.8rem; border-bottom: 1px solid var(--border); }
+.pg-know i { margin-left: auto; font-style: normal; font-size: 0.7rem; color: var(--text-faint); white-space: nowrap; }
+.pg-know.no { color: var(--text-faint); }
+.pg-know-mark { color: var(--accent); width: 10px; }
+.pg-hist { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; padding: 7px 12px; border-bottom: 1px solid var(--border); font-size: 0.8rem; cursor: pointer; }
+.pg-hist:hover { background: var(--panel-alt); }
+.pg-hist i { grid-column: 1; font-style: normal; font-size: 0.7rem; color: var(--text-faint); }
+.pg-hist span { grid-column: 1; }
+.pg-hist button { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
+.pg-hist.later { opacity: 0.45; }
+.pg-add { display: block; width: 100%; text-align: left; padding: 8px 12px; border: none; background: none; color: var(--accent); font: inherit; font-size: 0.8rem; cursor: pointer; }
+.pg-add:hover { background: var(--panel-alt); }
+.pg-now { margin-top: 6px; padding: 5px 8px; border-left: 2px solid var(--accent); background: var(--panel-alt); border-radius: 0 6px 6px 0; font-size: 0.82rem; }
+.pg-now-tag { display: block; font-size: 0.68rem; color: var(--accent); margin-bottom: 2px; }
+.pg-changed textarea, .pg-changed input { color: var(--text-faint); text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--text-faint) 60%, transparent); }
+.pg-form { width: 300px; padding: 10px 12px; }
+.pg-form-title { font-weight: 600; font-size: 0.88rem; }
+.pg-form select { width: 100%; }
+.pg-form-was { margin-top: 6px; font-size: 0.74rem; color: var(--text-faint); }
+.ms-cast-now { display: flex; flex-direction: column; font-size: 0.7rem; color: var(--text-dim); line-height: 1.35; margin-top: 2px; }
+.ms-cast-now .fresh { color: var(--accent); }
+.ms-cast-now .known { color: var(--text-faint); }
+.ms-cast-change { border: none; background: none; color: var(--text-faint); cursor: pointer; padding: 3px; border-radius: 5px; display: inline-flex; opacity: 0; margin-left: auto; align-self: center; }
+.ms-cast-row:hover .ms-cast-change, .ms-cast-change:focus-visible { opacity: 1; }
+.ms-cast-change:hover { color: var(--accent); }

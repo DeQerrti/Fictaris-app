@@ -14,6 +14,8 @@ import { pushTrash } from "./trash.js";
 import { iconSvg, locationTypeInfo, factionTypeInfo } from "./icons.js";
 import { toReaderText } from "./text-format.js";
 import { loadEntries, entryViews } from "./sections.js";
+import { readingOrder, summaryAt, openChangeForm } from "./progress.js";
+import { loadTemplates as loadEntityTemplates, templateFor as entityTemplateFor } from "./templates.js";
 import { recordToday, loadWritingLog, computeStats } from "./writing-goal.js";
 import { wordCount } from "./stats.js";
 import { openEntityModal } from "./entity-modal.js";
@@ -45,6 +47,8 @@ let characters = [];
 let locations = [];
 let factions = [];
 let entries = []; // записи своих разделов с _sec — для ссылок [[entry:…]]
+let charTemplates = []; // поля анкеты — для «изменения с этой главы» (progress.js)
+let knowledgeFacts = [];
 let focusMode = false;
 let container = null;
 let currentTextarea = null; // поле открытой главы в режиме «Разметка» — на него действуют кнопки панели инструментов
@@ -638,6 +642,10 @@ export async function renderManuscript(root, focusChapterId) {
   locations = Array.isArray(locationsData) ? locationsData : [];
   factions = Array.isArray(factionsData) ? factionsData : [];
   entries = entryViews(entriesData);
+  [charTemplates, knowledgeFacts] = await Promise.all([
+    loadEntityTemplates("characters").catch(() => []),
+    apiGet("/api/knowledge").then((k) => k?.facts || []).catch(() => []),
+  ]);
   statuses = statusList;
   const savedSize = Number(siteSettings.editorFontSize);
   editorFontSize =
@@ -1796,6 +1804,29 @@ function buildInspector(chapter) {
     const row = document.createElement("div");
     row.className = "ms-cast-row";
     row.innerHTML = `${avatarHtml(c, 26)}<span class="ms-cast-text"><span class="ms-cast-name">${escapeHtml(c.name || i18n("Без имени"))}</span><span class="ms-cast-role">${escapeHtml(mentioned ? i18n("упомянут в тексте") : c.role || "")}</span></span>`;
+    // Каким персонаж стал к этой главе: изменения анкеты и что он знает.
+    const fields = entityTemplateFor(charTemplates, c.templateId)?.fields || [];
+    const order = readingOrder(manuscript);
+    const sum = summaryAt(c, chapter.id, order, fields, knowledgeFacts);
+    if (sum.parts.length || sum.known) {
+      const now = document.createElement("span");
+      now.className = "ms-cast-now";
+      now.innerHTML = sum.parts.map((p) => `<span class="${p.fresh ? "fresh" : ""}">${escapeHtml(p.text)}</span>`).join("") + (sum.known ? `<span class="known">${escapeHtml(sum.known)}</span>` : "");
+      row.querySelector(".ms-cast-text").appendChild(now);
+    }
+    const change = document.createElement("button");
+    change.className = "ms-cast-change";
+    change.innerHTML = iconSvg("pencil", 11);
+    change.title = i18n("Изменение с этой главы – новое значение поля анкеты");
+    change.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const r = change.getBoundingClientRect();
+      openChangeForm(r.left - 260, r.bottom + 6, c, fields, order, chapter.id, async () => {
+        await apiPost("/api/characters", characters);
+        draw();
+      });
+    });
+    row.appendChild(change);
     row.addEventListener("click", () => openEntityModal("characters", c.id));
     if (!mentioned) {
       const del = document.createElement("button");

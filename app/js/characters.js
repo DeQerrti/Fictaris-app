@@ -4,6 +4,7 @@ import { debounceSave } from "./save-badge.js";
 import { escapeHtml, characterSelect, buildEmptyState } from "./chips.js";
 import { pushTrash, addTrashLinks } from "./trash.js";
 import { detachCharacter } from "./cascade.js";
+import { buildProgressPanel } from "./progress.js";
 import { loadTagsMap, buildTagsField, parseTags, stringifyTags } from "./tags.js";
 import { buildNameGeneratorButton } from "./name-generator.js";
 import { avatarInnerHtml, buildAvatarsField } from "./avatars.js";
@@ -85,6 +86,8 @@ let factions = [];
 let board = { cards: {} };
 let mapData = { maps: {} };
 let manuscript = { chapters: [] };
+let knowledgeFacts = [];
+let progressAt; // глава ползунка «Как на главе» (progress.js); null — начало книги
 let templates = [];
 let activeId = null;
 let container = null;
@@ -190,6 +193,9 @@ export async function renderCharacters(root, focusId) {
     loadTagsMap(),
     loadTemplates("characters"),
   ]);
+  knowledgeFacts = ((await apiGet("/api/knowledge").catch(() => null)) || {}).facts || [];
+  // Ползунок по умолчанию — на главе, открытой в Рукописи.
+  if (progressAt === undefined) progressAt = manuscript.activeChapterId || null;
   board = flattenBoards(board);
   if (focusId && characters.some((c) => c.id === focusId)) {
     activeId = focusId;
@@ -632,6 +638,23 @@ function buildDossier(c) {
   // ── Сводка
   page.appendChild(buildFacts(c, ageField));
 
+  // ── По ходу книги: ползунок «Как на главе», что знает, изменения
+  const progress = buildProgressPanel(c, {
+    manuscript,
+    fields,
+    facts: knowledgeFacts,
+    selected: progressAt,
+    onSelect: (id) => {
+      progressAt = id;
+      drawDossierOnly(c);
+    },
+    onChange: () => {
+      persist();
+      drawDossierOnly(c);
+    },
+  });
+  page.appendChild(progress.el);
+
   // ── Анкета и боковая колонка
   const cols = document.createElement("div");
   cols.className = "dossier-cols";
@@ -641,7 +664,7 @@ function buildDossier(c) {
   side.className = "dossier-side";
 
   main.appendChild(sectionHeading(i18n("Анкета")));
-  main.appendChild(buildTemplateFields(c, fields, ["role", "age"], () => persist()));
+  main.appendChild(buildTemplateFields(c, fields, ["role", "age"], () => persist(), progress.decorate));
 
   main.appendChild(sectionHeading(i18n("Облик и метки")));
   const colorRow = document.createElement("div");

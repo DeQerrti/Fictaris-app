@@ -272,7 +272,8 @@ export function buildSecretToggle(entity, onChange) {
   return btn;
 }
 
-export function buildTemplateFields(entity, fields, skip, onChange) {
+// decorate(field, fieldEl) — дописать что-то под полем (progress.js: значение на главе).
+export function buildTemplateFields(entity, fields, skip, onChange, decorate) {
   const grid = document.createElement("div");
   grid.className = "dossier-fields";
   for (const f of fields) {
@@ -297,6 +298,7 @@ export function buildTemplateFields(entity, fields, skip, onChange) {
         entity[f.key] = value;
         onChange(f.key);
       }));
+      decorate?.(f, field);
       grid.appendChild(field);
       continue;
     }
@@ -312,6 +314,7 @@ export function buildTemplateFields(entity, fields, skip, onChange) {
       onChange(f.key);
     });
     field.appendChild(input);
+    decorate?.(f, field);
     grid.appendChild(field);
   }
   return grid;
