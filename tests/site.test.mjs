@@ -4,12 +4,16 @@ import assert from "node:assert/strict";
 
 const data = {
   "/api/characters": [
-    { id: "a", name: "Астра", templateId: "default", role: "Наследница", backstory: "Видела @Тейн у ворот" },
+    { id: "a", name: "Астра", templateId: "default", role: "Наследница, ||дочь Варна||, изгнанница", backstory: "Видела @Тейн у ворот" },
     { id: "t", name: "Тейн", secret: true, templateId: "default", role: "Предатель" },
   ],
   "/api/locations": [{ id: "l", name: "Ивняк", type: "settlement", templateId: "default" }],
   "/api/factions": [],
-  "/api/timeline": [],
+  "/api/timeline": [
+    { id: "e1", order: 1, title: "Коронация", description: "Пир. ||Отравили вино.||", characterIds: ["a"] },
+    { id: "e2", order: 2, title: "Тайный сговор", secret: true },
+    { id: "e3", order: 3, title: "Встреча у ворот", characterIds: ["t"] },
+  ],
   "/api/relationships": [{ id: "r", charA: "a", charB: "t", label: "враг" }],
   "/api/site-settings": {
     templates: { characters: [{ id: "default", name: "Т", fields: [
@@ -43,4 +47,23 @@ test("сайт для читателей: без тайной записи, та
   assert.ok(!t.includes("Видела"), "тайного поля нет");
   assert.ok(!t.includes("t.html\">Тейн"), "ссылки на тайного нет");
   assert.ok(t.includes("Наследница"));
+});
+
+test("сайт для читателей: без ||тайных слов||, тайных событий и событий с тайными участниками", async () => {
+  await exportSiteZip({ readers: true });
+  const t = await text();
+  assert.ok(t.includes("Наследница, изгнанница"), "тайные слова выпали, запятые на месте");
+  assert.ok(!t.includes("дочь Варна"));
+  assert.ok(t.includes("Коронация") && t.includes("Пир."));
+  assert.ok(!t.includes("Отравили"));
+  assert.ok(!t.includes("Тайный сговор"));
+  assert.ok(!t.includes("Встреча у ворот"));
+});
+
+test("полный сайт: тайные слова остаются, без чёрточек", async () => {
+  await exportSiteZip();
+  const t = await text();
+  assert.ok(t.includes("Наследница, дочь Варна, изгнанница"));
+  assert.ok(t.includes("Тайный сговор") && t.includes("Отравили вино."));
+  assert.ok(!t.includes("||"));
 });

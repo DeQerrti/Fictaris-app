@@ -1,4 +1,5 @@
 import { escapeHtml } from "./chips.js";
+import { spoilerText } from "./text-format.js";
 import { parseRichSections } from "./templates.js";
 import { formatWorldDate } from "./calendar.js";
 import { mentionsToLinkedHtml } from "./mentions.js";
@@ -49,7 +50,8 @@ export function renderFieldsHtml(template, entity, characters, hrefForChar, idPr
   let html = "";
   for (const f of template?.fields || []) {
     if (hideSecret && f.secret) continue;
-    const value = entity[f.key];
+    // ||тайные слова|| — прочь для читателей, без чёрточек для остальных.
+    const value = typeof entity[f.key] === "string" ? spoilerText(entity[f.key], hideSecret) : entity[f.key];
     if (!value) continue;
     if (f.type === "richtext") {
       const sections = parseRichSections(value);

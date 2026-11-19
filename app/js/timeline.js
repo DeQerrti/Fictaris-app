@@ -11,6 +11,7 @@ import { openPopover } from "./context-menu.js";
 import { openCalendarPanel } from "./world-panels.js";
 import { avatarInnerHtml } from "./avatars.js";
 import { i18n, i18nPlural } from "./i18n.js";
+import { buildSecretToggle } from "./entity-view.js";
 
 let events = [];
 let characters = [];
@@ -734,6 +735,7 @@ function buildDrawer(ev) {
   const descArea = document.createElement("textarea");
   descArea.value = ev.description || "";
   descArea.addEventListener("input", () => { ev.description = descArea.value; persist(); });
+  descArea.placeholder = i18n("Что случилось. Скрыть часть от читателей сайта – ||вот так||");
   descField.appendChild(descArea);
   attachMentionAutocomplete(descArea, () => characters);
   attachMentionContextMenu(descArea, () => characters);
@@ -769,7 +771,8 @@ function buildDrawer(ev) {
     persist();
     draw();
   });
-  actions.append(closeBtn, delBtn);
+  // Тайное событие не попадает в «Сайт мира для читателей».
+  actions.append(closeBtn, buildSecretToggle(ev, () => persist()), delBtn);
   drawer.appendChild(actions);
 
   return drawer;

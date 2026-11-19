@@ -6,6 +6,7 @@ import { mentionsToLinkedHtml } from "./mentions.js";
 import { imageDataUri, safeName, renderFieldsHtml, galleryHtml } from "./entity-export.js";
 import { i18n } from "./i18n.js";
 import { buildZip } from "./zip-writer.js";
+import { spoilerText } from "./text-format.js";
 import { loadEntries, sectionKind } from "./sections.js";
 
 // ══════════════════════════════════════════════
@@ -126,7 +127,8 @@ export async function exportSiteZip({ readers = false } = {}) {
   for (const c of characters) {
     const avatar = imageDataUri(images, c.images?.[0]);
     let body = `<h1>${escapeHtml(c.name || i18n("Без имени"))}</h1>`;
-    if (c.role) body += `<p class="subtitle">${escapeHtml(c.role)}</p>`;
+    const role = spoilerText(c.role, readers);
+    if (role.trim()) body += `<p class="subtitle">${escapeHtml(role)}</p>`;
     if (avatar) body += `<img class="avatar" src="${avatar}" alt="">`;
     body += galleryHtml(images, (c.images || []).slice(1));
     body += renderFieldsHtml(templateFor(charTemplates, c.templateId), c, allCharacters, hrefForChar, "", fieldOpts);
@@ -188,11 +190,16 @@ export async function exportSiteZip({ readers = false } = {}) {
 
   // ── Таймлайн ──
   {
-    const rows = [...timeline].sort((a, b) => a.order - b.order);
+    // Для читателей — без тайных событий и событий с тайными участниками или местами.
+    const secretIds = new Set([...allCharacters, ...allLocations].filter((x) => x.secret).map((x) => x.id));
+    const rows = [...timeline]
+      .filter((e) => !readers || (!e.secret && ![...(e.characterIds || []), ...(e.locationIds || [])].some((id) => secretIds.has(id))))
+      .sort((a, b) => a.order - b.order);
     let body = `<h1>${escapeHtml(i18n("Таймлайн"))}</h1>`;
     for (const e of rows) {
-      body += `<section class="section"><h2>${escapeHtml(e.title || i18n("Без названия"))}${e.date ? ` <small>(${escapeHtml(e.date)})</small>` : ""}</h2>`;
-      if (e.description) body += `<p>${mentionsToLinkedHtml(e.description, allCharacters, (c) => (c && shown.has(c.id) ? `characters/${safeName(c.id)}.html` : null))}</p>`;
+      body += `<section class="section"><h2>${escapeHtml(spoilerText(e.title, readers) || i18n("Без названия"))}${e.date ? ` <small>(${escapeHtml(e.date)})</small>` : ""}</h2>`;
+      const description = spoilerText(e.description, readers);
+      if (description.trim()) body += `<p>${mentionsToLinkedHtml(description, allCharacters, (c) => (c && shown.has(c.id) ? `characters/${safeName(c.id)}.html` : null))}</p>`;
       const tags = [];
       for (const id of e.characterIds || []) {
         const c = characters.find((ch) => ch.id === id);

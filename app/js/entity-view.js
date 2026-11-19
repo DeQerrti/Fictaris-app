@@ -259,7 +259,7 @@ export function buildSecretToggle(entity, onChange) {
     btn.innerHTML = `${iconSvg(entity.secret ? "eyeOff" : "eye", 14)}<span>${escapeHtml(entity.secret ? i18n("Тайна") : i18n("Не тайна"))}</span>`;
     btn.title = entity.secret
       ? i18n("Тайна: этой записи не будет в сайте мира для читателей. Щёлкните, чтобы открыть")
-      : i18n("Сделать тайной – запись не попадёт в сайт мира для читателей");
+      : i18n("Сделать тайной – запись не попадёт в сайт мира для читателей. Спрятать только часть текста – ||вот так||");
     btn.setAttribute("aria-pressed", entity.secret ? "true" : "false");
   };
   paint();

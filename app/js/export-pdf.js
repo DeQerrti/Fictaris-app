@@ -5,7 +5,7 @@ import { loadTemplates, templateFor } from "./templates.js";
 import { mentionsToLinkedHtml } from "./mentions.js";
 import { imageDataUri, safeName, renderFieldsHtml, galleryHtml } from "./entity-export.js";
 import { i18n } from "./i18n.js";
-import { applyInlineMarkupHtml, toReaderText } from "./text-format.js";
+import { applyInlineMarkupHtml, toReaderText, spoilerText } from "./text-format.js";
 
 // ══════════════════════════════════════════════
 //  ЭКСПОРТ МИРА В PDF ("справочник мира")
@@ -99,7 +99,7 @@ export async function exportWorldPdf() {
       const avatar = imageDataUri(images, c.images?.[0]);
       body += `<div class="entity" id="char-${safeName(c.id)}">`;
       body += `<h2>${escapeHtml(c.name || i18n("Без имени"))}</h2>`;
-      if (c.role) body += `<p class="entity-subtitle">${escapeHtml(c.role)}</p>`;
+      if (c.role) body += `<p class="entity-subtitle">${escapeHtml(spoilerText(c.role, false))}</p>`;
       if (avatar) body += `<img class="avatar" src="${avatar}" alt="">`;
       body += galleryHtml(images, (c.images || []).slice(1));
       body += renderFieldsHtml(templateFor(charTemplates, c.templateId), c, characters, hrefForChar, idPrefix);
@@ -172,7 +172,7 @@ export async function exportWorldPdf() {
     body += `<section class="kind"><h1>${escapeHtml(i18n("Таймлайн"))}</h1>`;
     for (const e of rows) {
       body += `<div class="timeline-entry"><h3>${escapeHtml(e.title || i18n("Без названия"))}${e.date ? ` <small>(${escapeHtml(e.date)})</small>` : ""}</h3>`;
-      if (e.description) body += `<p>${mentionsToLinkedHtml(e.description, characters, hrefForChar)}</p>`;
+      if (e.description) body += `<p>${mentionsToLinkedHtml(spoilerText(e.description, false), characters, hrefForChar)}</p>`;
       const tags = [];
       for (const id of e.characterIds || []) {
         const c = characters.find((ch) => ch.id === id);

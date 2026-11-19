@@ -1632,4 +1632,7 @@ export const EN_DICT = {
   "Свои разделы мира": "Custom world sections",
   "Название, значок и цвет меняются в самом разделе – кнопка «⋯» в его шапке": "Name, icon and color are changed in the section itself – the “⋯” button in its header",
   "Персонаж, место, фракция, запись своего раздела или глава": "Character, place, faction, custom section entry or chapter",
+  "Что случилось. Скрыть часть от читателей сайта – ||вот так||": "What happened. Hide part from site readers – ||like this||",
+  "Тот же сайт, но без тайн. Не попадают: персонажи, места и фракции с пометкой «Тайна», тайные поля анкеты, тайные события таймлайна и события с тайными участниками или местами, а также слова, взятые в ||двойные черты|| в анкетах и описаниях. Ссылки на тайное становятся обычным текстом.": "The same site without secrets. Left out: characters, places and factions marked “Secret”, secret profile fields, secret timeline events and events with secret participants or places, and words wrapped in ||double bars|| in profiles and descriptions. Links to secrets become plain text.",
+  "Сделать тайной – запись не попадёт в сайт мира для читателей. Спрятать только часть текста – ||вот так||": "Make secret – the entry won't be in the world site for readers. To hide only part of the text – ||like this||",
 };
