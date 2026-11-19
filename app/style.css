@@ -4855,3 +4855,41 @@ input[type="color"]:focus-visible,
 .split-chapter-head h2 { margin: 0; font-size: 1.1rem; flex: 1; }
 .split-readonly { display: inline-flex; align-items: center; gap: 4px; font-size: 0.72rem; color: var(--text-faint); }
 @media (max-width: 900px) { .split-pane { display: none; } }
+
+/* ── Дневник письма ── */
+.diary-heat-wrap { overflow-x: auto; padding: 4px 0 10px; }
+.diary-heat { display: grid; grid-auto-flow: column; grid-template-rows: repeat(7, 12px); gap: 3px; width: max-content; }
+.diary-heat i { width: 12px; height: 12px; border-radius: 3px; background: var(--panel-alt); }
+.diary-heat i.hit { outline: 1px solid var(--accent-hover); outline-offset: -1px; }
+.diary-rec { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 8px 0 14px; }
+.diary-two { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+.diary-card { border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; background: var(--panel); }
+.diary-card > b { font-size: 0.86rem; }
+.diary-words { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 5px; }
+.diary-word { border: 1px solid var(--border); background: var(--panel-alt); color: var(--text); border-radius: 6px; padding: 2px 8px; font: inherit; font-size: 0.78rem; cursor: pointer; }
+.diary-word:hover { border-color: var(--accent); }
+.diary-word em { font-style: normal; color: var(--text-faint); font-size: 0.68rem; margin-left: 4px; }
+.diary-hint { margin-top: 8px; font-size: 0.74rem; color: var(--text-dim); }
+.diary-wd { display: flex; align-items: center; gap: 8px; font-size: 0.76rem; margin-top: 6px; }
+.diary-wd span:first-child { width: 26px; color: var(--text-dim); }
+.diary-wd span:last-child { width: 40px; text-align: right; }
+.diary-wd-track { flex: 1; height: 8px; background: var(--panel-alt); border-radius: 4px; overflow: hidden; }
+.diary-wd-track i { display: block; height: 100%; background: var(--accent); border-radius: 4px; }
+/* ── Спринт ── */
+.sprint-dialog { width: min(420px, calc(100vw - 32px)); padding: 22px 24px; text-align: center; }
+.sprint-sub { font-size: 0.8rem; color: var(--text-dim); }
+.sprint-row { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; margin: 12px 0; }
+.sprint-own { width: 72px; text-align: center; }
+.sprint-time { font-size: 3rem; font-weight: 600; letter-spacing: 0.02em; font-variant-numeric: tabular-nums; }
+.sprint-note { font-size: 0.78rem; color: var(--text-dim); margin: 6px 0 0; }
+.sprint-dialog .sec-new-actions { justify-content: center; }
+.sprint-mini { position: fixed; top: 14px; right: 18px; z-index: 900; display: flex; align-items: center; gap: 10px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel); box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35); font-size: 0.82rem; }
+.sprint-mini b { font-variant-numeric: tabular-nums; font-size: 0.95rem; }
+.sprint-mini.paused b { color: var(--text-faint); }
+.sprint-words { color: var(--text-dim); }
+.sprint-bar { width: 90px; height: 6px; border-radius: 3px; background: var(--panel-alt); overflow: hidden; }
+.sprint-bar i { display: block; height: 100%; background: var(--accent); }
+.sprint-mini .btn { padding: 3px 10px; font-size: 0.76rem; }
+.sprint-done { position: fixed; top: 14px; right: 18px; z-index: 900; display: flex; flex-direction: column; gap: 6px; padding: 14px 16px; border: 1px solid var(--accent); border-radius: 10px; background: var(--panel); box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35); min-width: 220px; }
+.sprint-done span { font-size: 0.8rem; color: var(--text-dim); }
+.sprint-done .btn { align-self: flex-end; }

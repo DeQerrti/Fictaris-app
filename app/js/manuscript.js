@@ -15,6 +15,7 @@ import { iconSvg, locationTypeInfo, factionTypeInfo } from "./icons.js";
 import { toReaderText } from "./text-format.js";
 import { loadEntries, entryViews } from "./sections.js";
 import { readingOrder, summaryAt, openChangeForm } from "./progress.js";
+import { buildSprintButton } from "./sprint.js";
 import { loadTemplates as loadEntityTemplates, templateFor as entityTemplateFor } from "./templates.js";
 import { recordToday, loadWritingLog, computeStats } from "./writing-goal.js";
 import { wordCount } from "./stats.js";
@@ -1614,7 +1615,7 @@ function buildEditorToolbar(chapter) {
     ]);
   });
 
-  bar.append(viewBtn, focusBtn, panelBtn, moreBtn);
+  bar.append(viewBtn, buildSprintButton(), focusBtn, panelBtn, moreBtn);
   return bar;
 }
 

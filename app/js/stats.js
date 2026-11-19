@@ -144,6 +144,12 @@ export async function renderStats(root) {
   const streakSection = buildWritingStreakSection(writingLog);
   streakSection.classList.add("stats-dashboard-full");
   wrap.appendChild(streakSection);
+  const { buildDiarySection } = await import("./diary.js");
+  wrap.appendChild(buildDiarySection(writingLog, manuscript, async (word) => {
+    const { openSearch } = await import("./search.js");
+    document.querySelector(".entity-modal-close")?.click();
+    openSearch(word);
+  }));
 
   const overview = buildSection(i18n("Обзор"));
   overview.classList.add("stats-dashboard-full");

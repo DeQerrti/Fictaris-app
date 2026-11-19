@@ -373,13 +373,14 @@ function close() {
   overlay?.classList.add("hidden");
 }
 
-export async function openSearch() {
+// query — сразу искать это (дневник письма: «где это слово»).
+export async function openSearch(query = "") {
   ensureOverlay();
   overlay.classList.remove("hidden");
-  input.value = "";
+  input.value = query;
   input.focus();
   if (Date.now() - indexLoadedAt > 5000) await refreshIndex();
-  renderResults(""); // индекс (для резолва недавнего) уже свежий на этот момент
+  renderResults(query); // индекс (для резолва недавнего) уже свежий на этот момент
 }
 
 // navigate(module, focusId) — вызывающая сторона (main.js) решает, как
