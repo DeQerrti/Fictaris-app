@@ -22,6 +22,7 @@ import { i18n } from "./i18n.js";
 export const HIDEABLE_TABS = [
   "manuscript",
   "board",
+  "plotlines",
   "characters",
   "locations",
   "factions",
@@ -33,7 +34,7 @@ export const HIDEABLE_TABS = [
 ];
 
 export const TAB_SECTIONS = [
-  { id: "plot", label: () => i18n("Сюжет"), keys: ["manuscript", "board"] },
+  { id: "plot", label: () => i18n("Сюжет"), keys: ["manuscript", "board", "plotlines"] },
   { id: "world", label: () => i18n("Мир"), keys: ["characters", "locations", "factions", "timeline"] },
   { id: "views", label: () => i18n("Наглядно"), keys: ["map", "familytree", "graph", "canvas"] },
 ];

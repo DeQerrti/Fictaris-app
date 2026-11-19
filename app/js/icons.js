@@ -90,6 +90,7 @@ const PATHS = {
 const NAV_ICONS = {
   manuscript: "book",
   board: "columns",
+  plotlines: "route",
   characters: "user",
   locations: "pin",
   factions: "shield",

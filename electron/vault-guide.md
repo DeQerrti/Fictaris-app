@@ -45,6 +45,12 @@
 ```
 Разделы, которые заводит автор: «Магия», «Артефакты», «Государства» и т.п. Раздел: `id`, `name`, `icon` (имя значка: `flame`, `gem`, `crown`, `sword`, `shield`, `coin`, `book`, `globe`, `lightbulb`, `landmark`, `door`, `eye`, `route`, `network`, `folder`), `color` (`#rrggbb`). Порядок `sections` – порядок плиток в «Мире». Запись: `id`, `sectionId` (раздел), `name`, `tags` (строка через запятую), `templateId`, `images`, `secret`; значения анкеты – под ключами полей. Шаблоны анкеты раздела – `site-settings.json` → `templates["section:<id раздела>"]`. Запись без существующего раздела не показывается.
 
+### plotlines.json – сюжетные линии
+```
+{ "lines": [{ "id", "name"?, "color", "kind", "refId"?, "cells": { "<id главы>": "текст" } }], "structure"? }
+```
+Строки сетки «линии × главы». `kind`: `"character"` | `"faction"` | `"entry"` (запись своего раздела) | `"custom"` (своя тема), `refId` – id персонажа, фракции или записи. `name` – своё название (у линии персонажа без него берётся имя). `cells` – свой текст клетки; у линии персонажа и фракции пустая клетка заполняется сама по главам, где они есть. `structure` – шаблон тактов над главами: `"three"`, `"stc"`, `"hero"`, `"seven"` или нет поля. Порядок `lines` – порядок строк.
+
 ### relationships.json – связи между персонажами
 Массив. `id`, `charA`, `charB` (id персонажей), `label` – как назвать связь («наставник»), `score` – число от −100 (вражда) до 100 (близость), `note`.
 
@@ -117,5 +123,6 @@
 - **персонаж** – карточки холстов `canvas` → `cards[].entity` (карточку удалить или оставить – приложение покажет её как «Удалено из мира»), `characters[].parentIds/adoptiveParentIds/uncertainParentIds/partnerIds`, ключи `partnerKinds`, `manuscript.chapters[].characterIds`, `relationships[].charA/charB` (связь удалить целиком), `factions[].leaderId/memberIds`, `timeline[].characterIds`, `board` → `cards[].characterIds`, `map` → `pins[].characterId`, ключи `knowledge.facts[].entries`, упоминания `@Имя` в тексте глав. **Переименование персонажа ломает упоминания** – замените `@Старое имя` в `content` глав.
 - **локация** – карточки холстов `canvas` → `cards[].entity` (карточку удалить или оставить – приложение покажет её как «Удалено из мира»), `locations[].parentId`, `manuscript.chapters[].locationIds`, `factions[].headquartersId`, `timeline[].locationIds`, карточки досок, метки карт, ссылки `[[place:id|слово]]` в тексте глав (заменить на само слово).
 - **фракция** – карточки холстов `canvas` → `cards[].entity` (карточку удалить или оставить – приложение покажет её как «Удалено из мира»), ключи `factions[].relations` других фракций, карточки досок (`factionId`), границы на картах `map` → `drawing.shapes[].factionId`, ссылки `[[faction:id|слово]]` в тексте глав (заменить на само слово).
+- Удаляя персонажа, фракцию, запись или главу, можно убрать и линию `plotlines.json` с этим `refId` и ключ главы в `cells` – иначе линия покажет «Удалено из мира».
 - **запись своего раздела** – ссылки `[[entry:id|слово]]` в тексте глав (заменить на само слово). Удаляя раздел, удалите и его записи.
 - **глава** – `canvas` → `cards[].chapterId` и `cards[].entity`, карточки досок (`chapterId`), значения `knowledge.facts[].entries`, `manuscript.activeChapterId`.

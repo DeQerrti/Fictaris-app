@@ -13,6 +13,7 @@ import { renderFamilyTree } from "./family-tree.js";
 import { renderCanvas } from "./canvas.js";
 import { renderKnowledge } from "./knowledge.js";
 import { renderSection } from "./sections.js";
+import { renderPlotlines } from "./plotlines.js";
 import { fillWithDemoData, isProjectEmpty, maybeRunHistoryCleanup } from "./data-panel.js";
 import { renderSettings } from "./settings-panel.js";
 import { initProjectSwitcher } from "./project-switcher.js";
@@ -47,6 +48,7 @@ const MODULES = {
   factions: renderFactions,
   timeline: renderTimeline,
   board: renderBoard,
+  plotlines: renderPlotlines,
   map: renderMap,
   graph: renderGraph,
   familytree: renderFamilyTree,

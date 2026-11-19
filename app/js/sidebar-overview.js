@@ -104,7 +104,7 @@ function goToTarget(target) {
 
 // ── Данные ─────────────────────────────────────
 async function loadData() {
-  const names = ["characters", "locations", "factions", "relationships", "timeline", "board", "map", "manuscript", "canvas", "knowledge", "writing-log", "trash", "entries"];
+  const names = ["characters", "locations", "factions", "relationships", "timeline", "board", "map", "manuscript", "canvas", "knowledge", "writing-log", "trash", "entries", "plotlines"];
   const values = await Promise.all(names.map((n) => apiGet(`/api/${n}`).catch(() => null)));
   const d = Object.fromEntries(names.map((n, i) => [n, values[i]]));
   return {
@@ -120,6 +120,7 @@ async function loadData() {
     knowledge: d.knowledge || { facts: [] },
     log: d["writing-log"] || { days: {} },
     trash: Array.isArray(d.trash) ? d.trash : [],
+    plotlines: Array.isArray(d.plotlines?.lines) ? d.plotlines.lines : [],
     sections: Array.isArray(d.entries?.sections) ? d.entries.sections : [],
     entries: Array.isArray(d.entries?.entries) ? d.entries.entries : [],
     statuses: await loadStatuses(),
@@ -173,6 +174,7 @@ function renderCounts(data) {
   const counts = {
     manuscript: (data.manuscript.chapters || []).length,
     board: Object.keys(data.board.cards || {}).length,
+    plotlines: data.plotlines.length,
     characters: data.characters.length,
     locations: data.locations.length,
     factions: data.factions.length,
@@ -323,7 +325,7 @@ function resolveRecent(entry, data) {
     return { lead: `<span class="sb-recent-icon">${iconSvg("book", 14)}</span>`, title: ch.title || i18n("Без названия"), kind: i18n("рукопись") };
   }
   if (entry.id) return null;
-  const icons = { board: "columns", timeline: "clock", map: "map", graph: "network", familytree: "tree", canvas: "frame", manuscript: "book", characters: "user", locations: "pin", factions: "shield" };
+  const icons = { board: "columns", plotlines: "route", timeline: "clock", map: "map", graph: "network", familytree: "tree", canvas: "frame", manuscript: "book", characters: "user", locations: "pin", factions: "shield" };
   if (!icons[entry.module]) return null;
   return { lead: `<span class="sb-recent-icon">${iconSvg(icons[entry.module], 14)}</span>`, title: navLabel(entry.module), kind: i18n("раздел") };
 }

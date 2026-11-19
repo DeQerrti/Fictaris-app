@@ -26,6 +26,7 @@ export function defaultLabels() {
       factions: i18n("Фракции"),
       timeline: i18n("Таймлайн"),
       board: i18n("Доска"),
+      plotlines: i18n("Сюжетные линии"),
       map: i18n("Карта"),
       graph: i18n("Отношения"),
       familytree: i18n("Родословная"),
