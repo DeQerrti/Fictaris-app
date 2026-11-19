@@ -57,12 +57,13 @@ export function mentionHtml(char, form, plain) {
 // разделах. Удалённое (id не найден) — приглушённо, но ссылка в тексте
 // сохраняется как была.
 export function entityOf(kind, id, ctx) {
-  const list = kind === "place" ? ctx.locations : ctx.factions;
+  const list = kind === "place" ? ctx.locations : kind === "entry" ? ctx.entries : ctx.factions;
   return (list || []).find((x) => x.id === id) || null;
 }
 
 export function entityColor(kind, entity) {
   if (!entity) return "var(--text-faint)";
+  if (kind === "entry") return safeColor(entity._sec?.color, "#7d6a9e");
   return kind === "place" ? locationTypeInfo(entity.type)[3] : factionTypeInfo(entity.type)[3];
 }
 
@@ -206,7 +207,7 @@ export function insertAtSelection(root, html) {
 // ── Сам редактор ──
 // opts: { text, characters, placeholder, onChange(text), onMentionClick(span), onReady }
 export function createRichEditor(opts) {
-  const ctx = { characters: opts.characters || [], locations: opts.locations || [], factions: opts.factions || [], mentionRe: buildMentionRegex(opts.characters || []) };
+  const ctx = { characters: opts.characters || [], locations: opts.locations || [], factions: opts.factions || [], entries: opts.entries || [], mentionRe: buildMentionRegex(opts.characters || []) };
   const el = document.createElement("div");
   el.className = "chapter-content rich-editor";
   el.contentEditable = "true";
@@ -500,13 +501,14 @@ export function createRichEditor(opts) {
       return !!sel.rangeCount && !sel.isCollapsed && el.contains(sel.anchorNode);
     },
     changed,
-    setSources({ characters, locations, factions }) {
+    setSources({ characters, locations, factions, entries }) {
       if (characters) {
         ctx.characters = characters;
         ctx.mentionRe = buildMentionRegex(characters);
       }
       if (locations) ctx.locations = locations;
       if (factions) ctx.factions = factions;
+      if (entries) ctx.entries = entries;
     },
   };
 }
@@ -516,11 +518,13 @@ export function createRichEditor(opts) {
 // "place" | "faction".
 const KIND_LABEL = { character: "Персонаж", place: "Место", faction: "Фракция" };
 
-export function linkTargets({ characters = [], locations = [], factions = [] }) {
+// entries — записи своих разделов с _sec (раздел: name, color), см. sections.js.
+export function linkTargets({ characters = [], locations = [], factions = [], entries = [] }) {
   return [
     ...characters.filter((c) => c.name).map((c) => ({ kind: "character", id: c.id, name: c.name, color: safeColor(c.color, "#7c7157"), entity: c })),
     ...locations.filter((l) => l.name).map((l) => ({ kind: "place", id: l.id, name: l.name, color: locationTypeInfo(l.type)[3], entity: l })),
     ...factions.filter((f) => f.name).map((f) => ({ kind: "faction", id: f.id, name: f.name, color: factionTypeInfo(f.type)[3], entity: f })),
+    ...entries.filter((e) => e.name && e._sec).map((e) => ({ kind: "entry", id: e.id, name: e.name, color: safeColor(e._sec.color, "#7d6a9e"), entity: e, label: e._sec.name })),
   ];
 }
 
@@ -564,7 +568,7 @@ function itemEl(t, active) {
   const name = document.createElement("span");
   name.textContent = t.name;
   const kind = document.createElement("small");
-  kind.textContent = i18n(KIND_LABEL[t.kind]);
+  kind.textContent = t.label || i18n(KIND_LABEL[t.kind]);
   item.append(name, kind);
   return item;
 }

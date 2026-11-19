@@ -48,6 +48,7 @@ function typeInfo() {
     timeline: { label: i18n("Событие таймлайна"), listPath: "/api/timeline", displayName: (i) => i.title },
     "board-card": { label: i18n("Карточка доски"), listPath: null, displayName: (i) => i.title },
     chapter: { label: i18n("Глава"), listPath: null, displayName: (i) => i.title || i18n("Без названия") },
+    entry: { label: i18n("Запись"), listPath: null, displayName: (i) => (i.sectionName ? `${i.name} · ${i.sectionName}` : i.name) },
   };
 }
 
@@ -138,6 +139,23 @@ async function restoreLocation(entry) {
   await reattachLocation(loc.id, entry.links);
 }
 
+// Запись своего раздела: раздел могли удалить целиком — тогда он
+// заводится заново с прежним id и названием (шаблон анкеты в
+// site-settings.json остаётся и после удаления раздела).
+async function restoreSectionEntry(entry) {
+  const { sectionName, ...item } = entry.item;
+  const data = await apiGet("/api/entries").catch(() => ({ sections: [], entries: [] }));
+  data.sections = Array.isArray(data.sections) ? data.sections : [];
+  data.entries = Array.isArray(data.entries) ? data.entries : [];
+  if (data.entries.some((e) => e.id === item.id)) return;
+  if (!data.sections.some((s) => s.id === item.sectionId)) {
+    data.sections.push({ id: item.sectionId, name: sectionName || i18n("Восстановлено"), icon: "folder", color: "#7d6a9e" });
+  }
+  data.entries.push(item);
+  await apiPost("/api/entries", data);
+  document.dispatchEvent(new CustomEvent("fictaris:sections-changed"));
+}
+
 async function restoreFaction(entry) {
   await restoreArrayItem("/api/factions", entry.item);
   await reattachFaction(entry.item.id, entry.links);
@@ -149,6 +167,7 @@ export async function restoreEntry(entry, trash) {
   else if (entry.type === "character") return restoreCharacter(entry, trash);
   else if (entry.type === "location") await restoreLocation(entry);
   else if (entry.type === "faction") await restoreFaction(entry);
+  else if (entry.type === "entry") await restoreSectionEntry(entry);
   else await restoreArrayItem(typeInfo()[entry.type].listPath, entry.item);
   return [];
 }

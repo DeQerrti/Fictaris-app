@@ -6,6 +6,7 @@ import { mentionsToLinkedHtml } from "./mentions.js";
 import { imageDataUri, safeName, renderFieldsHtml, galleryHtml } from "./entity-export.js";
 import { i18n } from "./i18n.js";
 import { buildZip } from "./zip-writer.js";
+import { loadEntries, sectionKind } from "./sections.js";
 
 // ══════════════════════════════════════════════
 //  ЭКСПОРТ МИРА КАК САЙТА
@@ -207,6 +208,24 @@ export async function exportSiteZip({ readers = false } = {}) {
     files.push({ name: `timeline.html`, text: pageShell("", siteTitle, i18n("Таймлайн"), body) });
   }
 
+  // ── Свои разделы мира ──
+  const own = await loadEntries();
+  const ownSections = [];
+  for (const s of own.sections) {
+    const list = visible(own.entries.filter((e) => e.sectionId === s.id));
+    if (!list.length) continue;
+    ownSections.push({ s, list });
+    const tpls = await loadTemplates(sectionKind(s.id));
+    for (const e of list) {
+      const avatar = imageDataUri(images, e.images?.[0]);
+      let body = `<h1>${escapeHtml(e.name || i18n("Без названия"))}</h1><p class="subtitle">${escapeHtml(s.name)}</p>`;
+      if (avatar) body += `<img class="avatar" src="${avatar}" alt="">`;
+      body += galleryHtml(images, (e.images || []).slice(1));
+      body += renderFieldsHtml(templateFor(tpls, e.templateId), e, allCharacters, hrefForChar, "", fieldOpts);
+      files.push({ name: `entries/${safeName(e.id)}.html`, text: pageShell("../", siteTitle, e.name || i18n("Без названия"), body) });
+    }
+  }
+
   // ── Индекс ──
   {
     function list(entities, kind) {
@@ -219,6 +238,7 @@ export async function exportSiteZip({ readers = false } = {}) {
     body += `<section class="section"><h2>${escapeHtml(i18n("Персонажи"))}</h2>${list(characters, "characters")}</section>`;
     body += `<section class="section"><h2>${escapeHtml(i18n("Локации"))}</h2>${list(locations.filter((l) => !l.parentId), "locations")}</section>`;
     body += `<section class="section"><h2>${escapeHtml(i18n("Фракции"))}</h2>${list(factions, "factions")}</section>`;
+    for (const { s, list: items } of ownSections) body += `<section class="section"><h2>${escapeHtml(s.name)}</h2>${list(items, "entries")}</section>`;
     body += `<p><a href="timeline.html">${escapeHtml(i18n("Таймлайн"))} →</a></p>`;
     files.push({ name: `index.html`, text: pageShell("", siteTitle, i18n("Обзор"), body) });
   }

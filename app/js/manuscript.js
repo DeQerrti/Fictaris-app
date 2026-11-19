@@ -13,6 +13,7 @@ import { loadStatuses, buildStatusDot, buildStatusManagePanel } from "./chapter-
 import { pushTrash } from "./trash.js";
 import { iconSvg, locationTypeInfo, factionTypeInfo } from "./icons.js";
 import { toReaderText } from "./text-format.js";
+import { loadEntries, entryViews } from "./sections.js";
 import { recordToday, loadWritingLog, computeStats } from "./writing-goal.js";
 import { wordCount } from "./stats.js";
 import { openEntityModal } from "./entity-modal.js";
@@ -43,6 +44,7 @@ let manuscript = { chapters: [], activeChapterId: null };
 let characters = [];
 let locations = [];
 let factions = [];
+let entries = []; // записи своих разделов с _sec — для ссылок [[entry:…]]
 let focusMode = false;
 let container = null;
 let currentTextarea = null; // поле открытой главы в режиме «Разметка» — на него действуют кнопки панели инструментов
@@ -258,7 +260,21 @@ function linkForms(kind, id, name) {
   return [...forms].filter(Boolean).slice(0, 12);
 }
 
-const ENTITY_KIND = { place: "location", faction: "faction" };
+const ENTITY_KIND = { place: "location", faction: "faction", entry: "entry" };
+
+function linkEntity(kind, id) {
+  const list = kind === "place" ? locations : kind === "entry" ? entries : factions;
+  return list.find((x) => x.id === id) || null;
+}
+
+function linkKindLabel(kind, entity) {
+  if (kind === "entry") return entity?._sec?.name || i18n("Запись");
+  return kind === "place" ? i18n("Место") : i18n("Фракция");
+}
+
+function linkOpenLabel(kind) {
+  return kind === "place" ? i18n("Открыть место") : kind === "entry" ? i18n("Открыть запись") : i18n("Открыть фракцию");
+}
 
 function openMentionPanel(span, editor) {
   const r = span.getBoundingClientRect();
@@ -273,15 +289,15 @@ function openMentionPanel(span, editor) {
   let panel;
   if (span.classList.contains("re-link")) {
     const kind = span.dataset.kind;
-    const entity = (kind === "place" ? locations : factions).find((x) => x.id === span.dataset.id);
-    const typeLabel = entity ? (kind === "place" ? locationTypeInfo(entity.type)[1] : factionTypeInfo(entity.type)[1]) : i18n("Удалено из мира");
+    const entity = linkEntity(kind, span.dataset.id);
+    const typeLabel = !entity ? i18n("Удалено из мира") : kind === "entry" ? "" : i18n(kind === "place" ? locationTypeInfo(entity.type)[1] : factionTypeInfo(entity.type)[1]);
     panel = buildMentionPanel(span, {
       ...done,
       title: entity?.name || span.textContent,
-      subtitle: `${kind === "place" ? i18n("Место") : i18n("Фракция")} · ${i18n(typeLabel)}`,
+      subtitle: typeLabel ? `${linkKindLabel(kind, entity)} · ${typeLabel}` : linkKindLabel(kind, entity),
       color: entityColor(kind, entity),
       forms: linkForms(kind, span.dataset.id, entity?.name || span.textContent),
-      openLabel: kind === "place" ? i18n("Открыть место") : i18n("Открыть фракцию"),
+      openLabel: linkOpenLabel(kind),
       onOpen: entity
         ? () => {
             closeMenu();
@@ -316,7 +332,7 @@ function openLinkPicker(editor, x, y) {
   if (!range || range.collapsed) return;
   const picker = buildLinkPicker({
     selected: range.toString().replace(/\s+/g, " ").trim(),
-    sources: { characters, locations, factions },
+    sources: { characters, locations, factions, entries },
     onPick: (target) => {
       closeMenu();
       editor.linkRange(range, target);
@@ -336,7 +352,7 @@ function attachRichContextMenu(editor, chapter) {
         ? [
             { label: i18n("Как назвать в тексте…"), action: () => openMentionPanel(mention, editor) },
             {
-              label: mention.classList.contains("re-link") ? (mention.dataset.kind === "place" ? i18n("Открыть место") : i18n("Открыть фракцию")) : i18n("Открыть досье"),
+              label: mention.classList.contains("re-link") ? linkOpenLabel(mention.dataset.kind) : i18n("Открыть досье"),
               action: () =>
                 mention.classList.contains("re-link")
                   ? document.dispatchEvent(new CustomEvent("fictaris:open-entity", { detail: { type: ENTITY_KIND[mention.dataset.kind], id: mention.dataset.id } }))
@@ -605,13 +621,14 @@ function openStatusManagePopover(x, y) {
 export async function renderManuscript(root, focusChapterId) {
   container = root;
   focusMode = false; // модуль всегда открывается в обычном виде, фокус — временное состояние сессии просмотра
-  const [manuscriptData, charactersData, locationsData, siteSettings, statusList, factionsData] = await Promise.all([
+  const [manuscriptData, charactersData, locationsData, siteSettings, statusList, factionsData, entriesData] = await Promise.all([
     apiGet("/api/manuscript"),
     apiGet("/api/characters"),
     apiGet("/api/locations").catch(() => []),
     apiGet("/api/site-settings").catch(() => ({})),
     loadStatuses(),
     apiGet("/api/factions").catch(() => []),
+    loadEntries(),
   ]);
   manuscript = manuscriptData;
   manuscript.folders = manuscript.folders || []; // старые проекты сохранялись без папок
@@ -620,6 +637,7 @@ export async function renderManuscript(root, focusChapterId) {
   characters = charactersData;
   locations = Array.isArray(locationsData) ? locationsData : [];
   factions = Array.isArray(factionsData) ? factionsData : [];
+  entries = entryViews(entriesData);
   statuses = statusList;
   const savedSize = Number(siteSettings.editorFontSize);
   editorFontSize =
@@ -1658,6 +1676,7 @@ function buildEditor() {
       characters,
       locations,
       factions,
+      entries,
       placeholder: i18n("Пиши здесь… «@» – ссылка на персонажа, место или фракцию"),
       onChange: (text) => {
         chapter.content = text;
@@ -1666,7 +1685,7 @@ function buildEditor() {
       },
       onMentionClick: (span) => openMentionPanel(span, editor),
     });
-    richAutocomplete = attachRichAutocomplete(editor, () => ({ characters, locations, factions }));
+    richAutocomplete = attachRichAutocomplete(editor, () => ({ characters, locations, factions, entries }));
     attachMentionHoverPreview(editor.el, () => characters);
     attachStickyPopover(editor.el, () => chapter.stickies || []);
     attachRichContextMenu(editor, chapter);

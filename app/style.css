@@ -4731,3 +4731,28 @@ input[type="color"]:focus-visible,
 .secret-mark { display: inline-flex; vertical-align: -1px; margin-left: 5px; color: var(--accent); }
 .secret-toggle:not(.on) { color: var(--text-faint); }
 .secret-toggle.on { color: var(--accent); border-color: var(--accent); }
+
+/* ── Свои разделы мира ── */
+.sb-add-tile { opacity: 0.6; }
+.sb-add-tile:hover { opacity: 1; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #1a1208; font-weight: 600; }
+.btn.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+.sec-new { width: min(440px, calc(100vw - 32px)); padding: 20px 22px; display: flex; flex-direction: column; }
+.sec-new-title { margin: 0 0 6px; font-size: 1.05rem; }
+.sec-new-label { display: block; font-size: 0.76rem; color: var(--text-dim); margin: 12px 0 6px; }
+.sec-new-input { width: 100%; box-sizing: border-box; padding: 7px 10px; border: 1px solid var(--border); border-radius: 7px; background: var(--panel-alt); color: var(--text); font: inherit; }
+.sec-new-input:focus { outline: none; border-color: var(--accent); }
+.sec-new-presets { display: flex; flex-wrap: wrap; gap: 6px; }
+.sec-new-chip { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border: 1px solid var(--border); border-radius: 999px; background: var(--panel-alt); color: var(--text-dim); font: inherit; font-size: 0.8rem; cursor: pointer; }
+.sec-new-chip.on { border-color: var(--accent); color: var(--text); }
+.sec-new-icons, .sec-new-colors { display: flex; flex-wrap: wrap; gap: 6px; }
+.sec-new-icon { width: 32px; height: 32px; display: grid; place-items: center; border: 1px solid var(--border); border-radius: 7px; background: var(--panel-alt); color: var(--text-dim); cursor: pointer; }
+.sec-new-icon.on { border-color: var(--accent); color: var(--accent); }
+.sec-new-color { width: 24px; height: 24px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; }
+.sec-new-color.on { border-color: var(--text); }
+.sec-new-fields { margin-top: 14px; font-size: 0.78rem; color: var(--text-faint); line-height: 1.5; }
+.sec-new-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+.sec-menu { width: 280px; padding: 4px 6px 8px; }
+.sec-menu .sec-new-label:first-child { margin-top: 4px; }
+.sec-menu .sec-new-colors { margin-top: 8px; }
+.sec-menu .sec-del { margin-top: 14px; width: 100%; }

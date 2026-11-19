@@ -7,6 +7,8 @@ import { exportSiteZip } from "./export-site.js";
 import { i18n } from "./i18n.js";
 import { chapterLabel } from "./books.js";
 import { toReaderText } from "./text-format.js";
+import { loadEntries, entryViews, sectionKind } from "./sections.js";
+import { loadTemplates, templateFor } from "./templates.js";
 import { readRecent } from "./recent-nav.js";
 import { openTagsPanel, openTemplatesPanel, openCalendarPanel } from "./world-panels.js";
 
@@ -150,8 +152,18 @@ async function buildIndex() {
     apiGet("/api/knowledge"),
     apiGet("/api/canvas"),
   ]);
+  const own = entryViews(await loadEntries());
 
   const entries = [];
+  // Записи своих разделов — переход открывает запись в её разделе.
+  const tplCache = new Map();
+  for (const e of own) {
+    const kind = sectionKind(e.sectionId);
+    if (!tplCache.has(kind)) tplCache.set(kind, await loadTemplates(kind));
+    const fields = templateFor(tplCache.get(kind), e.templateId)?.fields || [];
+    const text = [e.tags, ...fields.map((f) => e[f.key])].filter((v) => typeof v === "string").join("\n");
+    entries.push({ module: "section", id: e.id, title: e.name, subtitle: snippet(fields.map((f) => e[f.key]).find((v) => typeof v === "string" && v.trim())), text, color: e._sec.color || "#7d6a9e", typeLabel: e._sec.name });
+  }
   for (const c of characters) {
     // text — по чему ещё искать, кроме заголовка: раньше поиск видел только
     // первые 90 символов, и фраза из середины главы не находилась.
@@ -272,7 +284,7 @@ function appendContentRow(m, labels) {
     // карточек по id (Доска/Знания), чтобы не дублировать название раздела
     // ещё и типом рядом ("Доска" + бейдж "Доска"); || бы счёл пустую
     // строку отсутствующим значением и откатился к m.module.
-    `<span class="search-result-type">${labels[m.module] ?? m.module}</span>` +
+    `<span class="search-result-type">${m.typeLabel ? escapeHtml(m.typeLabel) : labels[m.module] ?? m.module}</span>` +
     `<span class="search-result-title">${escapeHtml(m.title || i18n("Без названия"))}</span>` +
     (m.subtitle ? `<span class="search-result-sub">${escapeHtml(m.subtitle)}</span>` : "");
   row.addEventListener("click", () => {

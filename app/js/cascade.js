@@ -226,6 +226,18 @@ export async function detachFaction(id) {
   return links;
 }
 
+// Запись своего раздела: ссылки [[entry:id|слово]] в главах становятся словом.
+export async function detachEntry(id) {
+  const manuscript = await apiGet("/api/manuscript");
+  let changed = false;
+  for (const ch of manuscript.chapters || []) {
+    const r = unlinkEntity(ch.content, "entry", id);
+    if (r.count) { ch.content = r.text; changed = true; }
+  }
+  if (changed) await apiPost("/api/manuscript", manuscript);
+  return {};
+}
+
 // ── Возврат из корзины ──
 // at — где id стоял в списке (порядок в списке — порядок в интерфейсе).
 function addId(list, id, at = -1) {

@@ -39,6 +39,12 @@
 Массив. `id`, `name`, `type` (`order` | `monarchy` | `cult` | `military` | `syndicate` | `other`), `description`, `notes`, `tags`, `leaderId` (персонаж или `null`), `headquartersId` (локация или `null`), `memberIds: string[]` (персонажи), `templateId`, `images`.
 - `relations: { [id другой фракции]: статус }` – отношения с другими фракциями. Статус – `"allies"` (союзники), `"enemies"` (враждуют), `"neutral"` (нейтрально) или свой текст («вассалы»). **Симметрично**: у обеих фракций одинаковый статус друг о друге. Нет записи – отношение не задано.
 
+### entries.json – свои разделы мира
+```
+{ "sections": [{ "id", "name", "icon", "color" }], "entries": [{ "id", "sectionId", "name", "tags", "templateId", "images", ... }] }
+```
+Разделы, которые заводит автор: «Магия», «Артефакты», «Государства» и т.п. Раздел: `id`, `name`, `icon` (имя значка: `flame`, `gem`, `crown`, `sword`, `shield`, `coin`, `book`, `globe`, `lightbulb`, `landmark`, `door`, `eye`, `route`, `network`, `folder`), `color` (`#rrggbb`). Порядок `sections` – порядок плиток в «Мире». Запись: `id`, `sectionId` (раздел), `name`, `tags` (строка через запятую), `templateId`, `images`, `secret`; значения анкеты – под ключами полей. Шаблоны анкеты раздела – `site-settings.json` → `templates["section:<id раздела>"]`. Запись без существующего раздела не показывается.
+
 ### relationships.json – связи между персонажами
 Массив. `id`, `charA`, `charB` (id персонажей), `label` – как назвать связь («наставник»), `score` – число от −100 (вражда) до 100 (близость), `note`.
 
@@ -54,7 +60,7 @@
 Текст главы `content` – **простой текст**, не HTML и не Markdown. Абзацы разделяются переводом строки. Внутри поддерживается:
 - форматирование: `**жирный**`, `*курсив*`, `~~зачёркнутый~~`, `==выделение==`, `<u>подчёркнутый</u>`;
 - упоминания персонажей: `@Имя` или `@[Имя|как в тексте]` (для падежей: `@[Надя|Наде]`). Слева от `|` – **точное** `name` персонажа;
-- ссылки на места и фракции: `[[place:<id места>|как в тексте]]`, `[[faction:<id фракции>|как в тексте]]` – по `id` из `locations.json` / `factions.json`, справа от `|` – слово, которое видит читатель, в нужном падеже: `шли до [[place:loc-ivnyak|Ивняка]]`. В слове нельзя `]` и `|`. Места, на которые есть ссылка, считаются местами главы наравне с `locationIds`;
+- ссылки на места и фракции: `[[place:<id места>|как в тексте]]`, `[[faction:<id фракции>|как в тексте]]`, `[[entry:<id записи>|как в тексте]]` (запись своего раздела) – по `id` из `locations.json` / `factions.json` / `entries.json`, справа от `|` – слово, которое видит читатель, в нужном падеже: `шли до [[place:loc-ivnyak|Ивняка]]`. В слове нельзя `]` и `|`. Места, на которые есть ссылка, считаются местами главы наравне с `locationIds`;
 - стикеры: `[[note:n1]]` – ссылка на `stickies[].id` той же главы.
 
 Папка: `id`, `name`, `bookId`, `parentId` (папка той же книги или `null`), `status`, `collapsed`. Папки верхнего уровня – части книги в «Обзоре».
@@ -111,4 +117,5 @@
 - **персонаж** – карточки холстов `canvas` → `cards[].entity` (карточку удалить или оставить – приложение покажет её как «Удалено из мира»), `characters[].parentIds/adoptiveParentIds/uncertainParentIds/partnerIds`, ключи `partnerKinds`, `manuscript.chapters[].characterIds`, `relationships[].charA/charB` (связь удалить целиком), `factions[].leaderId/memberIds`, `timeline[].characterIds`, `board` → `cards[].characterIds`, `map` → `pins[].characterId`, ключи `knowledge.facts[].entries`, упоминания `@Имя` в тексте глав. **Переименование персонажа ломает упоминания** – замените `@Старое имя` в `content` глав.
 - **локация** – карточки холстов `canvas` → `cards[].entity` (карточку удалить или оставить – приложение покажет её как «Удалено из мира»), `locations[].parentId`, `manuscript.chapters[].locationIds`, `factions[].headquartersId`, `timeline[].locationIds`, карточки досок, метки карт, ссылки `[[place:id|слово]]` в тексте глав (заменить на само слово).
 - **фракция** – карточки холстов `canvas` → `cards[].entity` (карточку удалить или оставить – приложение покажет её как «Удалено из мира»), ключи `factions[].relations` других фракций, карточки досок (`factionId`), границы на картах `map` → `drawing.shapes[].factionId`, ссылки `[[faction:id|слово]]` в тексте глав (заменить на само слово).
+- **запись своего раздела** – ссылки `[[entry:id|слово]]` в тексте глав (заменить на само слово). Удаляя раздел, удалите и его записи.
 - **глава** – `canvas` → `cards[].chapterId` и `cards[].entity`, карточки досок (`chapterId`), значения `knowledge.facts[].entries`, `manuscript.activeChapterId`.

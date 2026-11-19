@@ -75,7 +75,7 @@ export function parseInlineSegments(rawText) {
 // каждый формат сам.
 export function toReaderText(text) {
   return String(text || "")
-    .replace(/\[\[(?:place|faction):[\w-]+\|([^\]\n]*)\]\]/g, "$1")
+    .replace(/\[\[(?:place|faction|entry):[\w-]+\|([^\]\n]*)\]\]/g, "$1")
     .replace(/ ?\[\[note:[^\]\n]*\]\]/g, "")
     .replace(/@\[([^|\]\n]+)\|([^\]\n]+)\]/g, "$2")
     .replace(/(^|[^\p{L}\p{N}_@])@(?=\p{L})/gu, "$1");
@@ -86,7 +86,8 @@ export function toReaderText(text) {
 // — по id, а не по названию: переименование места ссылку не ломает, а
 // слово в тексте (падеж) остаётся тем, что написал автор. Персонажи —
 // по-прежнему @Имя / @[Имя|форма] (mentions.js).
-export const ENTITY_LINK_RE = /\[\[(place|faction):([\w-]+)\|([^\]\n]*)\]\]/g;
+// [[entry:<id записи>|как в тексте]] — запись своего раздела мира (sections.js).
+export const ENTITY_LINK_RE = /\[\[(place|faction|entry):([\w-]+)\|([^\]\n]*)\]\]/g;
 
 export function linkedEntityIds(text, kind) {
   const ids = new Set();

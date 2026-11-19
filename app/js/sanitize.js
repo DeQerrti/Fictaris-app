@@ -120,7 +120,16 @@ function settingsData(s) {
   return s;
 }
 
+// Свои разделы: цвет раздела, у записей — картинки (sections.js).
+function entriesData(data) {
+  if (!data || typeof data !== "object") return data;
+  if (Array.isArray(data.sections)) data.sections.forEach((s) => fixColor(s, "color"));
+  entities(data.entries);
+  return data;
+}
+
 const BY_FILE = {
+  entries: entriesData,
   characters: entities,
   locations: entities,
   factions: entities,

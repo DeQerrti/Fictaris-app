@@ -23,6 +23,8 @@ const EMPTY_CANVAS = { order: [], canvases: {} };
 const EMPTY_WRITING_LOG = { dailyGoal: 300, days: {} };
 const EMPTY_PLOT = { nodes: [], edges: [] };
 const EMPTY_KNOWLEDGE = { facts: [] };
+const EMPTY_ENTRIES = { sections: [], entries: [] };
+const EMPTY_PLOTLINES = { lines: [] };
 const IMAGE_EXT = /^(jpg|jpeg|png|webp)$/i;
 
 // Резервная копия/синхронизация (app/js/sync.js) — весь проект одним
@@ -44,6 +46,8 @@ const BACKUP_FILES = [
   "writing-log.json",
   "plot.json",
   "knowledge.json",
+  "entries.json",
+  "plotlines.json",
 ];
 
 // site-settings.json смешивает два рода настроек. Вид приложения (тема,
@@ -80,6 +84,10 @@ async function exportBackup({ vault }) {
         ? EMPTY_PLOT
         : name === "knowledge.json"
         ? EMPTY_KNOWLEDGE
+        : name === "entries.json"
+        ? EMPTY_ENTRIES
+        : name === "plotlines.json"
+        ? EMPTY_PLOTLINES
         : []
     );
   }
@@ -255,6 +263,21 @@ export const ROUTES = {
   "POST /api/knowledge": async ({ vault, body }) => {
     if (!body || !Array.isArray(body.facts)) throw new ApiError("Некорректный список фактов");
     return vault.writeJson("knowledge.json", body);
+  },
+
+  // Свои разделы мира (app/js/sections.js): «Магия», «Артефакты» и т.п.
+  // sections — сами разделы, entries — записи в них (sectionId).
+  "GET /api/entries": async ({ vault }) => vault.readJson("entries.json", EMPTY_ENTRIES),
+  "POST /api/entries": async ({ vault, body }) => {
+    if (!body || !Array.isArray(body.sections) || !Array.isArray(body.entries)) throw new ApiError("Некорректные разделы мира");
+    return vault.writeJson("entries.json", body);
+  },
+
+  // Сюжетные линии (app/js/plotlines.js): строки сетки «линии × главы».
+  "GET /api/plotlines": async ({ vault }) => vault.readJson("plotlines.json", EMPTY_PLOTLINES),
+  "POST /api/plotlines": async ({ vault, body }) => {
+    if (!body || !Array.isArray(body.lines)) throw new ApiError("Некорректные сюжетные линии");
+    return vault.writeJson("plotlines.json", body);
   },
 
   "GET /api/canvas": async ({ vault }) => vault.readJson("canvas.json", EMPTY_CANVAS),

@@ -1,4 +1,5 @@
 import { apiGet } from "./api.js";
+import { loadEntries, sectionKind } from "./sections.js";
 import { iconSvg } from "./icons.js";
 import { openPopover, closeMenu } from "./context-menu.js";
 import { KIND_LABELS, loadTemplates, saveTemplates, templateFor, blankField } from "./templates.js";
@@ -57,7 +58,14 @@ export async function renderFieldsEditor(body, startKind) {
 }
 
 async function render() {
-  const [list, entities] = await Promise.all([loadTemplates(kind), apiGet(ENTITY_PATH[kind]).catch(() => [])]);
+  // Свои разделы мира — тоже вкладками, их записи лежат в entries.json.
+  const ownData = await loadEntries();
+  const kinds = [...Object.keys(KIND_LABELS).map((k) => [k, KIND_LABELS[k]()]), ...ownData.sections.map((s) => [sectionKind(s.id), s.name])];
+  const sectionId = kind.startsWith("section:") ? kind.slice(8) : null;
+  const [list, entities] = await Promise.all([
+    loadTemplates(kind),
+    sectionId ? ownData.entries.filter((e) => e.sectionId === sectionId) : apiGet(ENTITY_PATH[kind]).catch(() => []),
+  ]);
   if (!list.some((t) => t.id === templateId)) templateId = list[0].id;
   const tpl = list.find((t) => t.id === templateId);
   const users = (Array.isArray(entities) ? entities : []).filter((e) => templateFor(list, e.templateId).id === tpl.id);
@@ -71,10 +79,10 @@ async function render() {
   top.className = "fe-top";
   const seg = document.createElement("div");
   seg.className = "segmented";
-  for (const k of Object.keys(KIND_LABELS)) {
+  for (const [k, title] of kinds) {
     const b = document.createElement("button");
     b.className = "segmented-btn" + (k === kind ? " active" : "");
-    b.textContent = KIND_LABELS[k]();
+    b.textContent = title;
     b.addEventListener("click", () => {
       kind = k;
       templateId = null;

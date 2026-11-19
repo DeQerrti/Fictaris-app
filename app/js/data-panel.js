@@ -51,7 +51,7 @@ function looksLikeProjectExport(bundle) {
 }
 
 async function fetchAll() {
-  const [characters, locations, relationships, factions, timeline, board, map, manuscript, plot, knowledge, canvas] = await Promise.all([
+  const [characters, locations, relationships, factions, timeline, board, map, manuscript, plot, knowledge, canvas, entries, plotlines] = await Promise.all([
     apiGet("/api/characters"),
     apiGet("/api/locations"),
     apiGet("/api/relationships"),
@@ -63,8 +63,10 @@ async function fetchAll() {
     apiGet("/api/plot"),
     apiGet("/api/knowledge"),
     apiGet("/api/canvas"),
+    apiGet("/api/entries"),
+    apiGet("/api/plotlines"),
   ]);
-  return { characters, locations, relationships, factions, timeline, board, map, manuscript, plot, knowledge, canvas };
+  return { characters, locations, relationships, factions, timeline, board, map, manuscript, plot, knowledge, canvas, entries, plotlines };
 }
 
 // Полная замена — импорт и «Заполнить примером» идут одним и тем же
@@ -87,6 +89,8 @@ async function applyAll(bundle) {
     apiPost("/api/plot", bundle.plot && Array.isArray(bundle.plot.nodes) ? bundle.plot : EMPTY_PLOT),
     apiPost("/api/knowledge", bundle.knowledge && Array.isArray(bundle.knowledge.facts) ? bundle.knowledge : EMPTY_KNOWLEDGE),
     apiPost("/api/canvas", bundle.canvas && Array.isArray(bundle.canvas.order) ? bundle.canvas : EMPTY_CANVAS),
+    apiPost("/api/entries", bundle.entries && Array.isArray(bundle.entries.sections) && Array.isArray(bundle.entries.entries) ? bundle.entries : { sections: [], entries: [] }),
+    apiPost("/api/plotlines", bundle.plotlines && Array.isArray(bundle.plotlines.lines) ? bundle.plotlines : { lines: [] }),
   ]);
 }
 
@@ -178,6 +182,8 @@ function historyFiles() {
     ["writing-log.json", i18n("Писательская серия")],
     ["plot.json", i18n("Карта сюжета")],
     ["knowledge.json", i18n("Знания")],
+    ["entries.json", i18n("Свои разделы")],
+    ["plotlines.json", i18n("Сюжетные линии")],
   ];
 }
 

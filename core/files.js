@@ -21,6 +21,8 @@ const KNOWN_FILES = new Set([
   "writing-log.json",
   "plot.json",
   "knowledge.json",
+  "entries.json",
+  "plotlines.json",
 ]);
 
 export const KNOWN_FILE_NAMES = [...KNOWN_FILES];

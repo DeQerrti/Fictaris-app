@@ -11,6 +11,7 @@ import { renderTrash } from "./trash.js";
 import { openPopover, closeMenu } from "./context-menu.js";
 import { openSearch } from "./search.js";
 import { personAvatarHtml } from "./entity-view.js";
+import { openNewSectionDialog } from "./sections.js";
 
 // ══════════════════════════════════════════════
 //  САЙДБАР — «Стол писателя»
@@ -39,6 +40,7 @@ let openEntityModal = null;
 let getCurrent = () => null;
 let refreshTimer = null;
 let lastData = null;
+let shownSectionId = null;
 
 export function initSidebarOverview(deps) {
   ({ openModule, openEntityModal, getCurrent } = deps);
@@ -56,6 +58,11 @@ export function initSidebarOverview(deps) {
   document.addEventListener("fictaris:data-changed", () => scheduleRefresh());
   document.addEventListener("fictaris:trash-changed", () => scheduleRefresh(100));
   document.addEventListener("fictaris:recent-changed", refreshRecent);
+  document.addEventListener("fictaris:sections-changed", () => scheduleRefresh(50));
+  document.addEventListener("fictaris:section-shown", (e) => {
+    shownSectionId = e.detail.id;
+    for (const btn of document.querySelectorAll(".nav-tile[data-section-id]")) btn.classList.toggle("active", btn.dataset.sectionId === shownSectionId);
+  });
   refreshSidebar();
 }
 
@@ -97,7 +104,7 @@ function goToTarget(target) {
 
 // ── Данные ─────────────────────────────────────
 async function loadData() {
-  const names = ["characters", "locations", "factions", "relationships", "timeline", "board", "map", "manuscript", "canvas", "knowledge", "writing-log", "trash"];
+  const names = ["characters", "locations", "factions", "relationships", "timeline", "board", "map", "manuscript", "canvas", "knowledge", "writing-log", "trash", "entries"];
   const values = await Promise.all(names.map((n) => apiGet(`/api/${n}`).catch(() => null)));
   const d = Object.fromEntries(names.map((n, i) => [n, values[i]]));
   return {
@@ -113,6 +120,8 @@ async function loadData() {
     knowledge: d.knowledge || { facts: [] },
     log: d["writing-log"] || { days: {} },
     trash: Array.isArray(d.trash) ? d.trash : [],
+    sections: Array.isArray(d.entries?.sections) ? d.entries.sections : [],
+    entries: Array.isArray(d.entries?.entries) ? d.entries.entries : [],
     statuses: await loadStatuses(),
   };
 }
@@ -134,6 +143,7 @@ export async function refreshSidebar() {
   if (!data) return;
   lastData = data;
   renderCounts(data);
+  renderSectionTiles(data);
   renderWorld(data);
   renderNow(data);
   renderBooks(data);
@@ -188,6 +198,34 @@ function renderCounts(data) {
     const label = btn.querySelector(".nav-label")?.textContent.trim() || "";
     btn.title = n ? `${label} · ${n}` : label;
   }
+}
+
+// Свои разделы мира — плитками в «Мире» после встроенных, последней —
+// «+ Раздел» (sections.js). Не .nav-item[data-module]: у них нет своей
+// цифры-клавиши и строки в «Разделах» Настроек, подсветку ставит событие
+// fictaris:section-shown.
+function renderSectionTiles(data) {
+  const world = document.querySelector('.sb-section[data-section="world"]');
+  if (!world) return;
+  world.querySelectorAll(".sb-custom-tile").forEach((el) => el.remove());
+  for (const s of data.sections) {
+    const n = data.entries.filter((e) => e.sectionId === s.id).length;
+    const btn = document.createElement("button");
+    btn.className = "nav-item nav-tile sb-custom-tile" + (s.id === shownSectionId && getCurrent() === "section" ? " active" : "");
+    btn.dataset.sectionId = s.id;
+    btn.innerHTML = `<span class="nav-icon" style="color:${/^#[0-9a-f]{6}$/i.test(s.color || "") ? s.color : "inherit"}">${iconSvg(s.icon || "folder", 16)}</span><span class="nav-label"></span><span class="nav-count">${n}</span>`;
+    btn.querySelector(".nav-label").textContent = s.name || i18n("Без названия");
+    btn.title = `${s.name} · ${n}`;
+    btn.addEventListener("click", () => openModule("section", s.id));
+    world.appendChild(btn);
+  }
+  const add = document.createElement("button");
+  add.className = "nav-item nav-tile sb-custom-tile sb-add-tile";
+  add.innerHTML = `<span class="nav-icon">${iconSvg("notePlus", 16)}</span><span class="nav-label"></span>`;
+  add.querySelector(".nav-label").textContent = i18n("Раздел");
+  add.title = i18n("Свой раздел мира – магия, артефакты, государства…");
+  add.addEventListener("click", () => openNewSectionDialog((section) => openModule("section", section.id)));
+  world.appendChild(add);
 }
 
 function renderWorld(data) {
@@ -271,6 +309,13 @@ function resolveRecent(entry, data) {
       ? personAvatarHtml(e, "cast-avatar sb-recent-avatar")
       : `<span class="sb-recent-icon">${iconSvg(entry.module === "locations" ? "pin" : "shield", 14)}</span>`;
     return { lead, title: e.name || i18n("Без имени"), kind };
+  }
+  if (entry.module === "section") {
+    const e = data.entries.find((x) => x.id === entry.id);
+    const s = data.sections.find((x) => x.id === (e ? e.sectionId : entry.id));
+    if (!s) return null;
+    const lead = `<span class="sb-recent-icon">${iconSvg(s.icon || "folder", 14)}</span>`;
+    return e ? { lead, title: e.name || i18n("Без названия"), kind: (s.name || "").toLowerCase() } : { lead, title: s.name, kind: i18n("раздел") };
   }
   if (entry.id && entry.module === "manuscript") {
     const ch = (data.manuscript.chapters || []).find((c) => c.id === entry.id);

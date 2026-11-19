@@ -12,6 +12,7 @@ import { renderStats } from "./stats.js";
 import { renderFamilyTree } from "./family-tree.js";
 import { renderCanvas } from "./canvas.js";
 import { renderKnowledge } from "./knowledge.js";
+import { renderSection } from "./sections.js";
 import { fillWithDemoData, isProjectEmpty, maybeRunHistoryCleanup } from "./data-panel.js";
 import { renderSettings } from "./settings-panel.js";
 import { initProjectSwitcher } from "./project-switcher.js";
@@ -50,6 +51,7 @@ const MODULES = {
   graph: renderGraph,
   familytree: renderFamilyTree,
   canvas: renderCanvas,
+  section: renderSection,
   knowledge: renderKnowledge,
   stats: renderStats,
   settings: renderSettings,
@@ -75,6 +77,7 @@ const statsBtn = document.getElementById("statsBtn");
 // будет показывать одно, а содержимое — другое.
 let openRequestId = 0;
 let currentModuleName = null;
+let currentArg = null;
 
 // Проверка и Корзина — окна из нижней строки сайдбара, а не вкладки
 // (sidebar-overview.js); Настройки и Статистика — окна поверх экрана.
@@ -116,11 +119,15 @@ async function openModule(name, arg) {
   if (name === "stats") return openEntityModal("stats");
   const requestId = ++openRequestId;
   currentModuleName = name;
+  currentArg = arg;
   // Фокус-режим рукописи прячет сайдбар классом на body (manuscript.js) —
   // сбрасываем его при любом переключении модуля, иначе уйти со
   // страницы, скрывшей навигацию, можно было бы только через Esc.
   document.body.classList.remove("focus-mode");
   navItems.forEach((btn) => btn.classList.toggle("active", btn.dataset.module === name));
+  // Плитки своих разделов (sidebar-overview.js) — подсветку им ставит
+  // сам раздел событием fictaris:section-shown.
+  document.querySelectorAll(".nav-tile[data-section-id]").forEach((btn) => btn.classList.remove("active"));
   // Клик мышью оставляет активный фокус на нажатой кнопке — саму подсветку
   // выбора это не портит (она через .active, не :focus), но при живом
   // переключении по горячим клавишам старая кнопка иначе продолжает
@@ -220,7 +227,9 @@ document.addEventListener("fictaris:open-character", (e) => {
 // «Отношения» и др.) — отдельное общее событие с типом сущности,
 // а не переиспользование fictaris:open-character (та завязана именно
 // на модуль «Персонажи» и используется @упоминаниями в тексте главы).
-const ENTITY_MODULES = { character: "characters", location: "locations", faction: "factions" };
+const ENTITY_MODULES = { character: "characters", location: "locations", faction: "factions", entry: "section" };
+// Раздел удалили (sections.js) — уходим на другой.
+document.addEventListener("fictaris:open-module", (e) => openModule(e.detail.module, e.detail.id));
 document.addEventListener("fictaris:open-entity", (e) => {
   const module = ENTITY_MODULES[e.detail.type];
   if (!module) return;
@@ -244,7 +253,7 @@ document.addEventListener("fictaris:open-chapter", (e) => {
 async function reloadAfterExternalChange() {
   if (currentModuleName) {
     const scroll = content.scrollTop;
-    await openModule(currentModuleName);
+    await openModule(currentModuleName, currentModuleName === "section" ? currentArg : undefined);
     content.scrollTop = scroll;
   }
   refreshEntityModal();
@@ -274,7 +283,7 @@ async function boot() {
   vaultId = info.currentVaultId || info.vaultPath || "";
   setSyncVault(vaultId, Array.isArray(info.vaults) ? info.vaults.length : 1);
   const last = lastModule();
-  const usable = (key) => MODULES[key] && !MODAL_ONLY_MODULES.includes(key) && !hidden.includes(key);
+  const usable = (key) => MODULES[key] && key !== "section" && !MODAL_ONLY_MODULES.includes(key) && !hidden.includes(key);
   const defaultModule = usable(last)
     ? last
     : usable("manuscript")
