@@ -1631,4 +1631,5 @@ export const EN_DICT = {
   "Это не файл .docx.": "This is not a .docx file.",
   "Свои разделы мира": "Custom world sections",
   "Название, значок и цвет меняются в самом разделе – кнопка «⋯» в его шапке": "Name, icon and color are changed in the section itself – the “⋯” button in its header",
+  "Персонаж, место, фракция, запись своего раздела или глава": "Character, place, faction, custom section entry or chapter",
 };

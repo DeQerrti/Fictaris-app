@@ -83,13 +83,13 @@
 ```
 { "boards": [ { "id", "name", "columns": [{id, title}], "cards": { "<id>": card }, "cardOrder": { "<columnId>": ["<cardId>", ...] } } ], "activeBoardId": "..." }
 ```
-Карточка: `id`, `title`, `notes`, `type` (`scene` | `idea` | `edit` | `research` | `mystery` или `null`), `characterIds: string[]` – участники, `factionId`, `locationId`, `chapterId` (каждое – id или `null`), `labelColor` (`#rrggbb` или `null` – тогда цвет типа), `checklist: [{id, text, done}]`. В старых карточках вместо `characterIds` бывает один `characterId` – приложение переведёт его само. Каждая карточка должна быть и в `cards`, и ровно в одном списке `cardOrder`. Старый формат одной доски (`{columns, cards, cardOrder}` без обёртки) тоже читается.
+Карточка: `id`, `title`, `notes`, `type` (`scene` | `idea` | `edit` | `research` | `mystery` или `null`), `characterIds: string[]` – участники, `factionId`, `locationId`, `chapterId` (каждое – id или `null`), `labelColor` (`#rrggbb` или `null` – тогда цвет типа), `checklist: [{id, text, done}]`, `entryIds: string[]` – записи своих разделов (`entries.json`), необязательно. В старых карточках вместо `characterIds` бывает один `characterId` – приложение переведёт его само. Каждая карточка должна быть и в `cards`, и ровно в одном списке `cardOrder`. Старый формат одной доски (`{columns, cards, cardOrder}` без обёртки) тоже читается.
 
 ### canvas.json – холсты
 ```
 { "order": ["<canvasId>", ...], "canvases": { "<id>": { "id", "name", "style"?, "cards": [...], "edges": [...], "groups": [...], "shapes": [...] } } }
 ```
-Карточка: `id`, `x`, `y`, `w`, `h` (пиксели), `title`, `text`, `chapterId` (глава или `null`), `color` (`#rrggbb` или `null`). Карточка из мира – с `entity: { type: "character" | "location" | "faction" | "chapter", id }`: имя и подпись берутся у этой записи, `text` – заметка к ней на холсте. Стрелка: `id`, `fromId`, `toId` (id карточек того же холста), `label`; приложение само ведёт её от ближайших краёв карточек. Группа – рамка на холсте: `id`, `x`, `y`, `w`, `h`, `title`, `color` (`#rrggbb` или `null`); карточки, чей центр внутри рамки, двигаются вместе с ней (сама рамка ссылок на карточки не хранит).
+Карточка: `id`, `x`, `y`, `w`, `h` (пиксели), `title`, `text`, `chapterId` (глава или `null`), `color` (`#rrggbb` или `null`). Карточка из мира – с `entity: { type: "character" | "location" | "faction" | "entry" | "chapter", id }` (`entry` – запись своего раздела): имя и подпись берутся у этой записи, `text` – заметка к ней на холсте. Стрелка: `id`, `fromId`, `toId` (id карточек того же холста), `label`; приложение само ведёт её от ближайших краёв карточек. Группа – рамка на холсте: `id`, `x`, `y`, `w`, `h`, `title`, `color` (`#rrggbb` или `null`); карточки, чей центр внутри рамки, двигаются вместе с ней (сама рамка ссылок на карточки не хранит).
 
 `style: "hand"` – холст «от руки» (контуры пером, рукописный шрифт); нет поля – аккуратный. Фигура (`shapes[]`) – рисунок поверх карточек, в пикселях холста:
 - `{ id, kind: "rect" | "diamond" | "ellipse", x, y, w, h }` – фигура; `fill` (`#rrggbb`) и `fillStyle` (`"cross"`, `"solid"` или нет поля – штрих) – заливка;
@@ -129,5 +129,5 @@
 - **локация** – карточки холстов `canvas` → `cards[].entity` (карточку удалить или оставить – приложение покажет её как «Удалено из мира»), `locations[].parentId`, `manuscript.chapters[].locationIds`, `factions[].headquartersId`, `timeline[].locationIds`, карточки досок, метки карт, ссылки `[[place:id|слово]]` в тексте глав (заменить на само слово).
 - **фракция** – карточки холстов `canvas` → `cards[].entity` (карточку удалить или оставить – приложение покажет её как «Удалено из мира»), ключи `factions[].relations` других фракций, карточки досок (`factionId`), границы на картах `map` → `drawing.shapes[].factionId`, ссылки `[[faction:id|слово]]` в тексте глав (заменить на само слово).
 - Удаляя персонажа, фракцию, запись или главу, можно убрать и линию `plotlines.json` с этим `refId` и ключ главы в `cells` – иначе линия покажет «Удалено из мира».
-- **запись своего раздела** – ссылки `[[entry:id|слово]]` в тексте глав (заменить на само слово). Удаляя раздел, удалите и его записи.
+- **запись своего раздела** – ссылки `[[entry:id|слово]]` в тексте глав (заменить на само слово), `board` → `cards[].entryIds`, карточки холстов `canvas` → `cards[].entity` с `type: "entry"`. Удаляя раздел, удалите и его записи.
 - **глава** – `canvas` → `cards[].chapterId` и `cards[].entity`, карточки досок (`chapterId`), значения `knowledge.facts[].entries`, `manuscript.activeChapterId`.

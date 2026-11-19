@@ -228,14 +228,36 @@ export async function detachFaction(id) {
 
 // Запись своего раздела: ссылки [[entry:id|слово]] в главах становятся словом.
 export async function detachEntry(id) {
-  const manuscript = await apiGet("/api/manuscript");
+  const [manuscript, board] = await Promise.all([apiGet("/api/manuscript"), apiGet("/api/board")]);
   let changed = false;
   for (const ch of manuscript.chapters || []) {
     const r = unlinkEntity(ch.content, "entry", id);
     if (r.count) { ch.content = r.text; changed = true; }
   }
   if (changed) await apiPost("/api/manuscript", manuscript);
-  return {};
+  const links = { cards: [] };
+  changed = false;
+  for (const b of boardsOf(board)) for (const card of Object.values(b.cards || {})) {
+    const at = Array.isArray(card.entryIds) ? card.entryIds.indexOf(id) : -1;
+    if (at < 0) continue;
+    card.entryIds = card.entryIds.filter((x) => x !== id);
+    if (!card.entryIds.length) delete card.entryIds;
+    links.cards.push({ id: card.id, at });
+    changed = true;
+  }
+  if (changed) await apiPost("/api/board", board);
+  return links;
+}
+
+export async function reattachEntry(id, links = {}) {
+  if (!links.cards?.length) return;
+  const board = await apiGet("/api/board");
+  const cards = cardsById(board);
+  for (const ref of links.cards.map(refOf)) {
+    const card = cards.get(ref.id);
+    if (card) card.entryIds = addId(card.entryIds, id, ref.at);
+  }
+  await apiPost("/api/board", board);
 }
 
 // ── Возврат из корзины ──

@@ -56,6 +56,7 @@ const ENTITY_KINDS = [
   ["character", "Персонаж"],
   ["location", "Место"],
   ["faction", "Фракция"],
+  ["entry", "Запись"],
   ["chapter", "Глава"],
 ];
 
@@ -141,12 +142,20 @@ export function buildBoard(ctx) {
       const [, label, icon, color] = factionTypeInfo(x.type);
       return { name: x.name, sub: i18n(label), lead: `<span class="cast-avatar cast-avatar-md" style="background:${color}">${iconSvg(icon, 18)}</span>` };
     }
+    if (ref.type === "entry") {
+      const x = (ctx.entries || []).find((p) => p.id === ref.id);
+      if (!x) return null;
+      const color = /^#[0-9a-f]{6}$/i.test(x._sec.color || "") ? x._sec.color : "#7d6a9e";
+      return { name: x.name, sub: "", kind: x._sec.name, lead: `<span class="cast-avatar cast-avatar-md" style="background:${color}">${iconSvg(x._sec.icon || "folder", 18)}</span>` };
+    }
     if (ref.type === "chapter") {
       const x = ctx.chapters.find((p) => p.id === ref.id);
       return x && { name: x.title, sub: chapterLabel(x, ctx.books) === x.title ? "" : chapterLabel(x, ctx.books).split(" · ")[0], lead: `<span class="cast-avatar cast-avatar-md cboard-chapter-lead">${iconSvg("manuscript", 18)}</span>` };
     }
     return null;
   }
+  // Подпись вида: у записи своего раздела — название раздела («Магия»).
+  const kindOf = (c) => entityOf(c)?.kind || i18n(ENTITY_KINDS.find(([k]) => k === c.entity?.type)?.[1] || "");
   if (!histories.has(cv.id)) histories.set(cv.id, { undo: [], redo: [] });
   const history = histories.get(cv.id);
 
@@ -519,7 +528,7 @@ export function buildBoard(ctx) {
     if (c.entity) {
       el.classList.add("entity");
       const info = entityOf(c);
-      const kindLabel = i18n(ENTITY_KINDS.find(([k]) => k === c.entity.type)?.[1] || "");
+      const kindLabel = kindOf(c);
       const head = document.createElement("div");
       head.className = "cboard-entity-head";
       head.innerHTML = info
@@ -685,7 +694,7 @@ export function buildBoard(ctx) {
     if (cards.length === 1 && !groups.length && cards[0].entity) {
       const c = cards[0];
       const info = entityOf(c);
-      side.appendChild(sectionHeading(i18n(ENTITY_KINDS.find(([k]) => k === c.entity.type)?.[1] || "Карточка")));
+      side.appendChild(sectionHeading(kindOf(c) || i18n("Карточка")));
       const name = document.createElement("div");
       name.className = "cboard-entity-name";
       name.textContent = info ? info.name : i18n("Удалено из мира");
@@ -937,17 +946,23 @@ export function buildBoard(ctx) {
       ...(ctx.characters || []).map((x) => ({ type: "character", id: x.id, name: x.name, sub: x.role })),
       ...(ctx.locations || []).map((x) => ({ type: "location", id: x.id, name: x.name, sub: i18n(locationTypeInfo(x.type)[1]) })),
       ...(ctx.factions || []).map((x) => ({ type: "faction", id: x.id, name: x.name, sub: i18n(factionTypeInfo(x.type)[1]) })),
+      ...(ctx.entries || []).map((x) => ({ type: "entry", id: x.id, name: x.name, sub: x._sec.name, group: x._sec.name })),
       ...ctx.chapters.map((x) => ({ type: "chapter", id: x.id, name: x.title, sub: chapterLabel(x, ctx.books) })),
     ];
     const render = () => {
       const q = search.value.trim().toLowerCase();
       list.innerHTML = "";
-      for (const [type, label] of ENTITY_KINDS) {
+      // Записи своих разделов — группой на раздел («Магия», «Артефакты»).
+      const groups = ENTITY_KINDS.flatMap(([type, label]) => {
         const items = all.filter((x) => x.type === type && (!q || (x.name || "").toLowerCase().includes(q)));
+        if (type !== "entry") return [[i18n(label), items]];
+        return [...new Set(items.map((x) => x.group))].map((g) => [g, items.filter((x) => x.group === g)]);
+      });
+      for (const [title, items] of groups) {
         if (!items.length) continue;
         const head = document.createElement("div");
         head.className = "dossier-list-group";
-        head.textContent = i18n(label);
+        head.textContent = title;
         list.appendChild(head);
         for (const item of items) {
           const onBoard = cv.cards.some((c) => c.entity?.type === item.type && c.entity?.id === item.id);
@@ -1469,7 +1484,7 @@ export function buildBoard(ctx) {
       const c = toWorld(r.left + r.width / 2, r.top + r.height / 2);
       addCardAt(c.x, c.y);
     }),
-    action(escapeHtml(i18n("+ Из мира")), (e) => openWorldPicker(e.currentTarget), i18n("Персонаж, место, фракция или глава")),
+    action(escapeHtml(i18n("+ Из мира")), (e) => openWorldPicker(e.currentTarget), i18n("Персонаж, место, фракция, запись своего раздела или глава")),
     action(iconSvg("camera", 16), () => pickImage(), i18n("Картинка – или вставьте из буфера, Ctrl+V")),
     action(escapeHtml(i18n("Группа")), () => groupSelection(), i18n("Рамка вокруг выбранного или пустая")),
     sep(),

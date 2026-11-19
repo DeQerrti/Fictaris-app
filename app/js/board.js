@@ -9,6 +9,7 @@ import { i18n, i18nPlural } from "./i18n.js";
 import { avatarInnerHtml } from "./avatars.js";
 import { chapterLabel } from "./books.js";
 import { migrateBoards, cardCharacterIds } from "./board-data.js";
+import { loadEntries, entryViews } from "./sections.js";
 
 const LABEL_COLORS = [
   "#c9944a", "#4f7d74", "#a4483c", "#7d6a9e",
@@ -26,6 +27,8 @@ let board = null;
 let characters = [];
 let factions = [];
 let locations = [];
+let entries = []; // записи своих разделов с _sec (sections.js)
+let sections = [];
 let chapters = [];
 let books = []; // manuscript.books — ради подписи книги у главы (chapterLabel)
 let container = null;
@@ -214,13 +217,16 @@ function visible(card) {
 
 export async function renderBoard(root, focusId) {
   container = root;
-  const [rawBoard, chars, facs, locs, manuscriptData] = await Promise.all([
+  const [rawBoard, chars, facs, locs, manuscriptData, own] = await Promise.all([
     apiGet("/api/board"),
     apiGet("/api/characters"),
     apiGet("/api/factions"),
     apiGet("/api/locations"),
     apiGet("/api/manuscript"),
+    loadEntries(),
   ]);
+  entries = entryViews(own);
+  sections = own.sections;
   characters = chars;
   factions = facs;
   locations = locs;
@@ -563,6 +569,11 @@ function buildCard(card, colId) {
   }
   if (chapter) chips.push(`<span class="board-link-chip">${iconSvg("book", 11)}${escapeHtml(chapterLabel(chapter, books))}</span>`);
   if (faction) chips.push(`<span class="board-link-chip">${iconSvg("shield", 11)}${escapeHtml(faction.name || i18n("Без имени"))}</span>`);
+  // Записи своих разделов мира (sections.js).
+  for (const id of card.entryIds || []) {
+    const e = entries.find((x) => x.id === id);
+    if (e) chips.push(`<span class="board-link-chip" style="--chip-color:${e._sec.color || "#7d6a9e"}">${iconSvg(e._sec.icon || "folder", 11)}${escapeHtml(e.name || i18n("Без названия"))}</span>`);
+  }
 
   el.innerHTML = `
     ${stripe || type ? `<div class="board-card-head">${stripe ? `<span class="board-card-stripe" style="background:${stripe}"></span>` : ""}${type ? `<span class="board-card-type">${escapeHtml(i18n(type[1]))}</span>` : ""}</div>` : ""}
@@ -680,6 +691,19 @@ function buildCardEditor(card) {
   links.appendChild(fieldWithLabel(i18n("Глава"), selectOf(chapters, card.chapterId, i18n("Без главы"), (c) => chapterLabel(c, books), (id) => { card.chapterId = id; persist(); draw(); })));
   links.appendChild(fieldWithLabel(i18n("Фракция"), selectOf(factions, card.factionId, i18n("Без фракции"), (f) => f.name || i18n("Без имени"), (id) => { card.factionId = id; persist(); draw(); })));
   drawer.appendChild(links);
+
+  // Записи своих разделов — по разделу на строку («Магия», «Артефакты»…).
+  for (const s of sections) {
+    const items = entries.filter((e) => e.sectionId === s.id);
+    if (!items.length) continue;
+    drawer.appendChild(buildToggleGroup(s.name || i18n("Без названия"), items, card.entryIds || [], (ids) => {
+      const others = (card.entryIds || []).filter((id) => !items.some((e) => e.id === id));
+      card.entryIds = [...others, ...ids];
+      if (!card.entryIds.length) delete card.entryIds;
+      persist();
+      draw();
+    }, () => s.color || "#7d6a9e"));
+  }
 
   // Чек-лист — что сделать по этой карточке; на лицевой стороне — «2/5».
   const check = document.createElement("div");

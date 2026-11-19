@@ -3,7 +3,7 @@ import { migrateBoards } from "./board-data.js";
 import { escapeHtml, buildEmptyState } from "./chips.js";
 import { iconSvg } from "./icons.js";
 import { i18n, i18nPlural } from "./i18n.js";
-import { reattachKin, reattachCharacter, reattachLocation, reattachFaction } from "./cascade.js";
+import { reattachKin, reattachCharacter, reattachLocation, reattachFaction, reattachEntry } from "./cascade.js";
 
 // Корзина ничего не выкидывает сама: раньше после 200 записей самые старые
 // молча пропадали навсегда. Теперь при большой корзине панель только
@@ -153,6 +153,7 @@ async function restoreSectionEntry(entry) {
   }
   data.entries.push(item);
   await apiPost("/api/entries", data);
+  await reattachEntry(item.id, entry.links);
   document.dispatchEvent(new CustomEvent("fictaris:sections-changed"));
 }
 

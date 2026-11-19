@@ -1,4 +1,5 @@
 import { apiGet, apiPost, uid } from "./api.js";
+import { loadEntries, entryViews } from "./sections.js";
 import { debounceSave } from "./save-badge.js";
 import { escapeHtml, buildEmptyState } from "./chips.js";
 import { iconSvg } from "./icons.js";
@@ -32,7 +33,7 @@ import { buildBoard, edgeGeometry } from "./canvas-board.js";
 let data = { order: [], canvases: {} };
 let chapters = [];
 let books = []; // manuscript.books — ради подписи книги у главы (chapterLabel)
-let world = { characters: [], locations: [], factions: [] }; // карточки «Из мира»
+let world = { characters: [], locations: [], factions: [], entries: [] }; // карточки «Из мира»
 let activeId = null;
 let focusCardId = null;
 let container = null;
@@ -126,7 +127,7 @@ export async function renderCanvas(root, focus) {
     apiGet("/api/locations"),
     apiGet("/api/factions"),
   ]);
-  world = { characters, locations, factions };
+  world = { characters, locations, factions, entries: entryViews(await loadEntries()) };
   if (!Array.isArray(data.order)) data.order = [];
   if (!data.canvases || typeof data.canvases !== "object") data.canvases = {};
   if (activeId && !data.canvases[activeId]) activeId = null;
