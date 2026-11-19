@@ -266,6 +266,16 @@ function linkForms(kind, id, name) {
 
 const ENTITY_KIND = { place: "location", faction: "faction", entry: "entry" };
 
+// Ссылку из текста — в правую половину экрана (split.js).
+function openNear(span) {
+  const detail = span.classList.contains("re-link")
+    ? { type: ENTITY_KIND[span.dataset.kind], id: span.dataset.id }
+    : { type: "character", id: span.dataset.charId || characters.find((c) => c.name === span.dataset.name)?.id };
+  if (detail.id) document.dispatchEvent(new CustomEvent("fictaris:open-split", { detail }));
+}
+
+const openSplitTab = (type, id) => document.dispatchEvent(new CustomEvent("fictaris:open-split", { detail: { type, id } }));
+
 function linkEntity(kind, id) {
   const list = kind === "place" ? locations : kind === "entry" ? entries : factions;
   return list.find((x) => x.id === id) || null;
@@ -362,6 +372,7 @@ function attachRichContextMenu(editor, chapter) {
                   ? document.dispatchEvent(new CustomEvent("fictaris:open-entity", { detail: { type: ENTITY_KIND[mention.dataset.kind], id: mention.dataset.id } }))
                   : document.dispatchEvent(new CustomEvent("fictaris:open-character", { detail: { id: mention.dataset.charId } })),
             },
+            { label: i18n("Открыть рядом"), action: () => openNear(mention) },
             {
               label: i18n("Убрать ссылку"),
               action: () => {
@@ -1574,6 +1585,25 @@ function buildEditorToolbar(chapter) {
       { label: i18n("Снимок версии"), icon: "camera", action: () => takeSnapshot(chapter) },
       { label: i18n("Знания"), icon: "lightbulb", action: () => openEntityModal("knowledge") },
       {
+        label: i18n("Открыть рядом"),
+        icon: "columns",
+        items: [
+          { label: i18n("Карта"), action: () => openSplitTab("map", null) },
+          {
+            label: i18n("Другая глава"),
+            items: manuscript.chapters.filter((c) => c.id !== chapter.id).map((c) => ({ label: c.title || i18n("Без названия"), action: () => openSplitTab("chapter", c.id) })),
+          },
+          {
+            label: i18n("Персонаж"),
+            items: characters.map((c) => ({ label: c.name || i18n("Без имени"), action: () => openSplitTab("character", c.id) })),
+          },
+          {
+            label: i18n("Место"),
+            items: locations.map((l) => ({ label: l.name || i18n("Без имени"), action: () => openSplitTab("location", l.id) })),
+          },
+        ],
+      },
+      {
         label: i18n("Размер шрифта: {n}px", { n: editorFontSize }),
         items: FONT_SIZE_PRESETS.map((size) => ({ label: `${size}px`, checked: size === editorFontSize, action: () => setFontSize(size) })),
       },
@@ -1691,7 +1721,8 @@ function buildEditor() {
         wc.textContent = wordsLine(chapter);
         persist();
       },
-      onMentionClick: (span) => openMentionPanel(span, editor),
+      // Ctrl+щелчок — открыть рядом, справа.
+      onMentionClick: (span, e) => (e && (e.ctrlKey || e.metaKey) ? openNear(span) : openMentionPanel(span, editor)),
     });
     richAutocomplete = attachRichAutocomplete(editor, () => ({ characters, locations, factions, entries }));
     attachMentionHoverPreview(editor.el, () => characters);

@@ -14,6 +14,7 @@ import { renderCanvas } from "./canvas.js";
 import { renderKnowledge } from "./knowledge.js";
 import { renderSection } from "./sections.js";
 import { renderPlotlines } from "./plotlines.js";
+import { initSplit } from "./split.js";
 import { fillWithDemoData, isProjectEmpty, maybeRunHistoryCleanup } from "./data-panel.js";
 import { renderSettings } from "./settings-panel.js";
 import { initProjectSwitcher } from "./project-switcher.js";
@@ -122,6 +123,7 @@ async function openModule(name, arg) {
   const requestId = ++openRequestId;
   currentModuleName = name;
   currentArg = arg;
+  document.dispatchEvent(new CustomEvent("fictaris:module-opened", { detail: { name } }));
   // Фокус-режим рукописи прячет сайдбар классом на body (manuscript.js) —
   // сбрасываем его при любом переключении модуля, иначе уйти со
   // страницы, скрывшей навигацию, можно было бы только через Esc.
@@ -212,6 +214,7 @@ initShortcuts((module) => openModule(module));
 initA11y();
 
 initEntityModal(MODULES);
+initSplit(MODULES);
 
 // Клик по @упоминанию в тексте главы (mentions.js), по персонажу в
 // «Отношениях» (graph.js) и похожим ссылкам — открывает карточку персонажа, а не

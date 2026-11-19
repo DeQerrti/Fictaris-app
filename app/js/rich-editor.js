@@ -412,7 +412,7 @@ export function createRichEditor(opts) {
     const m = e.target.closest?.(".re-mention, .re-link");
     if (m && el.contains(m)) {
       e.preventDefault();
-      opts.onMentionClick?.(m);
+      opts.onMentionClick?.(m, e);
     }
   });
 

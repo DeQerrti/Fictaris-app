@@ -43,6 +43,7 @@ export function closeEntityModal() {
   onCloseCb = null;
   cb?.();
   if (!wasOpen) return;
+  document.dispatchEvent(new CustomEvent("fictaris:entity-modal-closed"));
   // В окне что-то правили — раздел под ним держит в памяти старую копию
   // данных (например, «Отношения» — связи, которые удалили в досье) и
   // следующей своей правкой записал бы её поверх. Дописываем отложенные

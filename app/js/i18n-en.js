@@ -1523,4 +1523,13 @@ export const EN_DICT = {
   "Изменение с этой главы – новое значение поля анкеты": "Change from this chapter – a new profile value",
   "Сведения меняются по ходу сюжета? «+ Изменение с главы» – и досье покажет, каким персонаж стал к выбранной главе.": "Do details change during the story? “+ Change from chapter” – and the dossier shows the character as of the chosen chapter.",
   "знает {n} тайн из {total}": "knows {n} secret of {total}|knows {n} secrets of {total}",
+  "Открыть рядом": "Open alongside",
+  "Другая глава": "Another chapter",
+  "Закрыть вкладку": "Close tab",
+  "Закрыть панель": "Close panel",
+  "Главы уже нет.": "The chapter no longer exists.",
+  "только чтение": "read only",
+  "Писать здесь": "Write here",
+  "Открыть эту главу слева, в редакторе": "Open this chapter on the left, in the editor",
+  "Потяните, чтобы поменять ширину": "Drag to change the width",
 };
